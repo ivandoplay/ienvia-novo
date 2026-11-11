@@ -1,0 +1,126 @@
+/* ==========================================================================
+   Ienvia — cores, cantos, sombras e camadas (os "tokens" do visual)
+   Tema escuro é o padrão. O claro liga com <html data-theme="light">.
+   Qualquer cor nova do painel deve nascer aqui, nunca solta no meio de uma tela.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+  accent-color: #10b981;
+
+  /* Curvas de animação */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.2, 0.75, 0.25, 1);
+
+  /* Fundos, do mais profundo ao mais elevado */
+  --bg-app: #080e13;
+  --bg-sidebar: #0d151d;
+  --bg-card: #111c26;
+  --bg-card-subtle: #15232e;
+  --bg-elevated: #1b2b37;
+  --bg-input: #0b141c;
+
+  /* Linhas */
+  --border: #20313d;
+  --border-strong: #304653;
+
+  /* Texto */
+  --text-main: #edf5f4;
+  --text-secondary: #a0b2ba;
+  --text-muted: #71858e;
+
+  /* Verde da marca */
+  --accent: #10b981;
+  --accent-bright: #4adea7;
+  --accent-soft: rgba(16, 185, 129, 0.13);
+  --accent-border: rgba(74, 222, 167, 0.28);
+  --on-accent: #ffffff;
+
+  /* Cores de aviso */
+  --ring: #3b82f6;
+  --info: #3b82f6;
+  --info-soft: rgba(59, 130, 246, 0.13);
+  --warning: #d97706;
+  --warning-bright: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.13);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.14);
+
+  /* Conversa no estilo do WhatsApp (usado pela Inbox) */
+  --wa-canvas: #0b141a;
+  --wa-header: #18232c;
+  --wa-incoming: #1f2c34;
+  --wa-incoming-text: #f1f5f9;
+  --wa-outgoing: #005c4b;
+  --wa-outgoing-text: #f8fafc;
+  --wa-owner: #1e3a8a;
+
+  /* Cantos e sombras */
+  --radius-xl: 20px;
+  --radius-lg: 15px;
+  --radius-md: 11px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 2px 9px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 16px 38px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.48);
+  --shadow-glow: 0 0 0 1px rgba(52, 211, 153, 0.08), 0 14px 36px rgba(0, 0, 0, 0.18);
+
+  /* Camadas (quem fica por cima de quem) */
+  --z-sticky: 30;
+  --z-sidebar: 40;
+  --z-topbar: 60;
+  --z-bottomnav: 90;
+  --z-drawer-backdrop: 119;
+  --z-drawer: 120;
+  --z-popover: 150;
+  --z-modal: 340;
+  --z-toast: 620;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  accent-color: #059669;
+
+  --bg-app: #f1f6f5;
+  --bg-sidebar: #fbfdfc;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f5f9f8;
+  --bg-elevated: #eaf2ef;
+  --bg-input: #ffffff;
+
+  --border: #dce7e3;
+  --border-strong: #c5d5cf;
+
+  --text-main: #14252a;
+  --text-secondary: #52696b;
+  /* Um pouco mais escuro que no painel antigo (#788d8e), para o texto pequeno passar no contraste mínimo (4,5:1). */
+  --text-muted: #5f7476;
+
+  --accent: #059669;
+  --accent-bright: #047857;
+  --accent-soft: rgba(5, 150, 105, 0.09);
+  --accent-border: rgba(5, 150, 105, 0.24);
+  --on-accent: #ffffff;
+
+  --ring: #2563eb;
+  --info: #2563eb;
+  --info-soft: rgba(37, 99, 235, 0.09);
+  --warning: #b45309;
+  --warning-bright: #d97706;
+  --warning-soft: rgba(217, 119, 6, 0.1);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.09);
+
+  --wa-canvas: #efeae2;
+  --wa-header: #008069;
+  --wa-incoming: #ffffff;
+  --wa-incoming-text: #0f172a;
+  --wa-outgoing: #d9fdd3;
+  --wa-outgoing-text: #0f172a;
+  --wa-owner: #dbeafe;
+
+  --shadow-sm: 0 2px 8px rgba(24, 54, 45, 0.045);
+  --shadow-md: 0 14px 34px rgba(24, 54, 45, 0.09);
+  --shadow-lg: 0 24px 54px rgba(15, 23, 42, 0.16);
+  --shadow-glow: 0 0 0 1px rgba(5, 150, 105, 0.04), 0 12px 28px rgba(24, 54, 45, 0.07);
+}

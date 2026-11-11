@@ -1,0 +1,18 @@
+{
+  "_leiame": "Retrato do esquema do banco REAL (Supabase \"Ienvia\"), tirado com impressao-digital.sql. O teste esquema.test.ts compara este retrato com o banco montado a partir das migrações do Git. Ao aplicar uma migração nova no banco real, rode o SQL lá de novo e atualize este arquivo.",
+  "projeto": "jazvdlkyvwquoednmljf",
+  "tirado_em": "2026-11-11",
+  "ultima_migracao": "20261109154324_evolution_webhook_ingest.sql",
+  "categorias": {
+    "colunas": { "itens": 230, "md5": "fbb03604c2cd7478e356561439c2b1e9" },
+    "funcoes": { "itens": 14, "md5": "7cb1c46ccb728ff656210dca9feb53f0" },
+    "gatilhos": { "itens": 7, "md5": "9fba7eb6ce37515604b87c191cc6fd4e" },
+    "indices": { "itens": 77, "md5": "b5b130eb41e0bb0cdc004448b14719b5" },
+    "permissoes_coluna": { "itens": 35, "md5": "d12b54668087ea2b4407eb089bce25f2" },
+    "permissoes_funcao": { "itens": 42, "md5": "e4dc3f97765711aec21a5f93e4361386" },
+    "permissoes_tabela": { "itens": 186, "md5": "cec35b111645768c19e74c2ba25fd353" },
+    "politicas": { "itens": 32, "md5": "bd191e4037e9c5bad83bb01bc7d8e52d" },
+    "restricoes": { "itens": 142, "md5": "26dc1aed2e6dea26567ca811abab615e" },
+    "rls_ligado": { "itens": 23, "md5": "cbd76d267ad9c77fd49675b2bd01b0f7" }
+  }
+}

@@ -1,0 +1,63 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { apelidoDoLogin, iniciais } from '@ienvia/shared';
+import { Casca } from '@/components/casca/casca';
+import { ConfiguracaoPendente } from '@/components/configuracao-pendente';
+import { resumirInstancias } from '@/lib/dados/visao-geral';
+import { lerConfigSupabase } from '@/lib/env';
+import { resumoDeConexao } from '@/lib/formato';
+import { menuParaUsuario } from '@/lib/navegacao';
+import { obterSessao, rotuloDoPapel } from '@/lib/sessao';
+import { COOKIE_TEMA, lerTema } from '@/lib/tema';
+
+/** Moldura de todas as abas do painel. Só entra quem está logado. */
+export default async function LayoutDoPainel({ children }: { children: ReactNode }) {
+  if (!lerConfigSupabase()) return <ConfiguracaoPendente />;
+
+  const sessao = await obterSessao();
+  if (!sessao) redirect('/login');
+
+  const workspace = sessao.workspaceAtivo;
+  const instancias = workspace ? await resumirInstancias(workspace.id) : null;
+  const conexao = instancias
+    ? resumoDeConexao(instancias.conectadas, instancias.total)
+    : { texto: 'Sem informação', conectado: false };
+
+  const cookieStore = await cookies();
+
+  return (
+    <Casca
+      menu={menuParaUsuario(sessao.ehMaster)}
+      usuario={{
+        nome: sessao.usuario.nome,
+        login: sessao.usuario.login,
+        apelido: apelidoDoLogin(sessao.usuario.login),
+        iniciais: iniciais(sessao.usuario.nome),
+        papel: rotuloDoPapel(sessao),
+      }}
+      workspace={workspace?.nome ?? 'Nenhum workspace'}
+      conexao={conexao}
+      temaInicial={lerTema(cookieStore.get(COOKIE_TEMA)?.value)}
+    >
+      {workspace ? children : <SemWorkspace />}
+    </Casca>
+  );
+}
+
+/** A conta existe, mas ainda não foi ligada a nenhuma empresa. */
+function SemWorkspace() {
+  return (
+    <div className="apoio">
+      <div className="page-header">
+        <div>
+          <h1>Sua conta ainda não tem um workspace</h1>
+          <p>
+            O login funcionou, mas esta conta não está ligada a nenhuma empresa. Peça ao administrador da plataforma
+            para liberar o seu acesso.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

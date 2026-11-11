@@ -1,0 +1,8 @@
+/* A ordem importa: cores primeiro, depois a base, as peças e por fim cada tela. */
+@import '../styles/tokens.css';
+@import '../styles/base.css';
+@import '../styles/componentes.css';
+@import '../styles/casca.css';
+@import '../styles/login.css';
+@import '../styles/visao-geral.css';
+@import '../styles/apoio.css';

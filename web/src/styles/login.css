@@ -1,0 +1,125 @@
+/* ==========================================================================
+   Tela de login
+   ========================================================================== */
+
+.tela-login {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--bg-app);
+  overflow-y: auto;
+}
+
+.saas-login-card {
+  width: 100%;
+  max-width: 430px;
+  margin: 0;
+  padding: 28px 26px;
+  text-align: left;
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  background: linear-gradient(150deg, var(--bg-card), var(--bg-sidebar));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.32);
+}
+
+.login-marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.saas-login-card .brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+}
+
+.login-titulo {
+  margin: 0;
+  font-size: 25px;
+  letter-spacing: -0.045em;
+}
+
+.login-subtitulo {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.saas-login-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 12px 0 18px;
+}
+
+.saas-login-pill {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.login-descricao {
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-form .form-group {
+  margin: 0;
+}
+
+.login-form .aviso {
+  margin-bottom: 0;
+}
+
+.login-senha-linha {
+  display: flex;
+  gap: 8px;
+}
+
+.login-senha-linha input {
+  flex: 1;
+}
+
+.login-olho {
+  min-width: 44px;
+  padding: 0 12px;
+}
+
+.login-entrar {
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.login-rodape {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .saas-login-card {
+    margin: 14px;
+    padding: 22px 18px;
+  }
+}

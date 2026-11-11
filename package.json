@@ -1,0 +1,32 @@
+{
+  "name": "ienvia",
+  "version": "6.0.0-alpha.0",
+  "private": true,
+  "description": "Ienvia — atendimento inteligente e CRM para WhatsApp (reescrita limpa do ZAP-IA Studio)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "shared",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "start": "npm run start -w web",
+    "check": "npm run check -w shared && npm run check -w web && tsc --noEmit -p supabase/tsconfig.json",
+    "lint": "npm run lint -w web",
+    "test": "vitest run",
+    "test:unit": "vitest run --project shared --project web",
+    "test:db": "vitest run --project banco",
+    "test:e2e": "npm run test:e2e -w web",
+    "verificar": "npm run check && npm run lint && npm test && npm run build && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0"
+  }
+}

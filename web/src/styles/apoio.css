@@ -1,0 +1,119 @@
+/* ==========================================================================
+   Telas de apoio: aba em construção, página não encontrada, erro e
+   configuração pendente.
+   ========================================================================== */
+
+.apoio {
+  max-width: 720px;
+}
+
+.apoio-fase {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 5px 11px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.apoio-texto {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.apoio-texto + .apoio-texto {
+  margin-top: 10px;
+}
+
+.apoio-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.apoio-tela-cheia {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.apoio-tela-cheia .panel {
+  width: 100%;
+  max-width: 520px;
+  margin: 0;
+  padding: 26px;
+}
+
+.apoio-tela-cheia h1 {
+  margin-bottom: 8px;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.apoio-lista {
+  margin: 12px 0 0 18px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+/* ---------- Carregando (esqueleto) ---------- */
+
+.carregando {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.esqueleto {
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--bg-card) 0%, var(--bg-elevated) 50%, var(--bg-card) 100%);
+  background-size: 200% 100%;
+  animation: esqueleto-brilho 1.4s ease-in-out infinite;
+}
+
+.esqueleto--titulo {
+  width: min(320px, 60%);
+  height: 30px;
+}
+
+.esqueleto--linha {
+  width: min(520px, 85%);
+  height: 14px;
+}
+
+.esqueleto-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.esqueleto--cartao {
+  height: 132px;
+  border: 1px solid var(--border);
+}
+
+@keyframes esqueleto-brilho {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto {
+    animation: none;
+  }
+}

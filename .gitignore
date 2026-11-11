@@ -1,0 +1,32 @@
+# dependências e builds
+node_modules/
+.next/
+.next-e2e/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# segredos — NUNCA versionar
+.env
+.env.*
+!.env.example
+
+# testes
+test-results/
+playwright-report/
+.playwright/
+
+# sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# Vercel / Supabase local
+.vercel/
+supabase/.temp/
+supabase/.branches/

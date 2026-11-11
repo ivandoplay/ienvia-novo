@@ -1,0 +1,461 @@
+/* ==========================================================================
+   Peças reutilizáveis: ícone, botão, painel, cabeçalho de página, formulário,
+   pílula de status, contador, folha de ações e estado vazio.
+   ========================================================================== */
+
+/* ---------- Ícone ---------- */
+
+.icon-svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-svg.icon-15 {
+  width: 15px;
+  height: 15px;
+}
+
+/* ---------- Botões ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-shrink: 0;
+  min-height: 37px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 680;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  background-image: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 78%, #34d399 22%));
+  color: var(--on-accent);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 5px 15px rgba(5, 150, 105, 0.17);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 8px 22px rgba(5, 150, 105, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--bg-elevated);
+}
+
+.btn-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.btn-sm {
+  padding: 5px 11px;
+  font-size: 12px;
+}
+
+.btn-icon-only {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+/* ---------- Cabeçalho de página ---------- */
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 23px;
+}
+
+.page-header h1 {
+  color: var(--text-main);
+  font-size: clamp(22px, 2.1vw, 29px);
+  font-weight: 780;
+  letter-spacing: -0.045em;
+  line-height: 1.16;
+}
+
+.page-header p {
+  max-width: 760px;
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+/* ---------- Painel (cartão de conteúdo) ---------- */
+
+.panel {
+  min-width: 0;
+  padding: 19px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(155deg, var(--bg-card), color-mix(in srgb, var(--bg-card) 94%, var(--accent) 6%));
+  box-shadow: var(--shadow-sm);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.panel-title {
+  min-width: 0;
+  color: var(--text-main);
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.panel-desc {
+  max-width: 75ch;
+  margin-bottom: 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+/* ---------- Formulário ---------- */
+
+.form-group {
+  min-width: 0;
+  margin-bottom: 14px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+  font-size: 12.8px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- Pílula de status ---------- */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 260px;
+  height: 32px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-pill > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.status-pill.connected {
+  border-color: var(--accent-border);
+  color: var(--text-main);
+}
+
+.status-pill.connected .status-dot {
+  background: var(--accent-bright);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.status-pill.connecting .status-dot {
+  background: var(--warning-bright);
+}
+
+/* ---------- Contador (bolinha com número) ---------- */
+
+.badge-count {
+  min-width: 20px;
+  height: 19px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Folha de ações (menu da conta) ---------- */
+
+.action-sheet {
+  width: min(340px, calc(100% - 40px));
+  max-width: none;
+  margin: 62px 20px auto auto;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--bg-sidebar);
+  color: var(--text-main);
+  box-shadow: var(--shadow-lg);
+}
+
+.action-sheet[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-sheet::backdrop {
+  background: rgba(9, 14, 20, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.sheet-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-identidade {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-nome {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-papel {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-item-btn {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.sheet-item-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.sheet-item-btn.danger {
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.3);
+  background: var(--danger-soft);
+}
+
+.sheet-item-esquerda {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.sheet-item-dica {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* ---------- Estado vazio ---------- */
+
+.empty-state {
+  padding: 28px 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.empty-state strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ---------- Aviso em linha (erro, atenção) ---------- */
+
+.aviso {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.aviso--erro {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--danger);
+}
+
+.aviso--atencao {
+  background: var(--warning-soft);
+  border-color: rgba(245, 158, 11, 0.34);
+  color: var(--warning-bright);
+}
+
+/* ---------- Celular ---------- */
+
+@media (max-width: 900px) {
+  .btn {
+    padding: 10px 16px;
+  }
+
+  .btn-sm {
+    padding: 7px 12px;
+  }
+
+  .btn-icon-only {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+
+  .page-header {
+    gap: 11px;
+    margin-bottom: 17px;
+  }
+
+  .panel {
+    padding: 15px;
+    border-radius: 13px;
+  }
+
+  .status-pill {
+    max-width: 108px;
+    height: 29px;
+    min-height: 29px;
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+
+  .action-sheet {
+    width: 100%;
+    margin: auto 0 0;
+    padding: 16px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .page-header h1 {
+    font-size: 21px;
+  }
+
+  .panel {
+    padding: 13px;
+  }
+}
+
+@media (max-width: 360px) {
+  .status-pill {
+    max-width: 98px;
+  }
+}

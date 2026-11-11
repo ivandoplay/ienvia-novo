@@ -1,0 +1,660 @@
+/* ==========================================================================
+   Casca do painel: menu lateral, barra do topo, área de conteúdo e a
+   navegação do celular (gaveta + barra inferior).
+   No celular (até 900px de largura) o menu lateral vira uma gaveta.
+   ========================================================================== */
+
+.casca {
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---------- Menu lateral ---------- */
+
+.sidebar {
+  position: relative;
+  width: 264px;
+  flex: 0 0 264px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  box-shadow: 10px 0 34px rgba(0, 0, 0, 0.055);
+  z-index: var(--z-sidebar);
+  user-select: none;
+}
+
+.brand {
+  height: 72px;
+  flex-shrink: 0;
+  padding: 0 17px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brand-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-textos {
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #10b981, #047857);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 5px 20px rgba(16, 185, 129, 0.22);
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.brand-mark--pequena {
+  width: 28px;
+  height: 28px;
+}
+
+.brand-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-sub {
+  font-size: 10px;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.nav-menu {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 11px 18px;
+}
+
+.nav-group-label {
+  padding: 17px 11px 7px;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.nav-group-label:first-child {
+  padding-top: 2px;
+}
+
+.nav-btn {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 11px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 570;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.nav-btn-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-card-subtle);
+  border-color: var(--border);
+}
+
+.nav-btn.active {
+  position: relative;
+  color: var(--accent-bright);
+  font-weight: 600;
+  border-color: var(--accent-border);
+  background: linear-gradient(100deg, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0.045));
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.025);
+}
+
+/* Barrinha verde que marca a aba aberta. */
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  width: 3px;
+  height: 19px;
+  border-radius: 5px;
+  background: var(--accent-bright);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.45);
+  transform: translateY(-50%);
+}
+
+.nav-section {
+  margin: 2px 0;
+  border-radius: 12px;
+}
+
+.nav-section-toggle {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.nav-section-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.nav-section-toggle:hover {
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+}
+
+.nav-section-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-section-toggle .icon-svg {
+  width: 17px;
+  height: 17px;
+}
+
+.nav-section-toggle .nav-section-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  transition: transform 160ms ease;
+}
+
+.nav-section[open] .nav-section-chevron {
+  transform: rotate(180deg);
+}
+
+.nav-section-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 4px 12px;
+  padding: 3px 0 5px 8px;
+  border-left: 1px solid var(--border);
+}
+
+.nav-section-items .nav-btn {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
+.nav-section-items .icon-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.active-profile-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--bg-card), var(--bg-card-subtle));
+  padding: 11px 12px;
+}
+
+.active-profile-label {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.active-profile-name {
+  margin-top: 4px;
+  color: var(--text-main);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Fundo escurecido atrás da gaveta (só existe no celular). */
+.sidebar-drawer-backdrop {
+  display: none;
+}
+
+/* ---------- Coluna principal ---------- */
+
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100dvh;
+  background:
+    radial-gradient(ellipse at 82% -15%, rgba(16, 185, 129, 0.065), transparent 39%),
+    var(--bg-app);
+}
+
+.topbar {
+  height: 68px;
+  min-height: 68px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 0 clamp(16px, 2.3vw, 32px);
+  background: color-mix(in srgb, var(--bg-sidebar) 91%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(18px) saturate(140%);
+  z-index: var(--z-topbar);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 39px;
+  height: 39px;
+  flex: 0 0 39px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text-main);
+  background: var(--bg-card);
+  cursor: pointer;
+}
+
+.sidebar-toggle-btn:hover {
+  border-color: var(--accent-border);
+  color: var(--accent-bright);
+}
+
+.mob-topbar-brand {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mob-topbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-trigger-btn {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.account-trigger-btn:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-card-subtle);
+}
+
+.account-trigger-label {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-avatar-dot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-bright);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.account-trigger-btn .account-seta {
+  width: 13px;
+  height: 13px;
+  color: var(--text-muted);
+}
+
+.content-area {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: clip;
+  padding: 29px clamp(18px, 3vw, 42px) 48px;
+}
+
+/* Largura máxima do conteúdo de cada aba. */
+.pagina {
+  width: 100%;
+  max-width: 1580px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
+/* Barra inferior do celular (escondida em telas grandes). */
+.mobile-bottom-nav {
+  display: none;
+}
+
+/* ---------- Telas médias ---------- */
+
+@media (min-width: 901px) and (max-width: 1100px) {
+  .sidebar {
+    width: 238px;
+    flex-basis: 238px;
+  }
+
+  .content-area {
+    padding-inline: 22px;
+  }
+}
+
+@media (min-width: 1500px) {
+  .pagina {
+    max-width: 1640px;
+  }
+
+  .content-area {
+    padding-inline: 44px;
+  }
+}
+
+/* ---------- Celular e tablet em pé: menu vira gaveta ---------- */
+
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(304px, 86vw);
+    height: 100dvh;
+    max-height: 100dvh;
+    flex: none;
+    overflow: hidden;
+    transform: translateX(-105%);
+    transition: transform 260ms var(--ease-drawer);
+    z-index: var(--z-drawer);
+    box-shadow: 22px 0 65px rgba(0, 0, 0, 0.34);
+  }
+
+  .sidebar.drawer-open {
+    transform: translateX(0);
+  }
+
+  .nav-menu {
+    overscroll-behavior: contain;
+    padding-bottom: 28px;
+  }
+
+  .sidebar-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-drawer-backdrop);
+    background: rgba(3, 9, 12, 0.62);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    backdrop-filter: blur(3px);
+    transition:
+      opacity 220ms ease,
+      visibility 220ms ease;
+  }
+
+  .sidebar-drawer-backdrop.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .sidebar-toggle-btn {
+    display: inline-flex;
+  }
+
+  .main-wrapper {
+    width: 100%;
+    min-height: 0;
+  }
+
+  .topbar {
+    height: calc(60px + env(safe-area-inset-top, 0px));
+    min-height: calc(60px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 13px 0;
+    gap: 8px;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .mob-topbar-brand {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .account-trigger-label {
+    display: none;
+  }
+
+  .account-trigger-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .content-area {
+    min-height: 0;
+    overscroll-behavior: contain;
+    padding: 19px 14px calc(82px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.14);
+    z-index: var(--z-bottomnav);
+  }
+
+  .mob-nav-btn {
+    position: relative;
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 2px;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      color 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .mob-nav-btn .icon-svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .mob-nav-btn.active {
+    color: var(--accent-bright);
+    background: var(--accent-soft);
+  }
+
+  .mob-nav-btn:active {
+    transform: scale(0.96);
+  }
+
+  .mob-badge {
+    position: absolute;
+    top: 3px;
+    right: 14%;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #ffffff;
+    font-size: 9.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (max-width: 560px) {
+  .content-area {
+    padding-inline: 11px;
+  }
+
+  .sidebar-toggle-btn {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+}
+
+@media (max-width: 360px) {
+  .mob-topbar-title {
+    font-size: 13.5px;
+  }
+
+  .mob-nav-btn {
+    font-size: 9.8px;
+  }
+}
