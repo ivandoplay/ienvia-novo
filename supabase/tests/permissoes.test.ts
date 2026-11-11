@@ -136,19 +136,7 @@ describe('o que cada pessoa PODE fazer', () => {
     }
   });
 
-  test('só a dona cadastra um chip — e ele nasce desligado, sem IA respondendo', async () => {
-    await banco.comoUsuario(ATENDENTE_A, async () => {
-      expect(
-        await banco.esperarErro(executar(`select public.register_my_evolution_instance('${LOJA_A}', 'Chip da atendente', 'zap-ia-teste-slot_2')`)),
-      ).toMatch(/Workspace owner required/);
-    });
-    await banco.comoUsuario(DONA_A, async () => {
-      const r = await banco.db.query<{ resultado: { status: string; is_enabled: boolean; engine: string } }>(
-        `select public.register_my_evolution_instance('${LOJA_A}', 'Chip novo', 'zap-ia-teste-slot_2') as resultado`,
-      );
-      expect(r.rows[0]?.resultado).toMatchObject({ status: 'disconnected', is_enabled: false, engine: 'evolution' });
-    });
-  });
+  // Quem pode criar, renomear, conferir e remover chips: ver instancias.test.ts.
 
   test('só o administrador da plataforma é reconhecido como master', async () => {
     const souMaster = async () => (await banco.db.query<{ sim: boolean }>('select public.is_my_platform_master() as sim')).rows[0]?.sim;
