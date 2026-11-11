@@ -27,6 +27,8 @@ export class ErroEvolution extends Error {
     readonly motivo: MotivoDoErro,
     mensagem: string,
     readonly status?: number,
+    /** O que a Evolution respondeu junto com o erro (já lido como JSON), quando houve resposta. */
+    readonly corpo?: unknown,
   ) {
     super(mensagem);
     this.name = 'ErroEvolution';
@@ -48,7 +50,16 @@ export interface Aviso {
 }
 
 const TEMPO_LIMITE_PADRAO = 15_000;
-const EVENTOS_DO_AVISO = ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'];
+/** Enviar uma mensagem pode demorar mais que uma consulta; passado isto, o envio fica "sem confirmação". */
+const TEMPO_LIMITE_DO_ENVIO = 25_000;
+
+/**
+ * O que a Evolution avisa ao painel:
+ *   MESSAGES_UPSERT   — mensagem que chegou, ou que foi digitada direto no celular do chip;
+ *   SEND_MESSAGE      — mensagem que saiu pela Evolution (é o "eco" do que o painel enviou);
+ *   CONNECTION_UPDATE — chip conectou ou caiu.
+ */
+export const EVENTOS_DO_AVISO = ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] as const;
 
 function extrairMensagem(dado: unknown): string {
   if (dado && typeof dado === 'object') {
@@ -97,10 +108,10 @@ async function chamar<T>(
   if (resposta.ok) return dado as T;
 
   const mensagem = extrairMensagem(dado);
-  if (resposta.status === 404) throw new ErroEvolution('nao_encontrada', mensagem, 404);
-  if (resposta.status === 403 && /already in use/i.test(mensagem)) throw new ErroEvolution('nome_em_uso', mensagem, 403);
-  if (resposta.status >= 500) throw new ErroEvolution('incerta', mensagem, resposta.status);
-  throw new ErroEvolution('recusada', mensagem, resposta.status);
+  if (resposta.status === 404) throw new ErroEvolution('nao_encontrada', mensagem, 404, dado);
+  if (resposta.status === 403 && /already in use/i.test(mensagem)) throw new ErroEvolution('nome_em_uso', mensagem, 403, dado);
+  if (resposta.status >= 500) throw new ErroEvolution('incerta', mensagem, resposta.status, dado);
+  throw new ErroEvolution('recusada', mensagem, resposta.status, dado);
 }
 
 const nomeNoCaminho = (nome: string) => encodeURIComponent(nome);
@@ -119,7 +130,7 @@ function corpoDoAviso(aviso: Aviso) {
     byEvents: false,
     base64: false,
     headers: { Authorization: `Bearer ${aviso.token}` },
-    events: EVENTOS_DO_AVISO,
+    events: [...EVENTOS_DO_AVISO],
   };
 }
 
@@ -169,11 +180,27 @@ export async function consultarChip(nome: string): Promise<{ estado: EstadoNaEvo
   return { estado, telefone: estado === 'open' ? telefoneDoJid(chip.ownerJid) : null };
 }
 
+export interface AvisoConfigurado {
+  url: string;
+  ligado: boolean;
+  /** Quais acontecimentos a Evolution avisa hoje para este chip. */
+  eventos: string[];
+}
+
 /** Para onde a Evolution está mandando os avisos deste chip. `null` se não houver aviso configurado. */
-export async function consultarAviso(nome: string): Promise<{ url: string; ligado: boolean } | null> {
-  const resposta = await chamar<{ url?: unknown; enabled?: unknown } | null>('GET', `/webhook/find/${nomeNoCaminho(nome)}`);
+export async function consultarAviso(nome: string): Promise<AvisoConfigurado | null> {
+  const resposta = await chamar<{ url?: unknown; enabled?: unknown; events?: unknown } | null>(
+    'GET',
+    `/webhook/find/${nomeNoCaminho(nome)}`,
+  );
   if (!resposta || typeof resposta.url !== 'string' || !resposta.url) return null;
-  return { url: resposta.url, ligado: resposta.enabled === true };
+  const eventos = Array.isArray(resposta.events) ? resposta.events.filter((evento): evento is string => typeof evento === 'string') : [];
+  return { url: resposta.url, ligado: resposta.enabled === true, eventos };
+}
+
+/** O aviso deste chip aponta para o endereço certo, está ligado e avisa tudo de que o painel precisa? */
+export function avisoEstaEmDia(atual: AvisoConfigurado | null, url: string): boolean {
+  return Boolean(atual && atual.url === url && atual.ligado && EVENTOS_DO_AVISO.every((evento) => atual.eventos.includes(evento)));
 }
 
 export async function configurarAviso(nome: string, aviso: Aviso): Promise<void> {
@@ -194,5 +221,56 @@ export async function apagarInstancia(nome: string): Promise<void> {
   } catch (erro) {
     if (erro instanceof ErroEvolution && erro.motivo === 'nao_encontrada') return;
     throw erro;
+  }
+}
+
+/**
+ * Como terminou um envio:
+ *   enviada     — a Evolution confirmou (com o identificador da mensagem no WhatsApp, quando ela informou);
+ *   nao_enviada — com certeza NÃO saiu, e por quê;
+ *   incerta     — não dá para saber se saiu. O painel nunca reenvia sozinho: quem decide é a pessoa
+ *                 (ou o aviso da própria Evolution, se ele chegar).
+ */
+export type ResultadoDoEnvio =
+  | { situacao: 'enviada'; idNoWhatsApp: string | null }
+  | { situacao: 'nao_enviada'; motivo: 'sem_whatsapp' | 'chip_nao_encontrado' | 'nao_configurada' | 'chave_recusada' }
+  | { situacao: 'incerta'; detalhe: string };
+
+/** A Evolution responde assim quando o número não existe no WhatsApp: { response: { message: [{ exists: false }] } }. */
+function numeroSemWhatsApp(corpo: unknown): boolean {
+  const mensagens = (corpo as { response?: { message?: unknown } } | null)?.response?.message;
+  return (
+    Array.isArray(mensagens) &&
+    mensagens.some((item) => typeof item === 'object' && item !== null && (item as { exists?: unknown }).exists === false)
+  );
+}
+
+/**
+ * Envia um texto por um chip. `numero` vai só com dígitos (código do país + DDD + número): é assim que a
+ * Evolution confere o número no WhatsApp, aceitando o celular brasileiro com e sem o nono dígito.
+ *
+ * Nunca lança erro. Atenção ao que a Evolution 2.3.7 faz: qualquer erro durante o envio vira "400", até os que
+ * acontecem depois de a mensagem já ter saído. Por isso só é "não enviada" o que dá para ter certeza; o resto é "incerta".
+ */
+export async function enviarTexto(
+  nome: string,
+  numero: string,
+  texto: string,
+  opcoes: { tempoLimite?: number } = {},
+): Promise<ResultadoDoEnvio> {
+  try {
+    const resposta = await chamar<{ key?: { id?: unknown } } | null>('POST', `/message/sendText/${nomeNoCaminho(nome)}`, {
+      corpo: { number: numero, text: texto },
+      tempoLimite: opcoes.tempoLimite ?? TEMPO_LIMITE_DO_ENVIO,
+    });
+    const id = resposta?.key?.id;
+    return { situacao: 'enviada', idNoWhatsApp: typeof id === 'string' && id.length >= 1 && id.length <= 200 ? id : null };
+  } catch (erro) {
+    if (!(erro instanceof ErroEvolution)) return { situacao: 'incerta', detalhe: 'erro inesperado ao chamar a Evolution' };
+    if (erro.motivo === 'nao_configurada') return { situacao: 'nao_enviada', motivo: 'nao_configurada' };
+    if (erro.status === 404) return { situacao: 'nao_enviada', motivo: 'chip_nao_encontrado' };
+    if (erro.status === 401 || erro.status === 403) return { situacao: 'nao_enviada', motivo: 'chave_recusada' };
+    if (erro.status === 400 && numeroSemWhatsApp(erro.corpo)) return { situacao: 'nao_enviada', motivo: 'sem_whatsapp' };
+    return { situacao: 'incerta', detalhe: erro.status ? `HTTP ${erro.status}: ${erro.message}` : erro.message };
   }
 }

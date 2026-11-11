@@ -7,7 +7,9 @@ Esta é a **reescrita limpa** do sistema antigo (`zap-ia-studio`). O plano compl
 as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do que sai está em
 [docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md).
 
-**Situação:** Fase 0 (fundação) pronta. Fase 1 em andamento: a aba **Instâncias** (conectar chips) e o recebimento das mensagens estão prontos; falta a tela da Inbox.
+**Situação:** Fase 0 (fundação) pronta. Fase 1 quase pronta e no ar: a aba **Instâncias** (conectar chips),
+o recebimento das mensagens e a **Inbox** com texto (ler, responder, resolver, buscar, ver por chip).
+Falta, da Fase 1, ver e enviar fotos, áudios e documentos.
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
@@ -45,9 +47,9 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 229 testes: login, menu, datas, chips, a conversa com a Evolution, os avisos de mensagem e as regras de acesso do banco. |
+| Regras e banco | `npm test` | 365 testes: login, menu, datas, chips, a Inbox, a conversa com a Evolution, os avisos de mensagem e as regras do banco (acesso, envio, eco, leitura). |
 | Montagem | `npm run build` | O painel monta para produção. |
-| Navegador | `npm run test:e2e` | 68 testes num navegador de verdade, em tela de computador e de celular. |
+| Navegador | `npm run test:e2e` | 127 testes num navegador de verdade, em tela de computador e de celular (mais 9 que só valem para uma das duas telas). |
 
 Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`.
 
@@ -59,8 +61,8 @@ Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`
 - **Retrato do banco real** (`impressao-digital.remoto.json`): um teste compara o banco montado a
   partir do Git com o banco real. Se alguém mudar o banco por fora, o teste acusa.
 - **Navegador** (`web/e2e`): usam um "Supabase de mentira" com contas inventadas e uma "Evolution
-  de mentira" que responde no mesmo formato da verdadeira. Nenhum teste encosta no banco real nem
-  cria chip de verdade no WhatsApp.
+  de mentira" que responde no mesmo formato da verdadeira. Nenhum teste encosta no banco real,
+  cria chip de verdade nem manda mensagem para ninguém.
 
 ## Regras da casa
 

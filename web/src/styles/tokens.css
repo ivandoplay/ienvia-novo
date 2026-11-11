@@ -45,6 +45,9 @@
   --warning-soft: rgba(245, 158, 11, 0.13);
   --danger: #ef4444;
   --danger-soft: rgba(239, 68, 68, 0.14);
+  /* Vermelho e amarelo para TEXTO pequeno: passam no contraste mínimo (4,5:1) sobre os fundos do painel. */
+  --danger-text: #f87171;
+  --warning-text: #f59e0b;
 
   /* Conversa no estilo do WhatsApp (usado pela Inbox) */
   --wa-canvas: #0b141a;
@@ -110,6 +113,8 @@
   --warning-soft: rgba(217, 119, 6, 0.1);
   --danger: #dc2626;
   --danger-soft: rgba(220, 38, 38, 0.09);
+  --danger-text: #b91c1c;
+  --warning-text: #92400e;
 
   --wa-canvas: #efeae2;
   --wa-header: #008069;

@@ -105,8 +105,8 @@ Cada fase só começa quando a anterior está com os testes passando.
 | Fase | Nome | O que entrega | Situação |
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
-| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido, função do chip, ligar/desligar. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, assumir e devolver para a IA, ficha básica do contato. Recebimento das mensagens. | **Em andamento.** Prontos em 11/11/2026, conferidos com a Evolution e o banco de verdade: a aba Instâncias e a porta de entrada das mensagens (texto; foto, áudio e documento entram como etiqueta). Falta: a tela da Inbox, responder, e gravar o que é enviado pelo próprio celular. |
-| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. | |
+| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Quase pronta.** No ar desde 11/11/2026 em `https://ienvia-novo.vercel.app`: Instâncias, recebimento das mensagens e a **Inbox com texto** (ler, responder, resolver, reabrir, buscar, ver por chip). **Falta: fotos, áudios e documentos** (hoje chegam como etiqueta, por exemplo "📷 Imagem", e ainda não dá para enviar). |
+| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
 | 5 | Campanhas e segurança | **Campanhas** com prévia, cadência segura, rodízio de chips, pausar/retomar. **Segurança**: anti-ban, fila segura, horário de atendimento, contatos ignorados, alerta no seu WhatsApp. | |
@@ -135,6 +135,35 @@ trocam de lugar sem prejuízo.
   - navegador: login, sair, navegação no computador e no celular, tema, página não encontrada;
   - acessibilidade: contraste e rótulos nas telas prontas, nos dois temas.
 
+### O que a Fase 1 entregou até aqui
+
+- **Instâncias**: adicionar chip (QR Code ou código de 8 dígitos), apelido, função, desconectar,
+  remover. Só o dono da conta mexe nos chips; cada conta tem um limite de chips.
+- **Recebimento**: a Evolution avisa o painel a cada mensagem que chega, a cada mensagem que sai e
+  quando um chip conecta ou cai. Cada chip tem um segredo próprio; aviso sem o segredo certo não
+  grava nada. Mensagem repetida não é gravada duas vezes.
+- **Inbox**:
+  - lista das conversas com as não lidas em destaque; filtros **Ativas**, **Não lidas**,
+    **Esperando você** e **Resolvidas**; **Ver por chip** (inclusive chips já removidos: é o antigo
+    Histórico); busca por nome, telefone ou texto da última mensagem;
+  - conversa aberta com as mensagens em balões, dizendo quem respondeu (você, a equipe, pelo
+    celular do chip e, na Fase 2, a IA); abrir marca como lida; mensagem nova entra sozinha, sem
+    recarregar a página (a tela confere a cada 4 segundos);
+  - responder com texto; **resolver** e **reabrir**; ficha básica do contato;
+  - no celular, a lista e a conversa ocupam a tela inteira, uma de cada vez.
+- **Regras do envio** (decididas nesta fase):
+  - qualquer pessoa ativa da empresa responde; chips continuam sendo só do dono;
+  - o painel **nunca reenvia sozinho**. Cada mensagem leva uma chave única criada no navegador;
+    pedido repetido com a mesma chave não gera segundo envio;
+  - quando a Evolution não confirma o envio, a mensagem fica **"sem confirmação"**: a pessoa
+    confere no WhatsApp do chip e marca "foi enviada" ou "não foi enviada". Se o aviso da
+    Evolution chegar depois, a mensagem é confirmada sozinha;
+  - conversa resolvida não recebe resposta, mas pode ser reaberta. Se o cliente escrever de novo
+    depois de resolvida, nasce uma conversa nova;
+  - o que é digitado direto no celular do chip também aparece na conversa;
+  - envio comum que deu certo não vai para o registro de auditoria (seria uma linha por
+    mensagem); falha, "sem confirmação", resolver e reabrir vão.
+
 ### Diferenças pequenas em relação ao visual do branch
 
 - O cartão "Na fila segura" virou "Contatos" até a fila existir (Fase 5).
@@ -143,7 +172,12 @@ trocam de lugar sem prejuízo.
   chip entram na Fase 2, junto com o atendente de IA: antes disso não haveria o que ligar.
   A busca (Ctrl+K) entra quando houver o que buscar.
 - No tema claro, o cinza do texto pequeno ficou um pouco mais escuro, para dar leitura
-  (o original não atingia o contraste mínimo recomendado).
+  (o original não atingia o contraste mínimo recomendado). Pelo mesmo motivo, os textos de erro
+  e de atenção ganharam um vermelho e um amarelo próprios para letra pequena.
+- A Inbox desta fase tem a lista, a conversa e a ficha básica. As abas internas do branch
+  (Contatos, Kanban, Coach IA), os filtros "Quentes" e "Retorno S19", a seleção em lote e o
+  botão "Nova" (começar conversa) ficam para a Fase 3 (CRM completo).
+- Na conversa, resposta de pessoa é azul e resposta da IA é verde, como no branch.
 
 ## 5. Migração dos dados (Fase 7)
 
@@ -179,14 +213,34 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 - **Conta de teste no banco novo.** Existe um usuário `teste-automatico` com uma empresa
   "Teste automático (pode apagar)". Serve para conferir as telas no ambiente de verdade sem usar a
   sua conta. Será apagado antes da virada.
-- **Publicação.** O projeto `ienvia-novo` foi criado na Vercel, mas ainda não está no ar: a
-  publicação ficou esperando você decidir em qual conta da Vercel o sistema vai morar.
-- **As mensagens só chegam com o painel publicado.** A Evolution avisa o painel pela internet, e o
-  endereço da prévia só abre para quem está na conversa. Por isso, na prévia o chip conecta mas as
-  mensagens não chegam (a aba Instâncias mostra esse alerta). Quando o painel for publicado, basta
-  abrir a aba Instâncias uma vez: cada chip passa a avisar o endereço novo sozinho.
-- **"Esperando você" na Visão geral.** Hoje conta só conversas marcadas como "aguardando humano".
-  Conversa nova com mensagem não lida ainda não entra nessa conta; isso é acertado junto com a Inbox.
+- **Publicação.** O painel está no ar em `https://ienvia-novo.vercel.app`, na conta atual da
+  Vercel (plano Hobby, que é para uso não comercial). Antes de ter clientes pagantes o projeto
+  precisa ir para o plano Pro, na mesma conta ou em outra; mudar depois é simples.
+  Enviar para o GitHub **não** publica sozinho: cada publicação é feita de propósito, depois dos
+  testes.
+- **Conectar os chips pelo endereço publicado.** A Evolution avisa o painel pela internet, e o
+  endereço da prévia só abre para quem está na conversa. Chip conectado pela prévia não entrega
+  mensagens. Se um chip foi conectado por outro endereço, basta abrir a aba Instâncias no endereço
+  publicado: cada chip passa a avisar o endereço certo sozinho.
+- **"Esperando você" (decidido).** O cartão da Visão geral e o filtro da Inbox fazem a mesma
+  conta: conversas em que a próxima resposta é de uma pessoa (novas, passadas pela IA ou já em
+  atendimento). Quando você responde, a conversa sai da conta até o cliente escrever de novo.
+- **Envio ainda não conferido com um chip de verdade.** O caminho inteiro foi conferido contra a
+  Evolution real até onde dá sem um WhatsApp conectado. Falta ver, com um chip seu conectado:
+  uma mensagem real chegando, uma resposta saindo e o aviso de "mensagem enviada" voltando.
+- **O que a Evolution responde quando o envio falha.** A Evolution 2.3.7 devolve o mesmo erro
+  ("400") para quase tudo, inclusive quando a mensagem já saiu e o problema foi depois. Por isso o
+  painel só diz "não enviada" quando tem certeza (número sem WhatsApp, chip que não existe mais,
+  chave recusada). No resto, fica "sem confirmação" e a pessoa decide.
+- **Mensagens novas aparecem por consulta, não por conexão permanente.** A Inbox aberta pergunta ao
+  painel a cada 4 segundos se algo mudou (só com a aba visível). É simples e resistente, mas cada
+  pergunta é uma chamada ao servidor. Com muitos atendentes ao mesmo tempo, vale trocar pelo canal
+  em tempo real do Supabase.
+- **Endereço de uma conversa depois do login.** Quem abre o endereço de uma conversa sem estar
+  logado volta, depois do login, para a Inbox, e não direto para aquela conversa.
+- **Botão verde com letra branca.** A cor da marca com letra branca não atinge o contraste mínimo
+  recomendado (o teste automático não acusa porque o fundo do botão é em degradê). Ficou como no
+  branch visual. Se quiser, dá para escurecer o verde dos botões ou usar letra escura.
 
 ## 7. Como saber que uma fase está pronta
 

@@ -22,6 +22,46 @@ function avisoDeMensagem(mudancas: { chave?: object; dados?: object; mensagem?: 
   };
 }
 
+describe('mensagem que saiu pela Evolution (o eco do que o painel enviou)', () => {
+  /** O aviso SEND_MESSAGE, no formato que a Evolution 2.3.7 monta depois de enviar. */
+  const avisoDeEnvio = (chave: object = {}) => ({
+    event: 'send.message',
+    instance: 'ienvia-9cedadf2-a1b2c3d4e5f6',
+    data: {
+      key: { remoteJid: '5585999990000@s.whatsapp.net', fromMe: true, id: '3EB0AAAABBBBCCCCDDDD', ...chave },
+      pushName: 'Você',
+      status: 'PENDING',
+      message: { conversation: 'Temos sim!' },
+      messageType: 'conversation',
+      messageTimestamp: 1794409200,
+      instanceId: 'fbd56426-7889-45c5-bb11-f8fdb1d51ff5',
+      source: 'unknown',
+    },
+  });
+
+  test('vira uma mensagem "de mim", endereçada ao contato', () => {
+    expect(interpretarAviso(avisoDeEnvio(), AGORA)).toEqual({
+      tipo: 'mensagem',
+      instancia: 'ienvia-9cedadf2-a1b2c3d4e5f6',
+      idDoEvento: '3EB0AAAABBBBCCCCDDDD',
+      remetente: '5585999990000@s.whatsapp.net',
+      nome: 'Você',
+      texto: 'Temos sim!',
+      quando: '2026-11-11T15:00:00.000Z',
+      deMim: true,
+    });
+  });
+
+  test('é sempre "de mim", mesmo que o campo fromMe não venha', () => {
+    expect(interpretarAviso(avisoDeEnvio({ fromMe: undefined }), AGORA)).toMatchObject({ tipo: 'mensagem', deMim: true });
+    expect(interpretarAviso({ ...avisoDeEnvio(), event: 'SEND_MESSAGE' }, AGORA)).toMatchObject({ tipo: 'mensagem', deMim: true });
+  });
+
+  test('envio para grupo fica de fora', () => {
+    expect(interpretarAviso(avisoDeEnvio({ remoteJid: '120363000000000000@g.us' }), AGORA).tipo).toBe('ignorado');
+  });
+});
+
 describe('mensagem que chegou', () => {
   test('texto simples vira uma mensagem com remetente, nome, texto e hora', () => {
     expect(interpretarAviso(avisoDeMensagem(), AGORA)).toEqual({

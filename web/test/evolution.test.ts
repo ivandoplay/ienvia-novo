@@ -8,15 +8,22 @@ import { CHAVE_DE_TESTE, CODIGO_DE_PAREAMENTO, criarEvolutionFalsa } from '../e2
 import {
   ErroEvolution,
   apagarInstancia,
+  avisoEstaEmDia,
   configurarAviso,
   consultarAviso,
   consultarChip,
   criarInstancia,
   desconectarInstancia,
+  enviarTexto,
   pedirQrCode,
 } from '@/lib/evolution/cliente';
 
-const servidor = criarEvolutionFalsa();
+const servidor = criarEvolutionFalsa({
+  instancias: [
+    { nome: 'ienvia-fixo-conectado', estado: 'open', telefone: '5585999990010' },
+    { nome: 'ienvia-fixo-desconectado', estado: 'close', telefone: null },
+  ],
+});
 let endereco = '';
 
 const controle = (caminho: string) => fetch(`${endereco}/controle/${caminho}`, { method: 'POST' });
@@ -57,12 +64,12 @@ describe('criar e conectar', () => {
     expect(qr.imagem).toMatch(/^data:image\/png;base64,/);
     expect(qr.codigoDePareamento).toBeNull();
 
-    const [instancia] = (await (await fetch(`${endereco}/controle/instancias`)).json()) as Array<{
+    const [instancia] = (await (await fetch(`${endereco}/controle/instancias?prefixo=ienvia-teste`)).json()) as Array<{
       aviso: { url: string; headers: Record<string, string>; events: string[] };
     }>;
     expect(instancia?.aviso.url).toBe(AVISO.url);
     expect(instancia?.aviso.headers).toEqual({ Authorization: 'Bearer segredo-do-aviso' });
-    expect(instancia?.aviso.events).toEqual(['MESSAGES_UPSERT', 'CONNECTION_UPDATE']);
+    expect(instancia?.aviso.events).toEqual(['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE']);
   });
 
   test('nome repetido é reconhecido como "nome em uso"', async () => {
@@ -120,7 +127,11 @@ describe('aviso de mensagens', () => {
     expect(await consultarAviso('ienvia-teste-01')).toBeNull();
 
     await configurarAviso('ienvia-teste-01', AVISO);
-    expect(await consultarAviso('ienvia-teste-01')).toEqual({ url: AVISO.url, ligado: true });
+    expect(await consultarAviso('ienvia-teste-01')).toEqual({
+      url: AVISO.url,
+      ligado: true,
+      eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'],
+    });
   });
 });
 
@@ -159,5 +170,87 @@ describe('quando algo dá errado', () => {
       expect(String((erro as Error).message)).not.toContain(CHAVE_DE_TESTE);
       expect(String((erro as Error).message)).not.toContain(AVISO.token);
     }
+  });
+});
+
+describe('aviso de mensagens em dia', () => {
+  const URL_DO_PAINEL = AVISO.url;
+
+  test('o aviso criado junto com o chip já está em dia', async () => {
+    await criarInstancia({ nome: 'ienvia-teste-01', aviso: AVISO });
+    const atual = await consultarAviso('ienvia-teste-01');
+    expect(atual).toEqual({ url: URL_DO_PAINEL, ligado: true, eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] });
+    expect(avisoEstaEmDia(atual, URL_DO_PAINEL)).toBe(true);
+  });
+
+  test.each([
+    ['não existe', null],
+    ['aponta para outro endereço', { url: 'https://outro.exemplo/api', ligado: true, eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] }],
+    ['está desligado', { url: URL_DO_PAINEL, ligado: false, eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] }],
+    // Chip criado antes de o painel pedir o aviso das mensagens enviadas.
+    ['não avisa as mensagens enviadas', { url: URL_DO_PAINEL, ligado: true, eventos: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'] }],
+  ])('aviso que %s precisa ser refeito', (_caso, atual) => {
+    expect(avisoEstaEmDia(atual, URL_DO_PAINEL)).toBe(false);
+  });
+});
+
+describe('enviar texto', () => {
+  const enviadas = async () =>
+    (await (await fetch(`${endereco}/controle/enviadas`)).json()) as Array<{ instancia: string; numero: string; texto: string; id: string }>;
+
+  beforeEach(async () => {
+    await fetch(`${endereco}/controle/enviadas`, { method: 'DELETE' });
+  });
+
+  test('mensagem enviada volta com o identificador dela no WhatsApp', async () => {
+    const resultado = await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Temos sim!\nQuer que eu separe?');
+    expect(resultado).toEqual({ situacao: 'enviada', idNoWhatsApp: expect.stringMatching(/^3EB0[0-9A-F]{18}$/) });
+    expect(await enviadas()).toEqual([
+      {
+        instancia: 'ienvia-fixo-conectado',
+        numero: '5585988880001',
+        texto: 'Temos sim!\nQuer que eu separe?',
+        id: resultado.situacao === 'enviada' ? resultado.idNoWhatsApp : '',
+      },
+    ]);
+  });
+
+  test('número sem WhatsApp: com certeza não foi enviada', async () => {
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880404', 'Oi')).toEqual({ situacao: 'nao_enviada', motivo: 'sem_whatsapp' });
+    expect(await enviadas()).toEqual([]);
+  });
+
+  test('chip que não existe na Evolution: com certeza não foi enviada', async () => {
+    expect(await enviarTexto('ienvia-nao-existe', '5585988880001', 'Oi')).toEqual({ situacao: 'nao_enviada', motivo: 'chip_nao_encontrado' });
+  });
+
+  test('chave recusada: com certeza não foi enviada', async () => {
+    process.env.EVOLUTION_API_KEY = 'chave-errada';
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Oi')).toEqual({ situacao: 'nao_enviada', motivo: 'chave_recusada' });
+  });
+
+  test('Evolution não configurada neste ambiente: com certeza não foi enviada', async () => {
+    delete process.env.EVOLUTION_API_URL;
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Oi')).toEqual({ situacao: 'nao_enviada', motivo: 'nao_configurada' });
+  });
+
+  test('erro do servidor da Evolution: não dá para saber se saiu', async () => {
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880500', 'Oi')).toMatchObject({ situacao: 'incerta' });
+  });
+
+  test('"400" comum da Evolution também é incerto (ela responde assim até quando a mensagem já saiu)', async () => {
+    await controle('falha?tipo=recusa');
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Oi')).toMatchObject({ situacao: 'incerta' });
+  });
+
+  test('conexão que cai no meio: não dá para saber se saiu', async () => {
+    await controle('falha?tipo=queda');
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Oi')).toMatchObject({ situacao: 'incerta' });
+  });
+
+  test('chip desconectado: a Evolution não responde e o envio fica incerto depois do tempo limite', async () => {
+    const resultado = await enviarTexto('ienvia-fixo-desconectado', '5585988880001', 'Oi', { tempoLimite: 300 });
+    expect(resultado).toMatchObject({ situacao: 'incerta' });
+    expect(await enviadas()).toEqual([]);
   });
 });

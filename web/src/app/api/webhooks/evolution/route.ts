@@ -3,7 +3,7 @@ import { interpretarAviso } from '@/lib/evolution/aviso';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
 
 /**
- * Porta de entrada dos avisos da Evolution: mensagem que chegou e chip que conectou ou caiu.
+ * Porta de entrada dos avisos da Evolution: mensagem que chegou, mensagem que saiu e chip que conectou ou caiu.
  *
  * Não existe usuário logado aqui. Cada chip tem um segredo próprio, que a Evolution manda no
  * cabeçalho Authorization; o banco guarda só o resumo (SHA-256) desse segredo e é ele quem confere
@@ -51,6 +51,7 @@ export async function POST(pedido: Request): Promise<Response> {
           p_instance_name: aviso.instancia,
           p_token_sha256: resumo,
           p_event_id: aviso.idDoEvento,
+          // Para o banco, mensagem recebida e mensagem enviada entram pela mesma porta; quem diferencia é p_from_me.
           p_event_type: 'MESSAGES_UPSERT',
           p_sender_jid: aviso.remetente,
           p_push_name: aviso.nome,

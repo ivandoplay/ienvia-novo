@@ -6,6 +6,7 @@ import { enderecoPublico, lerConfigEvolution } from '@/lib/env';
 import {
   ErroEvolution,
   apagarInstancia,
+  avisoEstaEmDia,
   configurarAviso,
   consultarAviso,
   consultarChip,
@@ -160,7 +161,7 @@ async function garantirAviso(contexto: Contexto, chip: LinhaDoChip): Promise<voi
   if (!url || !chip.provider_instance_name) return;
   try {
     const atual = await consultarAviso(chip.provider_instance_name);
-    if (atual?.url === url && atual.ligado) return;
+    if (avisoEstaEmDia(atual, url)) return;
     const token = await trocarSegredo(contexto, chip.id);
     if (token) await configurarAviso(chip.provider_instance_name, { url, token });
   } catch (erro) {

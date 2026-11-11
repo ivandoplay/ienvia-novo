@@ -38,13 +38,13 @@ export default async function PaginaVisaoGeral() {
 
   const indicadores: Indicador[] = [
     {
-      rota: '/inbox',
-      dica: 'Conversas que a IA passou para você e estão paradas',
+      rota: '/inbox?ver=esperando',
+      dica: 'Conversas em que a próxima resposta é sua',
       icone: 'kpiAtencao',
       cor: 'atencao',
       valor: numero(dados.esperandoVoce),
       rotulo: 'Esperando você',
-      rodape: 'conversas paradas · abrir',
+      rodape: 'conversas para responder · abrir',
     },
     {
       rota: '/instancias',

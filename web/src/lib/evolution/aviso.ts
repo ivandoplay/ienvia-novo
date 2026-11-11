@@ -124,7 +124,9 @@ export function interpretarAviso(corpo: unknown, agora: Date = new Date()): Avis
     return { tipo: 'conexao', instancia, estado, telefone: estado === 'open' ? telefoneDoJid(texto(dados.wuid)) : null };
   }
 
-  if (evento === 'MESSAGES_UPSERT') {
+  // SEND_MESSAGE é a Evolution contando que uma mensagem saiu por ela (o que o painel enviou).
+  // Tem o mesmo formato de uma mensagem recebida e é sempre "de mim".
+  if (evento === 'MESSAGES_UPSERT' || evento === 'SEND_MESSAGE') {
     const chave = dados.key;
     if (!ehObjeto(chave)) return { tipo: 'ignorado', motivo: 'mensagem sem identificação' };
     const idDoEvento = texto(chave.id);
@@ -144,7 +146,7 @@ export function interpretarAviso(corpo: unknown, agora: Date = new Date()): Avis
       nome: texto(dados.pushName)?.slice(0, 160) ?? null,
       texto: conteudo.slice(0, TEXTO_MAXIMO),
       quando: quandoFoi(dados.messageTimestamp, agora),
-      deMim: chave.fromMe === true,
+      deMim: evento === 'SEND_MESSAGE' || chave.fromMe === true,
     };
   }
 

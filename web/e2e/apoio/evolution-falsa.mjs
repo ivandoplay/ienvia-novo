@@ -33,9 +33,31 @@ function lerCorpo(req) {
   });
 }
 
-export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE } = {}) {
+/**
+ * `instancias` são chips que já existem desde o começo (para os testes da Inbox, que não criam chip):
+ * [{ nome, estado: 'open' | 'close' | 'connecting', telefone }]. Eles sobrevivem ao "/controle/reiniciar".
+ */
+export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas = [] } = {}) {
   /** nome → instância */
   const instancias = new Map();
+  /** Tudo o que foi enviado por /message/sendText, na ordem. */
+  const enviadas = [];
+  /** Toda chamada a /message/sendText, tenha dado certo ou não (para provar que o painel chama uma vez só). */
+  const tentativas = [];
+  const colocarFixas = () => {
+    for (const fixa of fixas) {
+      instancias.set(fixa.nome, {
+        nome: fixa.nome,
+        id: crypto.randomUUID(),
+        estado: fixa.estado ?? 'open',
+        dono: fixa.telefone ? `${fixa.telefone}@s.whatsapp.net` : null,
+        aviso: null,
+        qr: 1,
+        fixa: true,
+      });
+    }
+  };
+  colocarFixas();
   /** 'nenhuma' | 'recusa' (responde 400) | 'pane' (responde 500) | 'queda' (derruba a conexão) | 'silencio' (não responde nunca) */
   let falha = 'nenhuma';
   const pendurados = new Set();
@@ -74,8 +96,20 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE } = {}) {
     }
     if (url.pathname === '/controle/reiniciar') {
       for (const instancia of alvos) instancias.delete(instancia.nome);
+      // Os chips fixos voltam ao estado inicial em vez de sumir.
+      colocarFixas();
       falha = 'nenhuma';
       return responder(res, 200, { apagadas: alvos.length });
+    }
+    if (url.pathname === '/controle/enviadas') {
+      if (req.method === 'DELETE') {
+        enviadas.length = 0;
+        tentativas.length = 0;
+      }
+      return responder(res, 200, enviadas.filter((envio) => envio.instancia.startsWith(prefixo)));
+    }
+    if (url.pathname === '/controle/tentativas') {
+      return responder(res, 200, tentativas.filter((envio) => envio.instancia.startsWith(prefixo)));
     }
     if (url.pathname === '/controle/falha') {
       falha = url.searchParams.get('tipo') ?? 'nenhuma';
@@ -163,6 +197,50 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE } = {}) {
       );
     }
 
+    // Envio de texto. As respostas imitam a Evolution 2.3.7 (código-fonte e servidor real conferidos em 11/11/2026).
+    if (req.method === 'POST' && grupo === 'message' && acao === 'sendText') {
+      if (!instancia) return naoExiste(res, nome ?? '');
+      const corpo = await lerCorpo(req);
+      tentativas.push({ instancia: instancia.nome, numero: corpo.number, texto: corpo.text });
+      if (typeof corpo.number !== 'string' || !corpo.number) {
+        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [['instance requires property "number"']] } });
+      }
+      if (typeof corpo.text !== 'string') {
+        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [['instance requires property "text"']] } });
+      }
+      if (!corpo.text.trim()) {
+        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: ['Text is required'] } });
+      }
+      if (instancia.estado !== 'open') {
+        // A Evolution de verdade não responde quando o chip não está conectado.
+        pendurados.add(res);
+        res.on('close', () => pendurados.delete(res));
+        return;
+      }
+      const digitos = corpo.number.replace(/\D/g, '');
+      const jid = `${digitos}@s.whatsapp.net`;
+      // O fim do número decide o que acontece (ver CONVERSAS_DA_INBOX em dados.mjs).
+      if (digitos.endsWith('0404')) {
+        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [{ jid, exists: false, number: corpo.number }] } });
+      }
+      if (digitos.endsWith('0500')) {
+        return responder(res, 500, { status: 500, error: 'Internal Server Error', response: { message: 'Falha simulada' } });
+      }
+      const id = `3EB0${crypto.randomBytes(9).toString('hex').toUpperCase()}`;
+      enviadas.push({ instancia: instancia.nome, numero: corpo.number, texto: corpo.text, id });
+      return responder(res, 201, {
+        key: { remoteJid: jid, fromMe: true, id },
+        pushName: 'Você',
+        status: 'PENDING',
+        message: { conversation: corpo.text },
+        contextInfo: null,
+        messageType: 'conversation',
+        messageTimestamp: Math.floor(Date.now() / 1000),
+        instanceId: instancia.id,
+        source: 'unknown',
+      });
+    }
+
     if (grupo === 'instance' || grupo === 'webhook') {
       if (!instancia) return naoExiste(res, nome ?? '');
 
@@ -212,7 +290,8 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE } = {}) {
 // Rodando direto (node evolution-falsa.mjs): sobe o servidor para os testes de navegador.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const porta = Number(process.env.PORTA_EVOLUTION_FALSA ?? 54398);
-  criarEvolutionFalsa().listen(porta, '127.0.0.1', () => {
+  const { CHIPS_FIXOS_NA_EVOLUTION } = await import('./dados.mjs');
+  criarEvolutionFalsa({ instancias: CHIPS_FIXOS_NA_EVOLUTION }).listen(porta, '127.0.0.1', () => {
     console.log(`Evolution de mentira ouvindo em http://127.0.0.1:${porta}`);
   });
 }

@@ -104,6 +104,33 @@ describe('aviso de mensagem', () => {
   });
 });
 
+describe('aviso de mensagem enviada (o eco do que saiu pela Evolution)', () => {
+  test('entra pela mesma porta, marcado como "de mim" e endereçado ao contato', async () => {
+    const r = await avisar({
+      event: 'send.message',
+      instance: 'ienvia-teste-01',
+      data: {
+        key: { remoteJid: '5585999990000@s.whatsapp.net', fromMe: true, id: '3EB0AAAABBBBCCCCDDDD' },
+        pushName: 'Você',
+        status: 'PENDING',
+        message: { conversation: 'Temos sim!' },
+        messageType: 'conversation',
+        messageTimestamp: 1794409200,
+      },
+    });
+    expect(r.status).toBe(200);
+    expect(chamadas).toHaveLength(1);
+    expect(chamadas[0]?.funcao).toBe('ingest_evolution_text');
+    expect(chamadas[0]?.parametros).toMatchObject({
+      p_event_id: '3EB0AAAABBBBCCCCDDDD',
+      p_event_type: 'MESSAGES_UPSERT',
+      p_sender_jid: '5585999990000@s.whatsapp.net',
+      p_body_text: 'Temos sim!',
+      p_from_me: true,
+    });
+  });
+});
+
 describe('aviso de conexão', () => {
   test('chip conectado: o banco recebe o estado e o número', async () => {
     resposta = { status: 200, corpo: { result: 'applied', status: 'connected' } };
