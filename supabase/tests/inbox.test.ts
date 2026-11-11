@@ -103,7 +103,7 @@ interface Aberta {
     contact: { id: string; display_name: string; phone_e164: string | null; erased: boolean };
     instance: { id: string; display_name: string; status: string; engine: string };
   };
-  messages: Array<{ body_text: string; direction: string; status: string; from_panel: boolean; mine: boolean; has_media: boolean }>;
+  messages: Array<{ body_text: string | null; direction: string; status: string; from_panel: boolean; mine: boolean; attachment: Record<string, unknown> | null }>;
   has_more: boolean;
 }
 async function abrir(conversa: string, limite: number | null = null, empresa = LOJA_A): Promise<Aberta | null> {
@@ -259,7 +259,7 @@ describe('conversa aberta', () => {
         instance: { id: CHIP_A, display_name: 'Chip da Loja A', status: 'connected', engine: 'evolution' },
       });
       expect(aberta?.messages).toMatchObject([
-        { body_text: 'Oi, tem pizza?', direction: 'inbound', status: 'received', from_panel: false, mine: false, has_media: false },
+        { body_text: 'Oi, tem pizza?', direction: 'inbound', status: 'received', from_panel: false, mine: false, attachment: null },
         { body_text: 'Temos sim!', direction: 'outbound', status: 'sent', from_panel: true, mine: true },
         { body_text: 'Respondi pelo celular', direction: 'outbound', from_panel: false, mine: false },
         { body_text: 'Da atendente', direction: 'outbound', status: 'failed', from_panel: true, mine: false },

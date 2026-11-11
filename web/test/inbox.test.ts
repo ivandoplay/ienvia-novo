@@ -4,6 +4,7 @@ import {
   CONVERSAS_POR_PAGINA,
   MENSAGENS_POR_VEZ,
   autorDoEnvio,
+  carimboParaNomeDeArquivo,
   descreverEtapa,
   diaDaConversa,
   ehChaveDeEnvio,
@@ -175,6 +176,16 @@ describe('horas e dias (sempre no fuso da operação)', () => {
     expect(diaDaConversa('2026-11-11T12:00:00.000Z', AGORA)).toBe('Hoje');
     expect(diaDaConversa('2026-11-11T02:30:00.000Z', AGORA)).toBe('Ontem');
     expect(diaDaConversa('2026-11-09T15:00:00.000Z', AGORA)).toBe('9 de novembro de 2026');
+  });
+});
+
+describe('data e hora para o nome de um arquivo baixado', () => {
+  test('no fuso de quem atende, num formato que ordena bem na pasta de downloads', () => {
+    // 15:00 em UTC são 12:00 em Fortaleza.
+    expect(carimboParaNomeDeArquivo('2026-11-11T15:00:00Z')).toBe('2026-11-11-1200');
+    // Perto da meia-noite, o dia é o de quem atende, não o de Londres.
+    expect(carimboParaNomeDeArquivo('2026-11-12T01:30:00Z')).toBe('2026-11-11-2230');
+    expect(carimboParaNomeDeArquivo('data ilegível')).toBe('');
   });
 });
 

@@ -258,11 +258,13 @@ export async function enviarTexto(
   texto: string,
   opcoes: { tempoLimite?: number } = {},
 ): Promise<ResultadoDoEnvio> {
+  return enviar(`/message/sendText/${nomeNoCaminho(nome)}`, { number: numero, text: texto }, opcoes.tempoLimite ?? TEMPO_LIMITE_DO_ENVIO);
+}
+
+/** Uma chamada de envio (texto ou arquivo) e a leitura do que a Evolution respondeu. Nunca lança erro. */
+async function enviar(caminho: string, corpo: Record<string, unknown>, tempoLimite: number): Promise<ResultadoDoEnvio> {
   try {
-    const resposta = await chamar<{ key?: { id?: unknown } } | null>('POST', `/message/sendText/${nomeNoCaminho(nome)}`, {
-      corpo: { number: numero, text: texto },
-      tempoLimite: opcoes.tempoLimite ?? TEMPO_LIMITE_DO_ENVIO,
-    });
+    const resposta = await chamar<{ key?: { id?: unknown } } | null>('POST', caminho, { corpo, tempoLimite });
     const id = resposta?.key?.id;
     return { situacao: 'enviada', idNoWhatsApp: typeof id === 'string' && id.length >= 1 && id.length <= 200 ? id : null };
   } catch (erro) {
@@ -272,5 +274,127 @@ export async function enviarTexto(
     if (erro.status === 401 || erro.status === 403) return { situacao: 'nao_enviada', motivo: 'chave_recusada' };
     if (erro.status === 400 && numeroSemWhatsApp(erro.corpo)) return { situacao: 'nao_enviada', motivo: 'sem_whatsapp' };
     return { situacao: 'incerta', detalhe: erro.status ? `HTTP ${erro.status}: ${erro.message}` : erro.message };
+  }
+}
+
+/** Mandar um arquivo demora mais que um texto: a Evolution recebe, converte e sobe para o WhatsApp. */
+const TEMPO_LIMITE_DO_ENVIO_DE_ARQUIVO = 40_000;
+
+export interface ArquivoParaEnviar {
+  tipo: 'image' | 'video' | 'audio' | 'document';
+  dados: Buffer;
+  /** Tipo de conteúdo ("application/pdf"). */
+  conteudo: string;
+  /** Nome que a pessoa do outro lado vê (só vale para documento). */
+  nome: string | null;
+  /** Legenda (foto, vídeo e documento). Áudio não leva. */
+  legenda: string | null;
+}
+
+/**
+ * Nome do documento do jeito que a Evolution precisa. A Evolution 2.3.7 descobre o tipo do documento
+ * pela terminação do nome (.pdf, .xlsx...) e ignora o tipo informado; sem nome, a chamada quebra.
+ * Por isso o nome nunca vai vazio e ganha a terminação certa quando não tem nenhuma.
+ */
+export function nomeDoDocumentoParaEnvio(nome: string | null, conteudo: string): string {
+  const limpo = (nome ?? '').replace(/[\u0000-\u001f\u007f\\/]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) || 'documento';
+  if (/\.[a-z0-9]{1,8}$/i.test(limpo)) return limpo;
+  const terminacao = TERMINACAO_PELO_CONTEUDO[conteudo] ?? 'bin';
+  return `${limpo}.${terminacao}`;
+}
+
+const TERMINACAO_PELO_CONTEUDO: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+  'text/csv': 'csv',
+  'application/zip': 'zip',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'video/mp4': 'mp4',
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+};
+
+/**
+ * Envia um arquivo por um chip. Mesmas garantias de `enviarTexto`: nunca lança erro, e só é
+ * "não enviada" o que dá para ter certeza.
+ *
+ * Como a Evolution 2.3.7 trata cada tipo (conferido no código-fonte dela):
+ *   foto      — ela mesma converte para JPEG antes de mandar;
+ *   vídeo     — vai como está (por isso o painel só aceita MP4 como vídeo);
+ *   áudio     — ela converte para o formato de mensagem de voz do WhatsApp e manda como voz;
+ *   documento — vai como está, com o nome do arquivo.
+ */
+export async function enviarArquivo(
+  nome: string,
+  numero: string,
+  arquivo: ArquivoParaEnviar,
+  opcoes: { tempoLimite?: number } = {},
+): Promise<ResultadoDoEnvio> {
+  const tempoLimite = opcoes.tempoLimite ?? TEMPO_LIMITE_DO_ENVIO_DE_ARQUIVO;
+  const base64 = arquivo.dados.toString('base64');
+
+  if (arquivo.tipo === 'audio') {
+    return enviar(`/message/sendWhatsAppAudio/${nomeNoCaminho(nome)}`, { number: numero, audio: base64 }, tempoLimite);
+  }
+  return enviar(
+    `/message/sendMedia/${nomeNoCaminho(nome)}`,
+    {
+      number: numero,
+      mediatype: arquivo.tipo,
+      media: base64,
+      mimetype: arquivo.tipo === 'image' ? 'image/jpeg' : arquivo.conteudo,
+      ...(arquivo.legenda ? { caption: arquivo.legenda } : {}),
+      // Foto e vídeo vão sem nome: a Evolution usa "image.jpg" / "video.mp4", que dão o tipo certo.
+      ...(arquivo.tipo === 'document' ? { fileName: nomeDoDocumentoParaEnvio(arquivo.nome, arquivo.conteudo) } : {}),
+    },
+    tempoLimite,
+  );
+}
+
+/** Buscar um arquivo recebido: a Evolution baixa do WhatsApp, abre e devolve inteiro. */
+const TEMPO_LIMITE_PARA_BUSCAR_ARQUIVO = 45_000;
+
+export type ArquivoBuscado =
+  | { ok: true; dados: Buffer; /** Tipo de conteúdo que a Evolution informou, se informou. */ conteudo: string | null }
+  | { ok: false; detalhe: string };
+
+/**
+ * Busca na Evolution o arquivo (foto, áudio, vídeo, documento, figurinha) de uma mensagem.
+ *
+ * `mensagem` é o que identifica a mensagem para a Evolution:
+ *   - o aviso inteiro que ela mandou ({ key, message }): ela baixa direto do WhatsApp;
+ *   - só a identificação ({ key: { id } }): ela procura a mensagem no próprio histórico (depende de a
+ *     Evolution estar configurada para guardar as mensagens).
+ * Nunca lança erro.
+ */
+export async function buscarArquivoDaMensagem(
+  nome: string,
+  mensagem: { key: Record<string, unknown>; message?: unknown },
+  opcoes: { tempoLimite?: number } = {},
+): Promise<ArquivoBuscado> {
+  try {
+    const resposta = await chamar<{ base64?: unknown; mimetype?: unknown } | null>(
+      'POST',
+      `/chat/getBase64FromMediaMessage/${nomeNoCaminho(nome)}`,
+      { corpo: { message: mensagem, convertToMp4: false }, tempoLimite: opcoes.tempoLimite ?? TEMPO_LIMITE_PARA_BUSCAR_ARQUIVO },
+    );
+    const base64 = resposta?.base64;
+    if (typeof base64 !== 'string' || !base64) return { ok: false, detalhe: 'a Evolution respondeu sem o arquivo' };
+    const dados = Buffer.from(base64, 'base64');
+    if (dados.length === 0) return { ok: false, detalhe: 'a Evolution devolveu um arquivo vazio' };
+    return { ok: true, dados, conteudo: typeof resposta?.mimetype === 'string' ? resposta.mimetype : null };
+  } catch (erro) {
+    if (!(erro instanceof ErroEvolution)) return { ok: false, detalhe: 'erro inesperado ao chamar a Evolution' };
+    return { ok: false, detalhe: erro.status ? `HTTP ${erro.status}: ${erro.message}` : erro.message };
   }
 }

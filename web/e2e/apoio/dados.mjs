@@ -2,7 +2,11 @@
  * Dados de mentira usados pelos testes de ponta a ponta.
  * Nada aqui existe de verdade: são contas e números inventados só para os testes.
  */
+import { audioDeExemplo, figurinhaDeExemplo, fotoDeExemplo, pdfDeExemplo } from './arquivos-de-exemplo.mjs';
+
 export const SENHA_DE_TESTE = 'senha-de-teste-123';
+/** A "chave do servidor" que o painel usa nos testes (o Supabase de mentira só aceita esta). */
+export const CHAVE_DE_SERVICO_DE_TESTE = 'chave-de-servico-de-teste';
 
 export const WORKSPACE_LOJA = 'a0000000-0000-4000-8000-000000000001';
 export const WORKSPACE_OUTRA = 'a0000000-0000-4000-8000-000000000002';
@@ -161,6 +165,10 @@ export const CHIP_SUPORTE = 'd0000000-0000-4000-8000-000000000002';
 /** Chip removido: não aparece em Instâncias, mas as conversas dele continuam na Inbox (é o histórico). */
 export const CHIP_ANTIGO = 'd0000000-0000-4000-8000-000000000003';
 
+/** Segredo que a "Evolution" manda junto com os avisos do chip Vendas (o painel só aceita aviso com o segredo certo). */
+export const SEGREDO_DO_AVISO_DO_CHIP_VENDAS = 'segredo-de-teste-do-aviso-do-chip-vendas';
+export const SEGREDOS_DOS_AVISOS = { 'ienvia-fixo-vendas': SEGREDO_DO_AVISO_DO_CHIP_VENDAS };
+
 /** Nomes dos chips fixos dentro da Evolution de mentira. */
 export const CHIPS_FIXOS_NA_EVOLUTION = [
   { nome: 'ienvia-fixo-vendas', estado: 'open', telefone: '5585999990010' },
@@ -182,7 +190,24 @@ export const CONVERSAS_DA_INBOX = {
   elisa: 'f0000000-0000-4000-8000-000000000006',
   fabio: 'f0000000-0000-4000-8000-000000000007',
   gabi: 'f0000000-0000-4000-8000-000000000008',
+  helena: 'f0000000-0000-4000-8000-000000000009',
 };
+
+/** O texto que representa a mensagem na lista de conversas (igual à função message_preview do banco). */
+export function previaDaMensagem(texto, anexo) {
+  const limpo = String(texto ?? '').trim();
+  if (!anexo) return limpo.slice(0, 300);
+  const rotulo =
+    {
+      image: '📷 Foto',
+      video: '🎥 Vídeo',
+      audio: anexo.voz ? '🎤 Áudio' : '🎵 Áudio',
+      sticker: 'Figurinha',
+    }[anexo.tipo] ?? `📄 ${String(anexo.nome ?? '').trim() || 'Documento'}`;
+  return `${rotulo}${limpo ? `: ${limpo}` : ''}`.slice(0, 300);
+}
+
+const NOME_PADRAO_NO_DEPOSITO = { image: 'foto', audio: 'audio', video: 'video', sticker: 'figurinha', document: 'documento' };
 
 /**
  * O cenário da Inbox, sempre "de agora" (as horas são calculadas na hora em que ele é montado):
@@ -195,6 +220,8 @@ export const CONVERSAS_DA_INBOX = {
  *   Elisa Prado    com você; o número dela não tem WhatsApp (o envio falha)
  *   Fábio Nunes    com você; a Evolution dá erro (o envio fica sem confirmação)
  *   Gabi Moura     resolvida; conversa de um chip que já foi removido
+ *   Helena Castro  aguardando o cliente; conversa com arquivos: foto, áudio, documento, figurinha,
+ *                  um vídeo grande demais para guardar e uma foto que o painel não conseguiu trazer
  */
 export function criarInbox() {
   const dona = USUARIOS[6].id;
@@ -222,9 +249,16 @@ export function criarInbox() {
   const contacts = [];
   const conversations = [];
   const messages = [];
+  /** A ficha de cada arquivo (tabela message_attachments). */
+  const message_attachments = [];
+  /** Os arquivos em si, como estariam no depósito: [{ caminho, dados, conteudo }]. */
+  const arquivos = [];
   let numeroDaMensagem = 0;
 
-  /** mensagens: [minutos atrás, 'cliente' | 'painel' | 'colega' | 'celular', texto] */
+  /**
+   * mensagens: [minutos atrás, 'cliente' | 'painel' | 'colega' | 'celular', texto, arquivo?]
+   * arquivo:   { tipo, conteudo, dados?, nome?, nomeNoDeposito?, duracao?, largura?, altura?, voz?, tamanho?, status? }
+   */
   function conversa(id, numero, nome, telefone, chipId, etapa, naoLidas, mensagens) {
     const contato = numerado('e0000000', numero);
     contacts.push(
@@ -239,23 +273,51 @@ export function criarInbox() {
       }),
     );
     let ultima = null;
-    for (const [minutos, autor, texto] of mensagens) {
+    for (const [minutos, autor, texto, anexo] of mensagens) {
       numeroDaMensagem += 1;
       const quando = minutosAtras(minutos);
       const recebida = autor === 'cliente';
-      ultima = { quando, texto };
+      const mensagemId = numerado('f1000000', numeroDaMensagem);
+      const chave = autor === 'painel' || autor === 'colega' ? `chave-fixa-000000${numeroDaMensagem}` : null;
+      let caminho = null;
+      if (anexo) {
+        const nomeNoDeposito = anexo.nomeNoDeposito ?? NOME_PADRAO_NO_DEPOSITO[anexo.tipo];
+        caminho = chave
+          ? `${WORKSPACE_INBOX}/${id}/envios/${chave}/${nomeNoDeposito}`
+          : `${WORKSPACE_INBOX}/${id}/${mensagemId}/${nomeNoDeposito}`;
+        const status = anexo.status ?? 'stored';
+        message_attachments.push(
+          daInbox({
+            id: numerado('f2000000', numeroDaMensagem),
+            message_id: mensagemId,
+            object_key: caminho,
+            kind: anexo.tipo,
+            content_type: anexo.conteudo,
+            byte_size: anexo.tamanho ?? anexo.dados?.length ?? 0,
+            file_name: anexo.nome ?? null,
+            duration_seconds: anexo.duracao ?? null,
+            width: anexo.largura ?? null,
+            height: anexo.altura ?? null,
+            is_voice: anexo.voz === true,
+            storage_status: status,
+          }),
+        );
+        if (status === 'stored' && anexo.dados) arquivos.push({ caminho, dados: anexo.dados, conteudo: anexo.conteudo });
+      }
+      ultima = { quando, texto: previaDaMensagem(texto, anexo) };
       messages.push(
         daInbox({
-          id: numerado('f1000000', numeroDaMensagem),
+          id: mensagemId,
           conversation_id: id,
           instance_id: chipId,
           provider_message_id: `WA-FIXA-${numeroDaMensagem}`,
-          idempotency_key: autor === 'painel' || autor === 'colega' ? `chave-fixa-000000${numeroDaMensagem}` : null,
+          idempotency_key: chave,
           direction: recebida ? 'inbound' : 'outbound',
           source_engine: 'evolution',
           actor_type: recebida ? 'contact' : 'human',
           status: recebida ? 'received' : 'sent',
-          body_text: texto,
+          body_text: texto || null,
+          media_object_key: caminho,
           occurred_at: quando,
           created_at: quando,
           sent_by: autor === 'painel' ? dona : autor === 'colega' ? colega : null,
@@ -305,7 +367,23 @@ export function criarInbox() {
   conversa(C.fabio, 7, 'Fábio Nunes', '5585988880500', CHIP_VENDAS, 'human', 0, [[140, 'cliente', 'Tem em estoque?']]);
   conversa(C.gabi, 8, 'Gabi Moura', '5585988880008', CHIP_ANTIGO, 'resolved', 0, [[60 * 24 * 3, 'cliente', 'Oi, ainda atendem neste número?']]);
 
-  return { instances, contacts, conversations, messages };
+  // A conversa dos arquivos. É a mais antiga das ativas, para ficar no fim da lista.
+  const foto = fotoDeExemplo();
+  const fachada = fotoDeExemplo({ tom: 'tarde' });
+  const figurinha = figurinhaDeExemplo();
+  const voz = audioDeExemplo(3);
+  const tabela = pdfDeExemplo();
+  conversa(C.helena, 9, 'Helena Castro', '5585988880009', CHIP_VENDAS, 'waiting_customer', 0, [
+    [200, 'cliente', 'Olha a vitrine como ficou', { tipo: 'image', conteudo: 'image/png', dados: foto, largura: 480, altura: 360 }],
+    [198, 'cliente', '', { tipo: 'audio', conteudo: 'audio/wav', dados: voz, duracao: 3, voz: true }],
+    [190, 'painel', 'Segue a tabela.', { tipo: 'document', conteudo: 'application/pdf', dados: tabela, nome: 'Tabela de preços.pdf', nomeNoDeposito: 'Tabela-de-precos.pdf' }],
+    [185, 'cliente', '', { tipo: 'sticker', conteudo: 'image/png', dados: figurinha, largura: 192, altura: 192 }],
+    [180, 'cliente', 'O vídeo da inauguração', { tipo: 'video', conteudo: 'video/mp4', tamanho: 41_943_040, duracao: 95, status: 'too_large' }],
+    [170, 'cliente', '', { tipo: 'image', conteudo: 'image/jpeg', tamanho: 182_000, largura: 480, altura: 360, status: 'failed' }],
+    [150, 'painel', 'Nossa fachada nova', { tipo: 'image', conteudo: 'image/png', dados: fachada, largura: 480, altura: 360, nomeNoDeposito: 'fachada.png' }],
+  ]);
+
+  return { instances, contacts, conversations, messages, message_attachments, arquivos };
 }
 
 /** Linhas de cada tabela. A "Loja da Maria" tem movimento; a "Outra Empresa" está vazia. */
@@ -322,6 +400,7 @@ export function criarTabelas() {
       ...inbox.instances,
     ],
     conversations: [...loja.conversas, ...inbox.conversations],
+    message_attachments: [...inbox.message_attachments],
     campaigns: [
       daLoja({ id: 'k1', status: 'running' }),
       daLoja({ id: 'k2', status: 'draft' }),

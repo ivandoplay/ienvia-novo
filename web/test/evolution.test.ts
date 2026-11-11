@@ -13,8 +13,11 @@ import {
   consultarAviso,
   consultarChip,
   criarInstancia,
+  buscarArquivoDaMensagem,
   desconectarInstancia,
+  enviarArquivo,
   enviarTexto,
+  nomeDoDocumentoParaEnvio,
   pedirQrCode,
 } from '@/lib/evolution/cliente';
 
@@ -252,5 +255,154 @@ describe('enviar texto', () => {
     const resultado = await enviarTexto('ienvia-fixo-desconectado', '5585988880001', 'Oi', { tempoLimite: 300 });
     expect(resultado).toMatchObject({ situacao: 'incerta' });
     expect(await enviadas()).toEqual([]);
+  });
+});
+
+describe('enviar arquivo', () => {
+  interface EnvioDeArquivo {
+    instancia: string;
+    numero: string;
+    tipo: string;
+    legenda: string | null;
+    nome: string | null;
+    conteudo: string | null;
+    bytes: number;
+  }
+  const arquivosEnviados = async () => (await (await fetch(`${endereco}/controle/enviadas`)).json()) as EnvioDeArquivo[];
+  const tentativasDeEnvio = async () => (await (await fetch(`${endereco}/controle/tentativas`)).json()) as EnvioDeArquivo[];
+  const BYTES = Buffer.from('conteúdo de um arquivo de teste, com acento e tudo');
+
+  beforeEach(async () => {
+    await fetch(`${endereco}/controle/enviadas`, { method: 'DELETE' });
+  });
+
+  test('foto: vai com a legenda, sem nome de arquivo (a Evolution converte para JPEG e põe o nome certo)', async () => {
+    const resultado = await enviarArquivo('ienvia-fixo-conectado', '5585988880001', {
+      tipo: 'image',
+      dados: BYTES,
+      conteudo: 'image/png',
+      nome: 'Promoção.png',
+      legenda: 'Olha a promoção!',
+    });
+    expect(resultado).toEqual({ situacao: 'enviada', idNoWhatsApp: expect.stringMatching(/^3EB0[0-9A-F]{18}$/) });
+    expect(await arquivosEnviados()).toMatchObject([
+      { instancia: 'ienvia-fixo-conectado', numero: '5585988880001', tipo: 'image', legenda: 'Olha a promoção!', nome: null, conteudo: 'image/jpeg', bytes: BYTES.length },
+    ]);
+  });
+
+  test('vídeo: vai como está, sem nome de arquivo; sem legenda, o campo nem é mandado', async () => {
+    await enviarArquivo('ienvia-fixo-conectado', '5585988880001', { tipo: 'video', dados: BYTES, conteudo: 'video/mp4', nome: 'inauguração.mp4', legenda: null });
+    expect(await arquivosEnviados()).toMatchObject([{ tipo: 'video', legenda: null, nome: null, conteudo: 'video/mp4', bytes: BYTES.length }]);
+  });
+
+  test('documento: vai com o nome que a pessoa vê e a legenda', async () => {
+    await enviarArquivo('ienvia-fixo-conectado', '5585988880001', {
+      tipo: 'document',
+      dados: BYTES,
+      conteudo: 'application/pdf',
+      nome: 'Orçamento nº 12.pdf',
+      legenda: 'Segue o orçamento.',
+    });
+    expect(await arquivosEnviados()).toMatchObject([{ tipo: 'document', legenda: 'Segue o orçamento.', nome: 'Orçamento nº 12.pdf', conteudo: 'application/pdf', bytes: BYTES.length }]);
+  });
+
+  test('documento sem nome nunca vai sem nome (a Evolution de verdade quebra): ganha um, com a terminação certa', async () => {
+    const resultado = await enviarArquivo('ienvia-fixo-conectado', '5585988880001', { tipo: 'document', dados: BYTES, conteudo: 'application/pdf', nome: null, legenda: null });
+    expect(resultado.situacao).toBe('enviada');
+    expect(await arquivosEnviados()).toMatchObject([{ tipo: 'document', nome: 'documento.pdf' }]);
+  });
+
+  test('áudio: sai como mensagem de voz, por outra porta da Evolution, sem legenda', async () => {
+    const resultado = await enviarArquivo('ienvia-fixo-conectado', '5585988880001', { tipo: 'audio', dados: BYTES, conteudo: 'audio/mpeg', nome: 'recado.mp3', legenda: null });
+    expect(resultado.situacao).toBe('enviada');
+    expect(await arquivosEnviados()).toMatchObject([{ tipo: 'audio', legenda: null, nome: null, conteudo: 'audio/ogg; codecs=opus', bytes: BYTES.length }]);
+  });
+
+  test('o arquivo chega inteiro, byte a byte', async () => {
+    const dados = Buffer.from(Array.from({ length: 70_000 }, (_, indice) => (indice * 31) % 256));
+    await enviarArquivo('ienvia-fixo-conectado', '5585988880001', { tipo: 'document', dados, conteudo: 'application/zip', nome: 'pacote.zip', legenda: null });
+    expect(await arquivosEnviados()).toMatchObject([{ bytes: 70_000 }]);
+  });
+
+  test('as mesmas certezas e dúvidas do texto: sem WhatsApp não sai; erro do servidor é incerto; chip desconectado é incerto', async () => {
+    const arquivo = { tipo: 'image' as const, dados: BYTES, conteudo: 'image/jpeg', nome: null, legenda: null };
+    expect(await enviarArquivo('ienvia-fixo-conectado', '5585988880404', arquivo)).toEqual({ situacao: 'nao_enviada', motivo: 'sem_whatsapp' });
+    expect(await enviarArquivo('ienvia-fixo-conectado', '5585988880500', arquivo)).toMatchObject({ situacao: 'incerta' });
+    expect(await enviarArquivo('ienvia-nao-existe', '5585988880001', arquivo)).toEqual({ situacao: 'nao_enviada', motivo: 'chip_nao_encontrado' });
+    expect(await enviarArquivo('ienvia-fixo-desconectado', '5585988880001', arquivo, { tempoLimite: 300 })).toMatchObject({ situacao: 'incerta' });
+    expect(await enviarArquivo('ienvia-fixo-conectado', '5585988880404', { ...arquivo, tipo: 'audio' })).toEqual({ situacao: 'nao_enviada', motivo: 'sem_whatsapp' });
+    expect(await arquivosEnviados()).toEqual([]);
+    // Cada envio chamou a Evolution uma única vez (o do chip que não existe nem chega a ser anotado por ela).
+    expect(await tentativasDeEnvio()).toHaveLength(4);
+  });
+
+  test.each([
+    ['Contrato.pdf', 'application/pdf', 'Contrato.pdf'],
+    ['Relatório Final.PDF', 'application/pdf', 'Relatório Final.PDF'],
+    ['Contrato', 'application/pdf', 'Contrato.pdf'],
+    ['planilha de vendas', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'planilha de vendas.xlsx'],
+    ['arquivo sem tipo conhecido', 'application/x-coisa-rara', 'arquivo sem tipo conhecido.bin'],
+    [null, 'application/pdf', 'documento.pdf'],
+    ['   ', 'text/plain', 'documento.txt'],
+    ['pasta/sub\\nome.txt', 'text/plain', 'pasta sub nome.txt'],
+    ['com\nquebra.txt', 'text/plain', 'com quebra.txt'],
+  ])('nome do documento %s (%s) → %s', (nome, conteudo, esperado) => {
+    expect(nomeDoDocumentoParaEnvio(nome, conteudo)).toBe(esperado);
+  });
+
+  test('nome de documento enorme é cortado', () => {
+    expect(nomeDoDocumentoParaEnvio(`${'a'.repeat(300)}`, 'application/pdf').length).toBeLessThanOrEqual(204);
+  });
+});
+
+describe('buscar o arquivo de uma mensagem recebida', () => {
+  const buscas = async () => (await (await fetch(`${endereco}/controle/buscas`)).json()) as Array<{ instancia: string; id: string; comAMensagemInteira: boolean }>;
+
+  beforeEach(async () => {
+    await fetch(`${endereco}/controle/buscas`, { method: 'DELETE' });
+  });
+
+  test('com o aviso inteiro, a Evolution baixa do WhatsApp e devolve o arquivo e o tipo dele', async () => {
+    const resultado = await buscarArquivoDaMensagem('ienvia-fixo-conectado', {
+      key: { id: 'MSG-FOTO', remoteJid: '5585988880001@s.whatsapp.net', fromMe: false },
+      message: { imageMessage: { mimetype: 'image/jpeg', mediaKey: { 0: 1 } } },
+    });
+    expect(resultado).toMatchObject({ ok: true, conteudo: 'image/png' });
+    // É mesmo um PNG, inteiro.
+    expect(resultado.ok && resultado.dados.subarray(0, 8).toString('latin1')).toBe('\x89PNG\r\n\x1a\n');
+    expect(await buscas()).toEqual([{ instancia: 'ienvia-fixo-conectado', id: 'MSG-FOTO', comAMensagemInteira: true }]);
+  });
+
+  test('só com a identificação, a Evolution procura a mensagem no próprio histórico', async () => {
+    const resultado = await buscarArquivoDaMensagem('ienvia-fixo-conectado', { key: { id: 'MSG-ANTIGA' } });
+    expect(resultado.ok).toBe(true);
+    expect(await buscas()).toEqual([{ instancia: 'ienvia-fixo-conectado', id: 'MSG-ANTIGA', comAMensagemInteira: false }]);
+  });
+
+  test('áudio e documento vêm com o tipo certo', async () => {
+    const audio = await buscarArquivoDaMensagem('ienvia-fixo-conectado', { key: { id: 'MSG-AUDIO' }, message: { audioMessage: { ptt: true } } });
+    expect(audio).toMatchObject({ ok: true, conteudo: 'audio/wav' });
+    const documento = await buscarArquivoDaMensagem('ienvia-fixo-conectado', { key: { id: 'MSG-DOC' }, message: { documentMessage: { fileName: 'Contrato.pdf' } } });
+    expect(documento).toMatchObject({ ok: true, conteudo: 'application/pdf' });
+    expect(documento.ok && documento.dados.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
+  test('mensagem que a Evolution não tem mais: devolve o motivo, sem lançar erro', async () => {
+    expect(await buscarArquivoDaMensagem('ienvia-fixo-conectado', { key: { id: 'MSG-SEM-ARQUIVO' } })).toEqual({ ok: false, detalhe: 'HTTP 400: Message not found' });
+  });
+
+  test('chip que não existe, Evolution fora do ar e Evolution não configurada: nunca lança erro', async () => {
+    expect(await buscarArquivoDaMensagem('ienvia-nao-existe', { key: { id: 'MSG-1' } })).toMatchObject({ ok: false });
+    await controle('falha?tipo=queda');
+    expect(await buscarArquivoDaMensagem('ienvia-fixo-conectado', { key: { id: 'MSG-1' } })).toEqual({ ok: false, detalhe: 'A Evolution não respondeu a tempo.' });
+    delete process.env.EVOLUTION_API_URL;
+    expect(await buscarArquivoDaMensagem('ienvia-fixo-conectado', { key: { id: 'MSG-1' } })).toMatchObject({ ok: false });
+  });
+
+  test('a chave da Evolution nunca aparece no motivo da falha', async () => {
+    await controle('falha?tipo=pane');
+    const resultado = await buscarArquivoDaMensagem('ienvia-fixo-conectado', { key: { id: 'MSG-1' } });
+    expect(resultado.ok).toBe(false);
+    expect(JSON.stringify(resultado)).not.toContain(CHAVE_DE_TESTE);
   });
 });

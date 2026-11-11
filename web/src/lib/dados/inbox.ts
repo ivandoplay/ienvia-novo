@@ -1,8 +1,19 @@
 import 'server-only';
 
 import {
+  duracaoLegivel,
+  ehCaminhoDeArquivo,
+  enderecoDoArquivo,
+  nomeDoTipo,
+  situacaoDoArquivo,
+  tamanhoLegivel,
+  type SituacaoDoArquivo,
+  type TipoDeArquivo,
+} from '@/lib/inbox/arquivos';
+import {
   MENSAGENS_POR_VEZ,
   autorDoEnvio,
+  carimboParaNomeDeArquivo,
   dataCurta,
   diaDaConversa,
   horaDaMensagem,
@@ -116,11 +127,33 @@ export async function carregarInbox(workspaceId: string, filtros: FiltrosDaInbox
   };
 }
 
+/** O arquivo (foto, áudio, vídeo, documento ou figurinha) de uma mensagem, pronto para a tela. */
+export interface ArquivoDaMensagem {
+  tipo: TipoDeArquivo;
+  situacao: SituacaoDoArquivo;
+  /** "Foto", "Mensagem de voz", "Documento"... */
+  descricao: string;
+  /** Endereço (dentro do painel) que mostra o arquivo. Só existe quando ele está guardado. */
+  endereco: string | null;
+  /** O mesmo arquivo, para baixar com o nome certo. */
+  enderecoParaBaixar: string | null;
+  /** Nome do documento, como a pessoa mandou. */
+  nome: string | null;
+  /** "239 KB", "3,2 MB" ou vazio quando o tamanho não é conhecido. */
+  tamanho: string;
+  /** "0:09" (áudio e vídeo), quando conhecida. */
+  duracao: string | null;
+  largura: number | null;
+  altura: number | null;
+}
+
 export interface MensagemDaConversa {
   id: string;
   /** `true` = veio do contato; `false` = saiu do nosso lado. */
   recebida: boolean;
+  /** O texto da mensagem; quando há arquivo, é a legenda (e pode estar vazio). */
   texto: string;
+  arquivo: ArquivoDaMensagem | null;
   hora: string;
   /** "Hoje", "Ontem" ou a data por extenso: vira o separador de dias da conversa. */
   dia: string;
@@ -150,7 +183,63 @@ interface LinhaDeMensagem {
   created_at: string;
   from_panel: boolean;
   mine: boolean;
-  has_media: boolean;
+  attachment: LinhaDeArquivo | null;
+}
+
+interface LinhaDeArquivo {
+  kind: string;
+  content_type: string;
+  byte_size: number;
+  file_name: string | null;
+  duration_seconds: number | null;
+  width: number | null;
+  height: number | null;
+  is_voice: boolean;
+  object_key: string;
+  status: string;
+}
+
+const TIPOS_DE_ARQUIVO: readonly string[] = ['image', 'audio', 'video', 'document', 'sticker'];
+/** Terminação mais comum de cada tipo, para o arquivo baixado abrir com dois cliques. */
+const TERMINACAO: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'video/mp4': 'mp4',
+  'audio/ogg': 'ogg',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/webm': 'webm',
+  'audio/wav': 'wav',
+  'application/pdf': 'pdf',
+};
+
+/** Nome do arquivo ao baixar: o do documento; para os outros, "foto-2026-11-11-1405.jpg". */
+function nomeAoBaixar(linha: LinhaDeArquivo, tipo: TipoDeArquivo, quando: string): string {
+  if (linha.file_name?.trim()) return linha.file_name.trim();
+  const base = { image: 'foto', audio: 'audio', video: 'video', document: 'documento', sticker: 'figurinha' }[tipo];
+  const carimbo = carimboParaNomeDeArquivo(quando);
+  const terminacao = TERMINACAO[linha.content_type];
+  return `${base}${carimbo ? `-${carimbo}` : ''}${terminacao ? `.${terminacao}` : ''}`;
+}
+
+function lerArquivo(linha: LinhaDeArquivo | null | undefined, mensagem: LinhaDeMensagem, agora: Date): ArquivoDaMensagem | null {
+  if (!linha || typeof linha !== 'object') return null;
+  const tipo = (TIPOS_DE_ARQUIVO.includes(linha.kind) ? linha.kind : 'document') as TipoDeArquivo;
+  const situacao = situacaoDoArquivo(linha.status, mensagem.created_at, agora);
+  const disponivel = situacao === 'guardado' && ehCaminhoDeArquivo(linha.object_key);
+  return {
+    tipo,
+    situacao: situacao === 'guardado' && !disponivel ? 'falhou' : situacao,
+    descricao: nomeDoTipo(tipo, linha.is_voice === true),
+    endereco: disponivel ? enderecoDoArquivo(linha.object_key) : null,
+    enderecoParaBaixar: disponivel ? enderecoDoArquivo(linha.object_key, nomeAoBaixar(linha, tipo, mensagem.occurred_at)) : null,
+    nome: tipo === 'document' ? linha.file_name?.trim() || 'Documento' : null,
+    tamanho: tamanhoLegivel(linha.byte_size),
+    duracao: tipo === 'audio' || tipo === 'video' ? duracaoLegivel(linha.duration_seconds) : null,
+    largura: typeof linha.width === 'number' && linha.width > 0 ? linha.width : null,
+    altura: typeof linha.height === 'number' && linha.height > 0 ? linha.height : null,
+  };
 }
 
 interface RespostaDaConversa {
@@ -218,7 +307,8 @@ export async function carregarConversa(
         return {
           id: linha.id,
           recebida,
-          texto: linha.body_text ?? (linha.has_media ? '📎 Arquivo' : ''),
+          texto: linha.body_text ?? '',
+          arquivo: lerArquivo(linha.attachment, linha, agora),
           hora: horaDaMensagem(linha.occurred_at),
           dia: diaDaConversa(linha.occurred_at, agora),
           autor: recebida ? null : autorDoEnvio({ autor: linha.actor_type, doPainel: linha.from_panel, minha: linha.mine }),

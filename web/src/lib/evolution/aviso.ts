@@ -2,7 +2,24 @@
  * Entende os avisos (webhooks) que a Evolution manda para o painel.
  * Código puro: recebe o corpo do aviso e devolve só o que interessa, já conferido.
  */
+import { limparTipoDeConteudo, type TipoDeArquivo } from '@/lib/inbox/arquivos';
 import { telefoneDoJid } from '@/lib/instancias/regras';
+
+/** A ficha do arquivo que veio numa mensagem (o arquivo em si o painel busca depois, à parte). */
+export interface ArquivoDoAviso {
+  tipo: TipoDeArquivo;
+  /** Tipo de conteúdo, já limpo: "image/jpeg", "audio/ogg"... */
+  conteudo: string;
+  /** Tamanho em bytes, quando o WhatsApp informa. */
+  tamanho: number | null;
+  nome: string | null;
+  /** Duração em segundos (áudio e vídeo). */
+  duracao: number | null;
+  largura: number | null;
+  altura: number | null;
+  /** `true` para áudio gravado na hora (mensagem de voz). */
+  voz: boolean;
+}
 
 export type AvisoDaEvolution =
   | { tipo: 'conexao'; instancia: string; estado: string; telefone: string | null }
@@ -14,7 +31,15 @@ export type AvisoDaEvolution =
       /** Quem mandou, no formato 5585999990000@s.whatsapp.net. */
       remetente: string;
       nome: string | null;
-      texto: string;
+      /** O texto da mensagem; quando há arquivo, é a legenda (e pode não existir). */
+      texto: string | null;
+      /** Foto, áudio, vídeo, documento ou figurinha que veio na mensagem. */
+      arquivo: ArquivoDoAviso | null;
+      /**
+       * Só quando há arquivo: o pedaço do aviso que a Evolution precisa de volta para baixar o arquivo
+       * do WhatsApp ({ key, message }), sem a miniatura e sem a mensagem citada (que só pesam).
+       */
+      paraBuscar: { key: Objeto; message: Objeto } | null;
       /** Quando a mensagem foi enviada (ISO 8601). */
       quando: string;
       /** `true` quando a mensagem saiu do próprio chip (enviada pelo celular ou pelo painel). */
@@ -22,7 +47,7 @@ export type AvisoDaEvolution =
     }
   | { tipo: 'ignorado'; motivo: string };
 
-type Objeto = Record<string, unknown>;
+export type Objeto = Record<string, unknown>;
 
 const ehObjeto = (valor: unknown): valor is Objeto => typeof valor === 'object' && valor !== null && !Array.isArray(valor);
 const texto = (valor: unknown): string | null => (typeof valor === 'string' && valor.trim() ? valor.trim() : null);
@@ -51,51 +76,111 @@ function remetenteDaMensagem(chave: Objeto, dados: Objeto): string | null {
   return null;
 }
 
-/** Desembrulha mensagens temporárias e de "ver uma vez", que vêm uma dentro da outra. */
-function desembrulhar(mensagem: Objeto): Objeto {
+const EMBRULHOS = ['ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'viewOnceMessageV2Extension', 'documentWithCaptionMessage'];
+
+/**
+ * Desembrulha mensagens temporárias, com legenda e de "visualização única", que vêm uma dentro da outra.
+ * Também conta se algum dos embrulhos era de visualização única.
+ */
+function desembrulhar(mensagem: Objeto): { mensagem: Objeto; verUmaVez: boolean } {
   let atual = mensagem;
+  let verUmaVez = false;
   for (let nivel = 0; nivel < 4; nivel += 1) {
-    const interna = ['ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'documentWithCaptionMessage']
-      .map((chave) => atual[chave])
-      .find((valor): valor is Objeto => ehObjeto(valor) && ehObjeto(valor.message));
-    if (!interna) break;
-    atual = interna.message as Objeto;
+    const campo = EMBRULHOS.find((chave) => ehObjeto(atual[chave]) && ehObjeto((atual[chave] as Objeto).message));
+    if (!campo) break;
+    if (campo.startsWith('viewOnce')) verUmaVez = true;
+    atual = (atual[campo] as Objeto).message as Objeto;
   }
-  return atual;
+  return { mensagem: atual, verUmaVez };
 }
 
-const MIDIAS: Array<[campo: string, rotulo: string]> = [
-  ['imageMessage', '📷 Imagem'],
-  ['videoMessage', '🎬 Vídeo'],
-  ['audioMessage', '🎤 Áudio'],
-  ['documentMessage', '📎 Documento'],
-  ['stickerMessage', 'Figurinha'],
+/** Os tipos de mensagem que trazem um arquivo que o painel guarda e mostra. */
+const ARQUIVOS: Array<[campo: string, tipo: TipoDeArquivo, verUmaVez: string]> = [
+  ['imageMessage', 'image', '📷 Foto de visualização única'],
+  ['videoMessage', 'video', '🎥 Vídeo de visualização única'],
+  ['ptvMessage', 'video', '🎥 Vídeo de visualização única'],
+  ['audioMessage', 'audio', '🎤 Áudio de visualização única'],
+  ['documentMessage', 'document', '📄 Documento'],
+  ['stickerMessage', 'sticker', 'Figurinha'],
+];
+
+/** Tipos que o painel ainda não abre: entram como uma etiqueta, para a conversa não ficar com buracos. */
+const ETIQUETAS: Array<[campo: string, rotulo: string]> = [
   ['locationMessage', '📍 Localização'],
   ['liveLocationMessage', '📍 Localização em tempo real'],
   ['contactMessage', '👤 Contato'],
   ['contactsArrayMessage', '👤 Contatos'],
 ];
 
+/** O WhatsApp manda números grandes como número, como texto ou no formato {low, high}. */
+function numero(valor: unknown): number | null {
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
+  if (typeof valor === 'string' && /^[0-9]{1,15}$/.test(valor.trim())) return Number(valor.trim());
+  if (ehObjeto(valor) && typeof valor.low === 'number') {
+    const alto = typeof valor.high === 'number' ? valor.high : 0;
+    const total = alto * 2 ** 32 + (valor.low >>> 0);
+    return Number.isFinite(total) ? total : null;
+  }
+  return null;
+}
+
+const inteiroEntre = (valor: unknown, minimo: number, maximo: number): number | null => {
+  const lido = numero(valor);
+  return lido !== null && Number.isInteger(lido) && lido >= minimo && lido <= maximo ? lido : null;
+};
+
+function fichaDoArquivo(tipo: TipoDeArquivo, midia: Objeto): ArquivoDoAviso {
+  const tamanho = numero(midia.fileLength);
+  return {
+    tipo,
+    conteudo: limparTipoDeConteudo(midia.mimetype),
+    tamanho: tamanho !== null && tamanho >= 0 && tamanho < 1e15 ? Math.round(tamanho) : null,
+    nome: tipo === 'document' ? ((texto(midia.fileName) ?? texto(midia.title))?.slice(0, 200) ?? null) : null,
+    duracao: tipo === 'audio' || tipo === 'video' ? inteiroEntre(midia.seconds, 0, 86_400) : null,
+    largura: tipo === 'audio' || tipo === 'document' ? null : inteiroEntre(midia.width, 1, 20_000),
+    altura: tipo === 'audio' || tipo === 'document' ? null : inteiroEntre(midia.height, 1, 20_000),
+    voz: tipo === 'audio' && midia.ptt === true,
+  };
+}
+
 /**
- * O texto da mensagem. Enquanto o painel não mostra fotos e áudios, eles entram como uma
- * etiqueta ("📷 Imagem"), com a legenda quando houver, para a conversa não ficar com buracos.
+ * O que a mensagem traz: texto, arquivo (com a legenda como texto) ou os dois.
+ * `null` quando é um tipo de mensagem que o painel não mostra (reação, apagada, enquete...).
  */
-function textoDaMensagem(mensagemBruta: unknown): string | null {
+function conteudoDaMensagem(
+  mensagemBruta: unknown,
+): { texto: string | null; arquivo: ArquivoDoAviso | null; /** Onde o arquivo está dentro da mensagem. */ no?: { campo: string; midia: Objeto } } | null {
   if (!ehObjeto(mensagemBruta)) return null;
-  const mensagem = desembrulhar(mensagemBruta);
+  const { mensagem, verUmaVez } = desembrulhar(mensagemBruta);
 
   const simples = texto(mensagem.conversation);
-  if (simples) return simples;
+  if (simples) return { texto: simples, arquivo: null };
   const estendido = ehObjeto(mensagem.extendedTextMessage) ? texto(mensagem.extendedTextMessage.text) : null;
-  if (estendido) return estendido;
+  if (estendido) return { texto: estendido, arquivo: null };
 
-  for (const [campo, rotulo] of MIDIAS) {
+  for (const [campo, tipo, rotuloDeUmaVez] of ARQUIVOS) {
     const midia = mensagem[campo];
     if (!ehObjeto(midia)) continue;
     const legenda = texto(midia.caption);
-    return legenda ? `${rotulo}: ${legenda}` : rotulo;
+    // Visualização única: quem mandou escolheu que só se veja uma vez, no celular. O painel respeita e não guarda.
+    if (verUmaVez || midia.viewOnce === true) {
+      return { texto: `${rotuloDeUmaVez} (só abre no celular do chip)${legenda ? `: ${legenda}` : ''}`, arquivo: null };
+    }
+    return { texto: legenda, arquivo: fichaDoArquivo(tipo, midia), no: { campo, midia } };
+  }
+
+  for (const [campo, rotulo] of ETIQUETAS) {
+    if (ehObjeto(mensagem[campo])) return { texto: rotulo, arquivo: null };
   }
   return null;
+}
+
+/** A ficha do arquivo sem o que a Evolution não usa para baixar: a miniatura e a mensagem citada. */
+function semPeso(midia: Objeto): Objeto {
+  const leve = { ...midia };
+  delete leve.jpegThumbnail;
+  delete leve.contextInfo;
+  return leve;
 }
 
 /** O WhatsApp manda a hora em segundos; aceita número, texto ou o formato {low, high}. */
@@ -135,7 +220,7 @@ export function interpretarAviso(corpo: unknown, agora: Date = new Date()): Avis
     const remetente = remetenteDaMensagem(chave, dados);
     if (!remetente) return { tipo: 'ignorado', motivo: 'não é conversa com uma pessoa (grupo, status ou lista)' };
 
-    const conteudo = textoDaMensagem(dados.message);
+    const conteudo = conteudoDaMensagem(dados.message);
     if (!conteudo) return { tipo: 'ignorado', motivo: 'tipo de mensagem sem texto (reação, apagada, enquete...)' };
 
     return {
@@ -144,7 +229,9 @@ export function interpretarAviso(corpo: unknown, agora: Date = new Date()): Avis
       idDoEvento,
       remetente,
       nome: texto(dados.pushName)?.slice(0, 160) ?? null,
-      texto: conteudo.slice(0, TEXTO_MAXIMO),
+      texto: conteudo.texto?.slice(0, TEXTO_MAXIMO) ?? null,
+      arquivo: conteudo.arquivo,
+      paraBuscar: conteudo.no ? { key: chave, message: { [conteudo.no.campo]: semPeso(conteudo.no.midia) } } : null,
       quando: quandoFoi(dados.messageTimestamp, agora),
       deMim: evento === 'SEND_MESSAGE' || chave.fromMe === true,
     };

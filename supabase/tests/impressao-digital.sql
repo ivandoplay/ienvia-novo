@@ -68,11 +68,27 @@ permissoes_funcao as (
   cross join (values ('anon'), ('authenticated'), ('service_role')) as papel(nome)
   where n.nspname in ('public', 'private')
 ),
+deposito as (
+  -- o depósito de arquivos (Supabase Storage): os depósitos que existem, as regras de acesso e a trava de linhas
+  select 'deposito', 'deposito:' || b.id || ':' || coalesce(b.public, false)::text || ':' || coalesce(b.file_size_limit::text, '')
+           || ':' || coalesce(array_to_string(b.allowed_mime_types, ','), '')
+  from storage.buckets b
+  union all
+  select 'deposito', 'politica:' || schemaname || '.' || tablename || ':' || policyname || ':' || cmd || ':' || array_to_string(roles, ',')
+           || ':' || coalesce(qual, '') || ':' || coalesce(with_check, '')
+  from pg_policies
+  where schemaname = 'storage'
+  union all
+  select 'deposito', 'rls_ligado:storage.objects:' || c.relrowsecurity::text
+  from pg_class c
+  where c.oid = 'storage.objects'::regclass
+),
 tudo as (
   select * from colunas union all select * from restricoes union all select * from indices
   union all select * from politicas union all select * from rls union all select * from funcoes
   union all select * from gatilhos union all select * from permissoes_tabela
   union all select * from permissoes_coluna union all select * from permissoes_funcao
+  union all select * from deposito
 )
 select categoria, count(*)::int as itens, md5(string_agg(item, E'\n' order by item collate "C")) as md5
 from tudo

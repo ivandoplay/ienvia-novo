@@ -563,6 +563,9 @@
   color: var(--text-main);
   box-shadow: var(--shadow-lg);
 }
+.dialogo--largo {
+  width: min(960px, calc(100vw - 28px));
+}
 .dialogo::backdrop {
   background: rgba(3, 10, 12, 0.66);
 }

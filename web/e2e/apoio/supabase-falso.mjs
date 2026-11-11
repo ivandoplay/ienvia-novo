@@ -8,6 +8,9 @@
  *   - contagem de linhas               (HEAD + Prefer: count=exact)
  *   - as ações dos chips               (/rest/v1/rpc/create_my_evolution_instance e afins)
  *   - a Inbox                          (/rest/v1/rpc/read_my_inbox, start_my_text_message e afins)
+ *   - o depósito de arquivos           (/storage/v1/object/...: assinar, subir, ler e baixar)
+ *   - o que o servidor do painel faz com a "chave do servidor" ao receber um aviso da Evolution
+ *     (ingest_evolution_message, begin_media_download, complete_media_download)
  *
  * Ele respeita a regra mais importante do banco real: cada pessoa só enxerga as linhas
  * dos workspaces de que participa. As regras de verdade (RLS) são testadas à parte,
@@ -15,13 +18,33 @@
  */
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { PARTICIPACOES, SENHA_DE_TESTE, USUARIOS, WORKSPACES, WORKSPACE_INBOX, criarInbox, criarTabelas } from './dados.mjs';
+import {
+  CHAVE_DE_SERVICO_DE_TESTE,
+  PARTICIPACOES,
+  SEGREDOS_DOS_AVISOS,
+  SENHA_DE_TESTE,
+  USUARIOS,
+  WORKSPACES,
+  WORKSPACE_INBOX,
+  criarInbox,
+  criarTabelas,
+  previaDaMensagem,
+} from './dados.mjs';
 
 const PORTA = Number(process.env.PORTA_SUPABASE_FALSO ?? 54399);
 const SEGREDO_JWT = 'segredo-so-para-testes';
 const UMA_HORA = 3600;
 
 const tabelas = criarTabelas();
+
+/** O depósito de arquivos: caminho → { dados, conteudo }. Começa com os arquivos das conversas de exemplo. */
+const deposito = new Map(criarInbox().arquivos.map((arquivo) => [arquivo.caminho, { dados: arquivo.dados, conteudo: arquivo.conteudo }]));
+/** Endereços assinados que o depósito já entregou: código → { caminho, uso: 'subir' | 'ler' }. */
+const assinaturas = new Map();
+/** Avisos da Evolution já recebidos (o mesmo aviso nunca é gravado duas vezes). */
+const avisosRecebidos = new Set();
+/** Só para os testes: quantas das próximas subidas de arquivo vão falhar (simula a internet caindo no meio). */
+let subidasQueVaoFalhar = 0;
 /** token de acesso → id do usuário */
 const sessoes = new Map();
 /** token de renovação → id do usuário */
@@ -76,11 +99,15 @@ function abrirSessao(usuario) {
   };
 }
 
+const tokenDaRequisicao = (req) => String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+
 function usuarioDaRequisicao(req) {
-  const token = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
-  const id = sessoes.get(token);
+  const id = sessoes.get(tokenDaRequisicao(req));
   return id ? USUARIOS.find((usuario) => usuario.id === id) : undefined;
 }
+
+/** O pedido veio do servidor do painel, com a chave do servidor? (ela ignora as regras por usuário) */
+const ehOServidorDoPainel = (req) => tokenDaRequisicao(req) === CHAVE_DE_SERVICO_DE_TESTE;
 
 function workspacesDoUsuario(usuario) {
   return PARTICIPACOES.filter((p) => p.user_id === usuario.id && p.status === 'active').map((p) => p.workspace_id);
@@ -107,6 +134,19 @@ function lerCorpo(req) {
         resolve({});
       }
     });
+  });
+}
+
+/** O corpo do pedido como veio (um arquivo), com um teto para não estourar a memória do teste. */
+function lerArquivo(req, teto = 40 * 1024 * 1024) {
+  return new Promise((resolve) => {
+    const partes = [];
+    let tamanho = 0;
+    req.on('data', (parte) => {
+      tamanho += parte.length;
+      if (tamanho <= teto) partes.push(parte);
+    });
+    req.on('end', () => resolve({ dados: Buffer.concat(partes), tamanho }));
   });
 }
 
@@ -233,9 +273,19 @@ const FUNCOES_DA_INBOX = [
   'read_my_conversation',
   'read_my_inbox_version',
   'start_my_text_message',
+  'start_my_media_message',
   'finish_my_text_message',
   'transition_workspace_conversation',
 ];
+/** Funções que só o servidor do painel chama (com a chave do servidor). */
+const FUNCOES_DO_SERVIDOR = ['ingest_evolution_message', 'begin_media_download', 'complete_media_download'];
+
+const MB = 1024 * 1024;
+const CAMINHO_DE_ENVIO = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/envios\/[a-zA-Z0-9_-]{16,80}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
+
+const fichaDoArquivo = (mensagemId) => tabelas.message_attachments.find((ficha) => ficha.message_id === mensagemId);
+/** A ficha do arquivo no formato que previaDaMensagem entende. */
+const anexoParaPrevia = (ficha) => (ficha ? { tipo: ficha.kind, voz: ficha.is_voice, nome: ficha.file_name } : null);
 
 const limitar = (valor, padrao, maximo) => Math.min(Math.max(Number.isInteger(valor) ? valor : padrao, 1), maximo);
 
@@ -364,18 +414,34 @@ function acoesDaInbox(res, usuario, nome, corpo) {
       messages: mensagens
         .slice(0, limite)
         .reverse()
-        .map((mensagem) => ({
-          id: mensagem.id,
-          direction: mensagem.direction,
-          actor_type: mensagem.actor_type,
-          status: mensagem.status,
-          body_text: mensagem.body_text,
-          occurred_at: mensagem.occurred_at,
-          created_at: mensagem.created_at,
-          from_panel: Boolean(mensagem.sent_by),
-          mine: mensagem.sent_by === usuario.id,
-          has_media: false,
-        })),
+        .map((mensagem) => {
+          const ficha = fichaDoArquivo(mensagem.id);
+          return {
+            id: mensagem.id,
+            direction: mensagem.direction,
+            actor_type: mensagem.actor_type,
+            status: mensagem.status,
+            body_text: mensagem.body_text,
+            occurred_at: mensagem.occurred_at,
+            created_at: mensagem.created_at,
+            from_panel: Boolean(mensagem.sent_by),
+            mine: mensagem.sent_by === usuario.id,
+            attachment: ficha
+              ? {
+                  kind: ficha.kind,
+                  content_type: ficha.content_type,
+                  byte_size: ficha.byte_size,
+                  file_name: ficha.file_name,
+                  duration_seconds: ficha.duration_seconds,
+                  width: ficha.width,
+                  height: ficha.height,
+                  is_voice: ficha.is_voice,
+                  object_key: ficha.object_key,
+                  status: ficha.storage_status,
+                }
+              : null,
+          };
+        }),
       has_more: mensagens.length > limite,
     });
   }
@@ -434,6 +500,99 @@ function acoesDaInbox(res, usuario, nome, corpo) {
     });
   }
 
+  if (nome === 'start_my_media_message') {
+    const legenda = String(corpo.p_caption ?? '').trim() || null;
+    if (typeof corpo.p_idempotency_key !== 'string' || !/^[a-zA-Z0-9_-]{16,80}$/.test(corpo.p_idempotency_key)) {
+      return erro(400, '22023', 'Invalid idempotency key');
+    }
+    if (!['image', 'audio', 'video', 'document'].includes(corpo.p_kind)) return erro(400, '22023', 'Invalid media kind');
+    if ((legenda?.length ?? 0) > 1024 || (corpo.p_kind === 'audio' && legenda)) return erro(400, '22023', 'Invalid caption');
+
+    const conversa = daEmpresa('conversations').find((item) => item.id === corpo.p_conversation_id);
+    if (!conversa) return erro(400, 'P0002', 'Conversation not found');
+    const repetida = daEmpresa('messages').find((mensagem) => mensagem.idempotency_key === corpo.p_idempotency_key);
+    if (repetida) return responder(res, 200, { message_id: repetida.id, status: repetida.status, already_exists: true });
+    if (['resolved', 'archived'].includes(conversa.stage)) return erro(400, 'P0001', 'conversation_closed');
+
+    const chip = chipDe(conversa);
+    if (!chip.id || chip.engine !== 'evolution' || chip.status === 'revoked' || !chip.provider_instance_name) {
+      return erro(400, 'P0001', 'instance_unavailable');
+    }
+    if (chip.status !== 'connected') return erro(400, 'P0001', 'instance_not_connected');
+    const contato = contatoDe(conversa);
+    if (!contato.id || contato.erased_at || !/^[1-9][0-9]{5,19}@s[.]whatsapp[.]net$/.test(String(contato.external_user_id ?? ''))) {
+      return erro(400, 'P0001', 'contact_unreachable');
+    }
+
+    const caminho = String(corpo.p_object_key ?? '');
+    if (!CAMINHO_DE_ENVIO.test(caminho) || !caminho.startsWith(`${workspaceId}/${conversa.id}/envios/${corpo.p_idempotency_key}/`)) {
+      return erro(400, '22023', 'Invalid media path');
+    }
+    const guardado = deposito.get(caminho);
+    if (!guardado) return erro(400, 'P0001', 'media_not_uploaded');
+    const tamanho = guardado.dados.length;
+    const conteudo = String(guardado.conteudo ?? '').split(';')[0].trim().toLowerCase() || 'application/octet-stream';
+    if (tamanho < 1) return erro(400, 'P0001', 'media_empty');
+    if (tamanho > (corpo.p_kind === 'document' ? 25 : 16) * MB) return erro(400, 'P0001', 'media_too_large');
+    if (
+      (corpo.p_kind === 'image' && !['image/jpeg', 'image/png', 'image/webp'].includes(conteudo)) ||
+      (corpo.p_kind === 'video' && conteudo !== 'video/mp4') ||
+      (corpo.p_kind === 'audio' && !conteudo.startsWith('audio/'))
+    ) {
+      return erro(400, 'P0001', 'media_type_mismatch');
+    }
+
+    const agora = new Date().toISOString();
+    const nomeDoArquivo = String(corpo.p_file_name ?? '').trim().slice(0, 200) || null;
+    const nova = {
+      id: crypto.randomUUID(),
+      workspace_id: workspaceId,
+      conversation_id: conversa.id,
+      instance_id: chip.id,
+      provider_message_id: null,
+      idempotency_key: corpo.p_idempotency_key,
+      direction: 'outbound',
+      source_engine: 'evolution',
+      actor_type: 'human',
+      status: 'sending',
+      body_text: legenda,
+      media_object_key: caminho,
+      occurred_at: agora,
+      created_at: agora,
+      sent_by: usuario.id,
+    };
+    tabelas.messages.push(nova);
+    const inteiroEntre = (valor, minimo, maximo) => (Number.isInteger(valor) && valor >= minimo && valor <= maximo ? valor : null);
+    tabelas.message_attachments.push({
+      id: crypto.randomUUID(),
+      workspace_id: workspaceId,
+      message_id: nova.id,
+      object_key: caminho,
+      kind: corpo.p_kind,
+      content_type: conteudo,
+      byte_size: tamanho,
+      file_name: nomeDoArquivo,
+      duration_seconds: inteiroEntre(corpo.p_duration_seconds, 0, 86400),
+      width: inteiroEntre(corpo.p_width, 1, 20000),
+      height: inteiroEntre(corpo.p_height, 1, 20000),
+      is_voice: corpo.p_kind === 'audio',
+      storage_status: 'stored',
+    });
+    return responder(res, 200, {
+      message_id: nova.id,
+      status: nova.status,
+      already_exists: false,
+      provider_instance_name: chip.provider_instance_name,
+      recipient: contato.external_user_id,
+      object_key: caminho,
+      kind: corpo.p_kind,
+      content_type: conteudo,
+      byte_size: tamanho,
+      file_name: nomeDoArquivo,
+      caption: legenda,
+    });
+  }
+
   if (nome === 'finish_my_text_message') {
     if (!['sent', 'failed', 'uncertain'].includes(corpo.p_outcome)) return erro(400, '22023', 'Invalid outcome');
     const mensagem = daEmpresa('messages').find((item) => item.id === corpo.p_message_id && item.direction === 'outbound');
@@ -450,7 +609,9 @@ function acoesDaInbox(res, usuario, nome, corpo) {
     mensagem.status = { sent: 'sent', failed: 'failed', uncertain: 'awaiting_human_confirmation' }[corpo.p_outcome];
     if (corpo.p_outcome === 'sent' && corpo.p_provider_message_id) mensagem.provider_message_id = corpo.p_provider_message_id;
     const conversa = daEmpresa('conversations').find((item) => item.id === mensagem.conversation_id);
-    if (conversa && mensagem.status === 'sent') tocarConversaDepoisDoEnvio(conversa, mensagem.body_text, mensagem.occurred_at);
+    if (conversa && mensagem.status === 'sent') {
+      tocarConversaDepoisDoEnvio(conversa, previaDaMensagem(mensagem.body_text, anexoParaPrevia(fichaDoArquivo(mensagem.id))), mensagem.occurred_at);
+    }
     anotarMudanca(workspaceId);
     return responder(res, 200, { message_id: mensagem.id, status: mensagem.status, changed: true });
   }
@@ -499,12 +660,341 @@ function acoesDaInbox(res, usuario, nome, corpo) {
   return erro(404, 'PGRST202', `Função não imitada: ${nome}`);
 }
 
+/**
+ * O que o servidor do painel faz, com a chave do servidor, quando chega um aviso da Evolution:
+ * gravar a mensagem e, se ela trouxe um arquivo, reservar e anotar a busca dele.
+ * (As regras de verdade estão em supabase/migrations e são testadas em supabase/tests/midia.test.ts.)
+ */
+function acoesDoServidor(res, nome, corpo) {
+  if (nome === 'ingest_evolution_message') {
+    const chip = tabelas.instances.find(
+      (item) => item.provider_instance_name === corpo.p_instance_name && item.engine === 'evolution' && item.status !== 'revoked',
+    );
+    const segredo = SEGREDOS_DOS_AVISOS[corpo.p_instance_name];
+    const resumoCerto = segredo ? crypto.createHash('sha256').update(segredo).digest('hex') : null;
+    if (!chip || !resumoCerto || corpo.p_token_sha256 !== resumoCerto) return responder(res, 200, { result: 'unauthorized' });
+
+    const marca = `${chip.id}:${corpo.p_event_id}`;
+    if (avisosRecebidos.has(marca)) return responder(res, 200, { result: 'duplicate' });
+    avisosRecebidos.add(marca);
+
+    const texto = String(corpo.p_body_text ?? '').trim() || null;
+    const midia = corpo.p_media && typeof corpo.p_media === 'object' && !Array.isArray(corpo.p_media) ? corpo.p_media : null;
+    if (!/^[1-9][0-9]{5,19}@s[.]whatsapp[.]net$/.test(String(corpo.p_sender_jid ?? '')) || (!texto && !midia)) {
+      return responder(res, 200, { result: 'ignored' });
+    }
+
+    const workspaceId = chip.workspace_id;
+    const deMim = corpo.p_from_me === true;
+    const quando = corpo.p_occurred_at ?? new Date().toISOString();
+    const agora = new Date().toISOString();
+
+    let contato = tabelas.contacts.find(
+      (item) => item.workspace_id === workspaceId && item.instance_id === chip.id && item.external_user_id === corpo.p_sender_jid && !item.erased_at,
+    );
+    if (!contato) {
+      contato = {
+        workspace_id: workspaceId,
+        id: crypto.randomUUID(),
+        instance_id: chip.id,
+        display_name: deMim ? '' : String(corpo.p_push_name ?? '').trim().slice(0, 160),
+        phone_e164: `+${String(corpo.p_sender_jid).split('@')[0]}`,
+        external_user_id: corpo.p_sender_jid,
+        erased_at: null,
+        created_at: agora,
+      };
+      tabelas.contacts.push(contato);
+    }
+    let conversa = tabelas.conversations
+      .filter((item) => item.workspace_id === workspaceId && item.contact_id === contato.id && item.instance_id === chip.id && ETAPAS_ABERTAS.includes(item.stage))
+      .sort((a, b) => String(b.activity_at).localeCompare(String(a.activity_at)))[0];
+    if (!conversa) {
+      conversa = {
+        workspace_id: workspaceId,
+        id: crypto.randomUUID(),
+        contact_id: contato.id,
+        instance_id: chip.id,
+        stage: deMim ? 'waiting_customer' : 'new',
+        unread_count: 0,
+        automation_paused: false,
+        last_message_at: null,
+        last_message_preview: null,
+        activity_at: quando,
+        created_at: agora,
+      };
+      tabelas.conversations.push(conversa);
+    }
+
+    const mensagemId = crypto.randomUUID();
+    let ficha = null;
+    if (midia) {
+      const tipo = ['image', 'audio', 'video', 'document', 'sticker'].includes(midia.kind) ? midia.kind : 'document';
+      const nomeDoArquivo = String(midia.file_name ?? '').trim().slice(0, 200) || null;
+      const nomeSeguro =
+        (nomeDoArquivo ?? '')
+          .toLowerCase()
+          .replace(/[^a-z0-9._-]+/g, '-')
+          .replace(/^[-._]+|[-._]+$/g, '')
+          .slice(0, 100) || { image: 'foto', video: 'video', audio: 'audio', sticker: 'figurinha' }[tipo] || 'documento';
+      const tamanho = Number.isInteger(midia.size) && midia.size >= 0 ? midia.size : 0;
+      const inteiroEntre = (valor, minimo, maximo) => (Number.isInteger(valor) && valor >= minimo && valor <= maximo ? valor : null);
+      ficha = {
+        id: crypto.randomUUID(),
+        workspace_id: workspaceId,
+        message_id: mensagemId,
+        object_key: `${workspaceId}/${conversa.id}/${mensagemId}/${nomeSeguro}`,
+        kind: tipo,
+        content_type: /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(String(midia.mime ?? '')) ? midia.mime : 'application/octet-stream',
+        byte_size: tamanho,
+        file_name: nomeDoArquivo,
+        duration_seconds: inteiroEntre(midia.duration, 0, 86400),
+        width: inteiroEntre(midia.width, 1, 20000),
+        height: inteiroEntre(midia.height, 1, 20000),
+        is_voice: midia.voice === true,
+        storage_status: tamanho > 25 * MB ? 'too_large' : 'pending',
+      };
+      tabelas.message_attachments.push(ficha);
+    }
+    tabelas.messages.push({
+      id: mensagemId,
+      workspace_id: workspaceId,
+      conversation_id: conversa.id,
+      instance_id: chip.id,
+      provider_message_id: corpo.p_event_id,
+      idempotency_key: null,
+      direction: deMim ? 'outbound' : 'inbound',
+      source_engine: 'evolution',
+      actor_type: deMim ? 'human' : 'contact',
+      status: deMim ? 'sent' : 'received',
+      body_text: texto,
+      media_object_key: ficha?.object_key ?? null,
+      occurred_at: quando,
+      created_at: agora,
+      sent_by: null,
+    });
+
+    const previa = previaDaMensagem(texto, anexoParaPrevia(ficha));
+    if (deMim) {
+      tocarConversaDepoisDoEnvio(conversa, previa, quando);
+    } else {
+      if (!conversa.last_message_at || quando >= conversa.last_message_at) conversa.last_message_preview = previa;
+      if (!conversa.last_message_at || quando > conversa.last_message_at) conversa.last_message_at = quando;
+      conversa.activity_at = conversa.last_message_at;
+      conversa.unread_count = (conversa.unread_count ?? 0) + 1;
+      if (conversa.stage === 'waiting_customer') conversa.stage = 'human';
+    }
+    anotarMudanca(workspaceId);
+    return responder(res, 200, {
+      result: 'accepted',
+      workspace_id: workspaceId,
+      instance_id: chip.id,
+      contact_id: contato.id,
+      conversation_id: conversa.id,
+      message_id: mensagemId,
+      direction: deMim ? 'outbound' : 'inbound',
+      adopted: false,
+      media: ficha ? { object_key: ficha.object_key, status: ficha.storage_status } : null,
+    });
+  }
+
+  const ficha = tabelas.message_attachments.find((item) => item.workspace_id === corpo.p_workspace_id && item.message_id === corpo.p_message_id);
+
+  if (nome === 'begin_media_download') {
+    if (!ficha) return responder(res, 200, { claimed: false, reason: 'not_found' });
+    if (!['pending', 'failed'].includes(ficha.storage_status)) return responder(res, 200, { claimed: false, reason: ficha.storage_status });
+    const mensagem = tabelas.messages.find((item) => item.id === ficha.message_id);
+    const conversa = tabelas.conversations.find((item) => item.id === mensagem?.conversation_id);
+    const contato = tabelas.contacts.find((item) => item.id === conversa?.contact_id);
+    const chip = tabelas.instances.find((item) => item.id === mensagem?.instance_id);
+    if (!mensagem?.provider_message_id || !chip?.provider_instance_name || chip.engine !== 'evolution' || chip.status === 'revoked') {
+      return responder(res, 200, { claimed: false, reason: 'unavailable' });
+    }
+    ficha.storage_status = 'pending';
+    return responder(res, 200, {
+      claimed: true,
+      object_key: ficha.object_key,
+      kind: ficha.kind,
+      content_type: ficha.content_type,
+      provider_instance_name: chip.provider_instance_name,
+      provider_message_id: mensagem.provider_message_id,
+      remote_jid: contato?.external_user_id ?? null,
+      from_me: mensagem.direction === 'outbound',
+    });
+  }
+
+  if (nome === 'complete_media_download') {
+    if (!['stored', 'failed', 'too_large'].includes(corpo.p_outcome)) {
+      return responder(res, 400, { code: '22023', details: null, hint: null, message: 'Invalid outcome' });
+    }
+    if (!ficha || !['pending', 'failed'].includes(ficha.storage_status)) return responder(res, 200, { changed: false });
+    ficha.storage_status = corpo.p_outcome;
+    if (corpo.p_outcome === 'stored') {
+      if (corpo.p_content_type) ficha.content_type = String(corpo.p_content_type).toLowerCase();
+      ficha.byte_size = corpo.p_byte_size;
+    }
+    // É isto que faz as telas abertas perceberem que o arquivo chegou (ou não).
+    anotarMudanca(ficha.workspace_id);
+    return responder(res, 200, { changed: true, status: ficha.storage_status });
+  }
+
+  return responder(res, 404, { code: 'PGRST202', details: null, hint: null, message: `Função não imitada: ${nome}` });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Depósito de arquivos (Supabase Storage)                                    */
+/* -------------------------------------------------------------------------- */
+
+/** O navegador fala direto com o depósito, a partir de outro endereço (o do painel). */
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET,HEAD,PUT,POST,DELETE,OPTIONS',
+  'access-control-allow-headers': '*',
+  'access-control-max-age': '3600',
+};
+const NOME_DO_DEPOSITO = 'midias';
+const LIMITE_DO_DEPOSITO = 25 * MB;
+
+/** As respostas de erro têm o formato do depósito de verdade (sempre HTTP 400, com o código por dentro). */
+const erroDoDeposito = (res, codigo, erro, mensagem) => responder(res, 400, { statusCode: String(codigo), error: erro, message: mensagem }, CORS);
+const naoEncontradoNoDeposito = (res) => erroDoDeposito(res, 404, 'not_found', 'Object not found');
+
+/** Quem pode ler: o servidor do painel, ou quem participa da empresa (a empresa é a primeira pasta do caminho). */
+function podeLerNoDeposito(req, caminho) {
+  if (ehOServidorDoPainel(req)) return true;
+  const usuario = usuarioDaRequisicao(req);
+  return Boolean(usuario && workspacesDoUsuario(usuario).includes(caminho.split('/')[0]));
+}
+
+/** Quem pode subir: o servidor do painel; ou a pessoa, só na pasta "envios" de uma conversa da própria empresa. */
+function podeSubirNoDeposito(req, caminho) {
+  if (ehOServidorDoPainel(req)) return true;
+  const usuario = usuarioDaRequisicao(req);
+  const [workspaceId, conversaId] = caminho.split('/');
+  return Boolean(
+    usuario &&
+      CAMINHO_DE_ENVIO.test(caminho) &&
+      workspacesDoUsuario(usuario).includes(workspaceId) &&
+      tabelas.conversations.some((conversa) => conversa.workspace_id === workspaceId && conversa.id === conversaId),
+  );
+}
+
+function assinar(caminho, uso) {
+  const codigo = crypto.randomBytes(18).toString('hex');
+  assinaturas.set(codigo, { caminho, uso });
+  return codigo;
+}
+
+/** Entrega um arquivo, inteiro ou só o pedaço pedido (o tocador de áudio e vídeo do navegador pede pedaços). */
+function entregarArquivo(req, res, arquivo, baixarComo) {
+  const total = arquivo.dados.length;
+  const cabecalhos = {
+    ...CORS,
+    'content-type': arquivo.conteudo,
+    'accept-ranges': 'bytes',
+    'cache-control': 'max-age=3600',
+    ...(baixarComo ? { 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(baixarComo)}` } : {}),
+  };
+  const faixa = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+  if (faixa && (faixa[1] || faixa[2])) {
+    const inicio = faixa[1] ? Number(faixa[1]) : Math.max(total - Number(faixa[2]), 0);
+    const fim = faixa[1] && faixa[2] ? Math.min(Number(faixa[2]), total - 1) : total - 1;
+    if (inicio > fim || inicio >= total) {
+      res.writeHead(416, { ...cabecalhos, 'content-range': `bytes */${total}` });
+      return res.end();
+    }
+    res.writeHead(206, { ...cabecalhos, 'content-range': `bytes ${inicio}-${fim}/${total}`, 'content-length': fim - inicio + 1 });
+    return res.end(req.method === 'HEAD' ? undefined : arquivo.dados.subarray(inicio, fim + 1));
+  }
+  res.writeHead(200, { ...cabecalhos, 'content-length': total });
+  return res.end(req.method === 'HEAD' ? undefined : arquivo.dados);
+}
+
+async function rotasDoDeposito(req, res, url) {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS);
+    return res.end();
+  }
+  const resto = decodeURIComponent(url.pathname.slice('/storage/v1/'.length));
+  const depois = (prefixo) => (resto.startsWith(prefixo) ? resto.slice(prefixo.length) : null);
+  const codigo = url.searchParams.get('token') ?? '';
+
+  // Pedir um endereço de uso único para subir um arquivo.
+  let caminho = depois(`object/upload/sign/${NOME_DO_DEPOSITO}/`);
+  if (caminho !== null && req.method === 'POST') {
+    if (!podeSubirNoDeposito(req, caminho)) return erroDoDeposito(res, 403, 'Unauthorized', 'new row violates row-level security policy');
+    if (deposito.has(caminho)) return erroDoDeposito(res, 409, 'Duplicate', 'The resource already exists');
+    const novo = assinar(caminho, 'subir');
+    return responder(res, 200, { url: `/object/upload/sign/${NOME_DO_DEPOSITO}/${caminho}?token=${novo}`, token: novo }, CORS);
+  }
+  // Subir o arquivo nesse endereço (sem login: o que vale é o código do endereço).
+  if (caminho !== null && req.method === 'PUT') {
+    const { dados, tamanho } = await lerArquivo(req);
+    if (subidasQueVaoFalhar > 0) {
+      subidasQueVaoFalhar -= 1;
+      return responder(res, 500, { statusCode: '500', error: 'Internal', message: 'falha simulada ao subir' }, CORS);
+    }
+    const assinatura = assinaturas.get(codigo);
+    if (!assinatura || assinatura.uso !== 'subir' || assinatura.caminho !== caminho) return erroDoDeposito(res, 400, 'InvalidJWT', 'Invalid JWT');
+    if (deposito.has(caminho)) return erroDoDeposito(res, 409, 'Duplicate', 'The resource already exists');
+    if (tamanho > LIMITE_DO_DEPOSITO) return erroDoDeposito(res, 413, 'Payload too large', 'The object exceeded the maximum allowed size');
+    deposito.set(caminho, { dados, conteudo: String(req.headers['content-type'] ?? 'application/octet-stream') });
+    return responder(res, 200, { Key: `${NOME_DO_DEPOSITO}/${caminho}` }, CORS);
+  }
+
+  // Pedir um endereço de leitura que vale por pouco tempo.
+  caminho = depois(`object/sign/${NOME_DO_DEPOSITO}/`);
+  if (caminho !== null && req.method === 'POST') {
+    if (!podeLerNoDeposito(req, caminho) || !deposito.has(caminho)) return naoEncontradoNoDeposito(res);
+    return responder(res, 200, { signedURL: `/object/sign/${NOME_DO_DEPOSITO}/${caminho}?token=${assinar(caminho, 'ler')}` }, CORS);
+  }
+  // Ler nesse endereço (sem login).
+  if (caminho !== null && (req.method === 'GET' || req.method === 'HEAD')) {
+    const assinatura = assinaturas.get(codigo);
+    const arquivo = deposito.get(caminho);
+    if (!assinatura || assinatura.uso !== 'ler' || assinatura.caminho !== caminho) return erroDoDeposito(res, 400, 'InvalidJWT', 'Invalid JWT');
+    if (!arquivo) return naoEncontradoNoDeposito(res);
+    return entregarArquivo(req, res, arquivo, url.searchParams.get('download'));
+  }
+
+  // Apagar (só o servidor do painel).
+  if (resto === `object/${NOME_DO_DEPOSITO}` && req.method === 'DELETE') {
+    if (!ehOServidorDoPainel(req)) return erroDoDeposito(res, 403, 'Unauthorized', 'new row violates row-level security policy');
+    const { prefixes: caminhos = [] } = await lerCorpo(req);
+    const apagados = caminhos.filter((item) => deposito.delete(item));
+    return responder(res, 200, apagados.map((item) => ({ name: item, bucket_id: NOME_DO_DEPOSITO })), CORS);
+  }
+
+  caminho = depois(`object/${NOME_DO_DEPOSITO}/`);
+  // Ler com login (é como o servidor do painel lê o arquivo que vai enviar).
+  if (caminho !== null && req.method === 'GET') {
+    const arquivo = deposito.get(caminho);
+    if (!podeLerNoDeposito(req, caminho) || !arquivo) return naoEncontradoNoDeposito(res);
+    return entregarArquivo(req, res, arquivo, null);
+  }
+  // Guardar com login (é como o servidor do painel guarda o arquivo que buscou na Evolution).
+  if (caminho !== null && req.method === 'POST') {
+    const { dados, tamanho } = await lerArquivo(req);
+    if (!podeSubirNoDeposito(req, caminho)) return erroDoDeposito(res, 403, 'Unauthorized', 'new row violates row-level security policy');
+    if (deposito.has(caminho) && req.headers['x-upsert'] !== 'true') return erroDoDeposito(res, 409, 'Duplicate', 'The resource already exists');
+    if (tamanho > LIMITE_DO_DEPOSITO) return erroDoDeposito(res, 413, 'Payload too large', 'The object exceeded the maximum allowed size');
+    deposito.set(caminho, { dados, conteudo: String(req.headers['content-type'] ?? 'application/octet-stream') });
+    return responder(res, 200, { Key: `${NOME_DO_DEPOSITO}/${caminho}`, Id: crypto.randomUUID() }, CORS);
+  }
+
+  return responder(res, 404, { message: `Rota do depósito não imitada: ${req.method} ${url.pathname}` }, CORS);
+}
+
 /** Só para os testes: põe as conversas da Empresa da Inbox de volta no começo. */
 function reiniciarInbox() {
   const inbox = criarInbox();
-  for (const tabela of ['instances', 'contacts', 'conversations', 'messages']) {
+  for (const tabela of ['instances', 'contacts', 'conversations', 'messages', 'message_attachments']) {
     tabelas[tabela] = [...tabelas[tabela].filter((linha) => linha.workspace_id !== WORKSPACE_INBOX), ...inbox[tabela]];
   }
+  for (const caminho of [...deposito.keys()]) if (caminho.startsWith(`${WORKSPACE_INBOX}/`)) deposito.delete(caminho);
+  for (const arquivo of inbox.arquivos) deposito.set(arquivo.caminho, { dados: arquivo.dados, conteudo: arquivo.conteudo });
+  assinaturas.clear();
+  avisosRecebidos.clear();
+  subidasQueVaoFalhar = 0;
   anotarMudanca(WORKSPACE_INBOX);
 }
 
@@ -541,10 +1031,17 @@ function receberMensagem(conversaId, texto) {
 }
 
 async function rotasDeDados(req, res, url) {
+  const recurso = url.pathname.replace('/rest/v1/', '');
+
+  // O servidor do painel, com a chave do servidor (não há pessoa logada: é o aviso da Evolution chegando).
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DO_SERVIDOR.includes(recurso.slice(4))) {
+    if (!ehOServidorDoPainel(req)) return responder(res, 403, { code: '42501', details: null, hint: null, message: 'permission denied for function' });
+    return acoesDoServidor(res, recurso.slice(4), await lerCorpo(req));
+  }
+
   const usuario = usuarioDaRequisicao(req);
   if (!usuario) return naoAutorizado(res);
   const permitidos = workspacesDoUsuario(usuario);
-  const recurso = url.pathname.replace('/rest/v1/', '');
 
   if (req.method === 'POST' && FUNCOES_DA_INBOX.includes(recurso.slice(4)) && recurso.startsWith('rpc/')) {
     return acoesDaInbox(res, usuario, recurso.slice(4), await lerCorpo(req));
@@ -621,9 +1118,37 @@ const servidor = http.createServer(async (req, res) => {
       return responder(
         res,
         200,
-        tabelas.messages.filter((mensagem) => mensagem.conversation_id === conversa).map(({ body_text, status, direction, provider_message_id }) => ({ body_text, status, direction, provider_message_id })),
+        tabelas.messages
+          .filter((mensagem) => mensagem.conversation_id === conversa)
+          .map(({ id, body_text, status, direction, provider_message_id }) => {
+            const ficha = fichaDoArquivo(id);
+            return {
+              body_text,
+              status,
+              direction,
+              provider_message_id,
+              arquivo: ficha
+                ? { tipo: ficha.kind, situacao: ficha.storage_status, nome: ficha.file_name, conteudo: ficha.content_type, tamanho: ficha.byte_size, caminho: ficha.object_key, guardado: deposito.has(ficha.object_key) }
+                : null,
+            };
+          }),
       );
     }
+    if (url.pathname === '/controle/falha-ao-subir') {
+      // Só para os testes: as próximas N subidas de arquivo falham.
+      subidasQueVaoFalhar = Number(url.searchParams.get('vezes') ?? 1);
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/arquivos') {
+      // Só para os testes: o que está guardado no depósito (dá para filtrar pelo começo do caminho).
+      const prefixo = url.searchParams.get('prefixo') ?? '';
+      return responder(
+        res,
+        200,
+        [...deposito.entries()].filter(([caminho]) => caminho.startsWith(prefixo)).map(([caminho, arquivo]) => ({ caminho, tamanho: arquivo.dados.length, conteudo: arquivo.conteudo })),
+      );
+    }
+    if (url.pathname.startsWith('/storage/v1/')) return await rotasDoDeposito(req, res, url);
     if (url.pathname.startsWith('/auth/v1/')) return await rotasDeLogin(req, res, url);
     if (url.pathname.startsWith('/rest/v1/')) return await rotasDeDados(req, res, url);
     return responder(res, 404, { message: `Rota não imitada: ${req.method} ${url.pathname}` });

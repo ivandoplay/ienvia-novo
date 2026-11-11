@@ -7,10 +7,11 @@ Esta é a **reescrita limpa** do sistema antigo (`zap-ia-studio`). O plano compl
 as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do que sai está em
 [docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md).
 
-**Situação:** Fase 0 (fundação) pronta. Fase 1 quase pronta: a aba **Instâncias** (conectar chips),
-o recebimento das mensagens e a **Inbox** com texto (ler, responder, resolver, buscar, ver por chip).
-Falta, da Fase 1, ver e enviar fotos, áudios e documentos. A publicação está parada: a conta da Vercel
-foi bloqueada por limite de uso em 11/11/2026 (detalhes em [docs/PLANO.md](docs/PLANO.md), seção 6).
+**Situação:** Fase 0 (fundação) pronta. Fase 1 pronta no código e no banco: a aba **Instâncias**
+(conectar chips), o recebimento das mensagens e a **Inbox** com texto e com arquivos (fotos, áudios,
+vídeos, documentos e figurinhas). Falta a conferência final no ar, que está travada por dois bloqueios
+de conta desde 11/11/2026: a Vercel (publicação) e o Supabase (cota de tráfego do banco). Os detalhes
+e o que fazer estão no começo da seção 6 de [docs/PLANO.md](docs/PLANO.md).
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
@@ -48,9 +49,9 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 367 testes: login, menu, datas, chips, a Inbox, a conversa com a Evolution, os avisos de mensagem e as regras do banco (acesso, envio, eco, leitura). |
+| Regras e banco | `npm test` | 593 testes: login, menu, datas, chips, a Inbox, os arquivos (fotos, áudios, vídeos, documentos), a conversa com a Evolution, os avisos de mensagem e as regras do banco (acesso, envio, eco, leitura, depósito de arquivos). |
 | Montagem | `npm run build` | O painel monta para produção. |
-| Navegador | `npm run test:e2e` | 127 testes num navegador de verdade, em tela de computador e de celular (mais 9 que só valem para uma das duas telas). |
+| Navegador | `npm run test:e2e` | 161 testes num navegador de verdade, em tela de computador e de celular (mais 11 que só valem para uma das duas telas). |
 
 Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`.
 
@@ -61,9 +62,9 @@ Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`
   não lê nada e que o navegador não consegue fazer o que é trabalho do servidor.
 - **Retrato do banco real** (`impressao-digital.remoto.json`): um teste compara o banco montado a
   partir do Git com o banco real. Se alguém mudar o banco por fora, o teste acusa.
-- **Navegador** (`web/e2e`): usam um "Supabase de mentira" com contas inventadas e uma "Evolution
-  de mentira" que responde no mesmo formato da verdadeira. Nenhum teste encosta no banco real,
-  cria chip de verdade nem manda mensagem para ninguém.
+- **Navegador** (`web/e2e`): usam um "Supabase de mentira" com contas inventadas (inclusive o
+  depósito de arquivos) e uma "Evolution de mentira" que responde no mesmo formato da verdadeira.
+  Nenhum teste encosta no banco real, cria chip de verdade nem manda mensagem para ninguém.
 
 ## Regras da casa
 
@@ -86,3 +87,6 @@ Explicadas uma a uma em [web/.env.example](web/.env.example).
 | `NEXT_PUBLIC_SUPABASE_URL` | Endereço do projeto Supabase. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Chave pública do projeto. |
 | `AUTH_DOMINIO_USUARIO` | (Opcional) Domínio interno dos logins por nome de usuário. Padrão: `zapia.local`. |
+| `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` | (Servidor) Endereço e chave da Evolution, para conectar chips e enviar mensagens. |
+| `SUPABASE_SERVICE_ROLE_KEY` | (Servidor, segredo) Gravar os avisos da Evolution e guardar os arquivos recebidos. |
+| `IENVIA_URL_PUBLICA` | (Servidor) Endereço público do painel, para a Evolution avisar. Na Vercel não precisa. |

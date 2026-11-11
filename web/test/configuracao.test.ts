@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { atributosDeCookie, atributosDoCookieDeSessao } from '@/lib/cookies';
 import { dominioDeUsuario, lerConfigSupabase } from '@/lib/env';
 import { nomeDaFase } from '@/lib/fases';
+import { enderecoDoDepositoParaONavegador } from '@/lib/supabase/deposito';
 import { lerTema } from '@/lib/tema';
 
 const ambiente = (valores: Record<string, string>) => valores as unknown as NodeJS.ProcessEnv;
@@ -86,5 +87,28 @@ describe('fases do plano', () => {
   test('toda fase tem nome; fase desconhecida não quebra a tela', () => {
     expect(nomeDaFase(1)).toBe('Conectar e conversar');
     expect(nomeDaFase(99)).toBe('Fase 99');
+  });
+});
+
+describe('endereço do depósito de arquivos para o navegador', () => {
+  const SUPABASE = 'https://projeto.supabase.co';
+  const ASSINADO = `${SUPABASE}/storage/v1/object/sign/midias/empresa/conversa/mensagem/foto?token=abc`;
+
+  test('em produção o navegador fala direto com o Supabase, sempre', () => {
+    expect(enderecoDoDepositoParaONavegador(ASSINADO, ambiente({ NODE_ENV: 'production', NEXT_PUBLIC_SUPABASE_URL: SUPABASE }))).toBe(ASSINADO);
+    expect(
+      enderecoDoDepositoParaONavegador(ASSINADO, ambiente({ NODE_ENV: 'production', NEXT_PUBLIC_SUPABASE_URL: SUPABASE, IENVIA_DEPOSITO_PELO_PAINEL: '1' })),
+    ).toBe(ASSINADO);
+  });
+
+  test('em desenvolvimento, sem o desvio ligado, também', () => {
+    expect(enderecoDoDepositoParaONavegador(ASSINADO, ambiente({ NODE_ENV: 'development', NEXT_PUBLIC_SUPABASE_URL: SUPABASE }))).toBe(ASSINADO);
+  });
+
+  test('em desenvolvimento, com o desvio ligado, o endereço passa pelo próprio painel', () => {
+    const comDesvio = ambiente({ NODE_ENV: 'development', NEXT_PUBLIC_SUPABASE_URL: `${SUPABASE}/`, IENVIA_DEPOSITO_PELO_PAINEL: '1' });
+    expect(enderecoDoDepositoParaONavegador(ASSINADO, comDesvio)).toBe('/_deposito/object/sign/midias/empresa/conversa/mensagem/foto?token=abc');
+    // Endereço que não é do depósito deste projeto fica como está.
+    expect(enderecoDoDepositoParaONavegador('https://outro.exemplo.com/arquivo', comDesvio)).toBe('https://outro.exemplo.com/arquivo');
   });
 });

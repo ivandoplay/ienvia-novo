@@ -14,6 +14,8 @@ const ambienteDoPainel = {
   IENVIA_PASTA_DE_MONTAGEM: '.next-e2e',
   NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${PORTA_SUPABASE_FALSO}`,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'chave-publica-de-teste',
+  // A "chave do servidor": só o Supabase de mentira a conhece (e2e/apoio/dados.mjs).
+  SUPABASE_SERVICE_ROLE_KEY: 'chave-de-servico-de-teste',
   EVOLUTION_API_URL: `http://127.0.0.1:${PORTA_EVOLUTION_FALSA}`,
   EVOLUTION_API_KEY: 'chave-da-evolution-de-teste',
   IENVIA_URL_PUBLICA: 'https://painel.teste.invalid',

@@ -3,7 +3,8 @@
  *
  * Imita o mínimo do ambiente Supabase que as migrações esperam:
  * papéis (anon, authenticated, service_role), o schema `auth` com `auth.users`
- * e `auth.uid()`, e os privilégios padrão que o Supabase concede no schema public.
+ * e `auth.uid()`, um Storage mínimo (`storage.buckets` e `storage.objects`) e os
+ * privilégios padrão que o Supabase concede no schema public.
  *
  * Não substitui um teste no Supabase real, mas pega a grande maioria dos erros
  * de SQL, de RLS e de permissão antes de qualquer coisa chegar ao banco remoto.
@@ -42,6 +43,35 @@ const AMBIENTE_SUPABASE = `
   grant usage on schema auth to anon, authenticated, service_role;
   grant execute on function auth.uid(), auth.role() to anon, authenticated, service_role;
   grant select on auth.users to service_role;
+
+  -- O mínimo do Supabase Storage: a lista de depósitos, a lista de arquivos (com a trava de linhas
+  -- ligada, como no Supabase de verdade) e a função que separa as pastas de um caminho.
+  create schema storage;
+  create table storage.buckets (
+    id text primary key,
+    name text not null unique,
+    public boolean default false,
+    file_size_limit bigint,
+    allowed_mime_types text[],
+    created_at timestamptz default now(),
+    updated_at timestamptz default now()
+  );
+  create table storage.objects (
+    id uuid primary key default gen_random_uuid(),
+    bucket_id text references storage.buckets(id),
+    name text not null,
+    owner uuid,
+    metadata jsonb,
+    created_at timestamptz default now(),
+    updated_at timestamptz default now(),
+    unique (bucket_id, name)
+  );
+  alter table storage.objects enable row level security;
+  create or replace function storage.foldername(name text) returns text[] language sql immutable as $$
+    select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1]
+  $$;
+  grant usage on schema storage to anon, authenticated, service_role;
+  grant all on storage.buckets, storage.objects to anon, authenticated, service_role;
 
   -- Privilégios padrão iguais aos de um projeto Supabase novo: tudo que nasce em
   -- public já vem liberado para os três papéis. Por isso as migrações precisam

@@ -193,6 +193,14 @@ export function horaDaMensagem(iso: string, fuso: string = FUSO_PADRAO): string 
   return `${hora}:${minuto}`;
 }
 
+/** Data e hora para compor um nome de arquivo: "2026-11-11-1405" (no fuso de quem atende). */
+export function carimboParaNomeDeArquivo(iso: string, fuso: string = FUSO_PADRAO): string {
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return '';
+  const { dia, mes, ano, hora, minuto } = partesDaData(data, fuso);
+  return `${ano}-${mes}-${dia}-${hora}${minuto}`;
+}
+
 /** Hora curta da lista de conversas: "14:05" hoje, "ontem", ou "09/11" (com o ano, se for de outro ano). */
 export function quandoNaLista(iso: string | null | undefined, agora: Date, fuso: string = FUSO_PADRAO): string {
   if (!iso) return '';

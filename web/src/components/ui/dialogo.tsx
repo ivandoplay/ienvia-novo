@@ -8,7 +8,18 @@ import { Icone } from '@/components/ui/icone';
  * Quem abre controla: para fechar, basta deixar de renderizar. Ao sair, a janela é fechada
  * do jeito nativo, que devolve o foco para o botão que a abriu.
  */
-export function Dialogo({ titulo, aoFechar, children }: { titulo: string; aoFechar: () => void; children: ReactNode }) {
+export function Dialogo({
+  titulo,
+  aoFechar,
+  children,
+  largo = false,
+}: {
+  titulo: string;
+  aoFechar: () => void;
+  children: ReactNode;
+  /** Janela larga, para conteúdo que precisa de espaço (uma foto, por exemplo). */
+  largo?: boolean;
+}) {
   const referencia = useRef<HTMLDialogElement>(null);
   const idTitulo = useId();
 
@@ -24,7 +35,7 @@ export function Dialogo({ titulo, aoFechar, children }: { titulo: string; aoFech
   return (
     <dialog
       ref={referencia}
-      className="dialogo"
+      className={largo ? 'dialogo dialogo--largo' : 'dialogo'}
       aria-labelledby={idTitulo}
       onClose={(evento) => {
         // O aviso de "fechou" chega com atraso. Se a janela já foi reaberta (o modo de desenvolvimento

@@ -11,6 +11,7 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { audioDeExemplo, figurinhaDeExemplo, fotoDeExemplo, pdfDeExemplo, videoDeExemplo } from './arquivos-de-exemplo.mjs';
 
 export const CHAVE_DE_TESTE = 'chave-da-evolution-de-teste';
 /** Código de 8 dígitos que a Evolution de mentira sempre devolve. */
@@ -40,10 +41,12 @@ function lerCorpo(req) {
 export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas = [] } = {}) {
   /** nome → instância */
   const instancias = new Map();
-  /** Tudo o que foi enviado por /message/sendText, na ordem. */
+  /** Tudo o que foi enviado (texto ou arquivo), na ordem. */
   const enviadas = [];
-  /** Toda chamada a /message/sendText, tenha dado certo ou não (para provar que o painel chama uma vez só). */
+  /** Toda chamada de envio, tenha dado certo ou não (para provar que o painel chama uma vez só). */
   const tentativas = [];
+  /** Toda vez que o painel pediu o arquivo de uma mensagem (/chat/getBase64FromMediaMessage). */
+  const buscas = [];
   const colocarFixas = () => {
     for (const fixa of fixas) {
       instancias.set(fixa.nome, {
@@ -110,6 +113,10 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas 
     }
     if (url.pathname === '/controle/tentativas') {
       return responder(res, 200, tentativas.filter((envio) => envio.instancia.startsWith(prefixo)));
+    }
+    if (url.pathname === '/controle/buscas') {
+      if (req.method === 'DELETE') buscas.length = 0;
+      return responder(res, 200, buscas.filter((busca) => busca.instancia.startsWith(prefixo)));
     }
     if (url.pathname === '/controle/falha') {
       falha = url.searchParams.get('tipo') ?? 'nenhuma';
@@ -197,47 +204,110 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas 
       );
     }
 
-    // Envio de texto. As respostas imitam a Evolution 2.3.7 (código-fonte e servidor real conferidos em 11/11/2026).
-    if (req.method === 'POST' && grupo === 'message' && acao === 'sendText') {
-      if (!instancia) return naoExiste(res, nome ?? '');
-      const corpo = await lerCorpo(req);
-      tentativas.push({ instancia: instancia.nome, numero: corpo.number, texto: corpo.text });
-      if (typeof corpo.number !== 'string' || !corpo.number) {
-        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [['instance requires property "number"']] } });
-      }
-      if (typeof corpo.text !== 'string') {
-        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [['instance requires property "text"']] } });
-      }
-      if (!corpo.text.trim()) {
-        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: ['Text is required'] } });
-      }
+    // Envios. As respostas imitam a Evolution 2.3.7 (código-fonte e servidor real conferidos em 11/11/2026).
+    const pedidoInvalido = (mensagem) => responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [mensagem] } });
+
+    /**
+     * O que é igual em todo envio (texto ou arquivo): o chip precisa estar conectado, e o fim do número
+     * decide o que acontece (ver CONVERSAS_DA_INBOX em dados.mjs). `registro` é o que fica anotado.
+     */
+    function concluirEnvio(numero, registro, mensagem, tipoDaMensagem) {
       if (instancia.estado !== 'open') {
         // A Evolution de verdade não responde quando o chip não está conectado.
         pendurados.add(res);
         res.on('close', () => pendurados.delete(res));
         return;
       }
-      const digitos = corpo.number.replace(/\D/g, '');
+      const digitos = numero.replace(/\D/g, '');
       const jid = `${digitos}@s.whatsapp.net`;
-      // O fim do número decide o que acontece (ver CONVERSAS_DA_INBOX em dados.mjs).
       if (digitos.endsWith('0404')) {
-        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [{ jid, exists: false, number: corpo.number }] } });
+        return responder(res, 400, { status: 400, error: 'Bad Request', response: { message: [{ jid, exists: false, number: numero }] } });
       }
       if (digitos.endsWith('0500')) {
         return responder(res, 500, { status: 500, error: 'Internal Server Error', response: { message: 'Falha simulada' } });
       }
       const id = `3EB0${crypto.randomBytes(9).toString('hex').toUpperCase()}`;
-      enviadas.push({ instancia: instancia.nome, numero: corpo.number, texto: corpo.text, id });
+      enviadas.push({ instancia: instancia.nome, numero, ...registro, id });
       return responder(res, 201, {
         key: { remoteJid: jid, fromMe: true, id },
         pushName: 'Você',
         status: 'PENDING',
-        message: { conversation: corpo.text },
+        message: mensagem,
         contextInfo: null,
-        messageType: 'conversation',
+        messageType: tipoDaMensagem,
         messageTimestamp: Math.floor(Date.now() / 1000),
         instanceId: instancia.id,
         source: 'unknown',
+      });
+    }
+
+    if (req.method === 'POST' && grupo === 'message' && acao === 'sendText') {
+      if (!instancia) return naoExiste(res, nome ?? '');
+      const corpo = await lerCorpo(req);
+      tentativas.push({ instancia: instancia.nome, numero: corpo.number, texto: corpo.text });
+      if (typeof corpo.number !== 'string' || !corpo.number) return pedidoInvalido(['instance requires property "number"']);
+      if (typeof corpo.text !== 'string') return pedidoInvalido(['instance requires property "text"']);
+      if (!corpo.text.trim()) return pedidoInvalido('Text is required');
+      return concluirEnvio(corpo.number, { texto: corpo.text }, { conversation: corpo.text }, 'conversation');
+    }
+
+    // Foto, vídeo e documento. O arquivo vem inteiro no pedido, em base64.
+    if (req.method === 'POST' && grupo === 'message' && acao === 'sendMedia') {
+      if (!instancia) return naoExiste(res, nome ?? '');
+      const corpo = await lerCorpo(req);
+      const bytes = typeof corpo.media === 'string' ? Buffer.from(corpo.media, 'base64').length : 0;
+      const registro = { tipo: corpo.mediatype, legenda: corpo.caption ?? null, nome: corpo.fileName ?? null, conteudo: corpo.mimetype ?? null, bytes };
+      tentativas.push({ instancia: instancia.nome, numero: corpo.number, ...registro });
+      if (typeof corpo.number !== 'string' || !corpo.number) return pedidoInvalido(['instance requires property "number"']);
+      if (!['image', 'video', 'document'].includes(corpo.mediatype)) return pedidoInvalido(['instance.mediatype is not one of enum values: image,document,video,audio']);
+      // A Evolution de verdade quebra quando um documento chega sem nome.
+      if (corpo.mediatype === 'document' && !corpo.fileName) {
+        return responder(res, 500, { status: 500, error: 'Internal Server Error', response: { message: "TypeError: Cannot read properties of null (reading '1')" } });
+      }
+      if (bytes === 0) return pedidoInvalido('Owned media must be a url or base64');
+      const campo = `${corpo.mediatype}Message`;
+      return concluirEnvio(corpo.number, registro, { [campo]: { caption: corpo.caption, mimetype: corpo.mimetype, fileName: corpo.fileName, fileLength: String(bytes) } }, campo);
+    }
+
+    // Áudio: sai como mensagem de voz.
+    if (req.method === 'POST' && grupo === 'message' && acao === 'sendWhatsAppAudio') {
+      if (!instancia) return naoExiste(res, nome ?? '');
+      const corpo = await lerCorpo(req);
+      const bytes = typeof corpo.audio === 'string' ? Buffer.from(corpo.audio, 'base64').length : 0;
+      const registro = { tipo: 'audio', legenda: null, nome: null, conteudo: 'audio/ogg; codecs=opus', bytes };
+      tentativas.push({ instancia: instancia.nome, numero: corpo.number, ...registro });
+      if (typeof corpo.number !== 'string' || !corpo.number) return pedidoInvalido(['instance requires property "number"']);
+      if (bytes === 0) return pedidoInvalido('File buffer, URL, or base64 audio is required');
+      return concluirEnvio(corpo.number, registro, { audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true, fileLength: String(bytes) } }, 'audioMessage');
+    }
+
+    // Buscar o arquivo de uma mensagem recebida. A Evolution baixa do WhatsApp e devolve inteiro, em base64.
+    if (req.method === 'POST' && grupo === 'chat' && acao === 'getBase64FromMediaMessage') {
+      if (!instancia) return naoExiste(res, nome ?? '');
+      const corpo = await lerCorpo(req);
+      const chave = corpo.message?.key ?? {};
+      const conteudo = corpo.message?.message ?? null;
+      buscas.push({ instancia: instancia.nome, id: chave.id ?? null, comAMensagemInteira: Boolean(conteudo) });
+      // Mensagem que a "Evolution" não tem (o identificador termina em SEM-ARQUIVO): igual à de verdade.
+      if (!chave.id || String(chave.id).endsWith('SEM-ARQUIVO')) return pedidoInvalido('Message not found');
+      const campo = conteudo ? Object.keys(conteudo).find((item) => item.endsWith('Message')) : 'imageMessage';
+      const arquivo =
+        {
+          imageMessage: { dados: fotoDeExemplo({ tom: 'tarde' }), mimetype: 'image/png', nomeDoArquivo: `${chave.id}.png` },
+          stickerMessage: { dados: figurinhaDeExemplo(), mimetype: 'image/png', nomeDoArquivo: `${chave.id}.png` },
+          audioMessage: { dados: audioDeExemplo(2), mimetype: 'audio/wav', nomeDoArquivo: `${chave.id}.wav` },
+          videoMessage: { dados: videoDeExemplo(), mimetype: 'video/mp4', nomeDoArquivo: `${chave.id}.mp4` },
+          documentMessage: { dados: pdfDeExemplo(), mimetype: 'application/pdf', nomeDoArquivo: conteudo?.documentMessage?.fileName ?? `${chave.id}.pdf` },
+        }[campo] ?? null;
+      if (!arquivo) return pedidoInvalido('The message is not of the media type');
+      return responder(res, 201, {
+        mediaType: campo,
+        fileName: arquivo.nomeDoArquivo,
+        caption: conteudo?.[campo]?.caption,
+        size: { fileLength: String(arquivo.dados.length) },
+        mimetype: arquivo.mimetype,
+        base64: arquivo.dados.toString('base64'),
+        buffer: null,
       });
     }
 

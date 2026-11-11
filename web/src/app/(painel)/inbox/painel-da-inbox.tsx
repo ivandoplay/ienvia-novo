@@ -5,8 +5,18 @@ import { useRouter } from 'next/navigation';
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
-import type { ChipDaInbox, ConversaAberta, FiltrosDaInbox, ListaDaInbox, MensagemDaConversa } from '@/lib/dados/inbox';
+import type { ArquivoDaMensagem, ChipDaInbox, ConversaAberta, FiltrosDaInbox, ListaDaInbox, MensagemDaConversa } from '@/lib/dados/inbox';
 import { plural } from '@/lib/formato';
+import {
+  LEGENDA_MAXIMA,
+  LIMITE_DE_DOCUMENTO,
+  avaliarArquivo,
+  depositoDizQueEhGrandeDemais,
+  depositoDizQueJaExiste,
+  tamanhoLegivel,
+  tamanhoNoBalao,
+  type TipoDeEnvio,
+} from '@/lib/inbox/arquivos';
 import {
   BUSCA_MAXIMA,
   TEXTO_MAXIMO,
@@ -22,7 +32,15 @@ import {
   type SituacaoDoEnvio,
 } from '@/lib/inbox/regras';
 import { descreverEstado } from '@/lib/instancias/regras';
-import { decidirEnvio, enviarMensagem, mudarConversa, type ResultadoDoEnvio } from './acoes';
+import {
+  buscarArquivo,
+  decidirEnvio,
+  enviarArquivo,
+  enviarMensagem,
+  mudarConversa,
+  prepararEnvioDeArquivo,
+  type ResultadoDoEnvio,
+} from './acoes';
 
 interface Props {
   workspaceId: string;
@@ -48,11 +66,16 @@ interface Props {
 interface Pendente {
   chave: string;
   conversaId: string;
+  /** O texto; com arquivo, é a legenda. */
   texto: string;
   hora: string;
   criadaEm: number;
   fase: 'enviando' | 'recusada' | 'sem_resposta';
   erro?: string;
+  /** O arquivo que vai junto, quando há. */
+  anexo?: Anexo;
+  /** Enquanto o arquivo sobe para o painel: quanto já subiu, de 0 a 100. Fora disso, `null`. */
+  progresso?: number | null;
   /** Preenchido quando o painel respondeu; a partir daí a mensagem que vem do banco assume o lugar. */
   mensagemId?: string;
   situacao?: SituacaoDoEnvio;
@@ -61,6 +84,110 @@ interface Pendente {
 interface Aviso {
   tipo: 'erro' | 'atencao';
   texto: string;
+}
+
+/** Um arquivo que a pessoa escolheu para enviar (foto, vídeo, áudio ou documento). */
+interface Anexo {
+  arquivo: File;
+  tipo: TipoDeEnvio;
+  /** Tipo de conteúdo com que o arquivo sobe ("image/jpeg"). */
+  conteudo: string;
+  nomeNoDeposito: string;
+  /** "Vai como foto", "Vai como documento"... */
+  comoVai: string;
+  tamanho: string;
+  /** Endereço local para mostrar a foto antes de ela subir. */
+  previa: string | null;
+  largura: number | null;
+  altura: number | null;
+  duracao: number | null;
+}
+
+/** Uma foto aberta em tamanho maior. */
+interface FotoAberta {
+  endereco: string;
+  enderecoParaBaixar: string | null;
+  legenda: string;
+}
+
+const soltarPrevia = (anexo: Anexo | null | undefined): void => {
+  if (anexo?.previa) URL.revokeObjectURL(anexo.previa);
+};
+
+/** Tamanho da foto, ou duração do áudio e do vídeo, lidos no próprio navegador antes de enviar. Sem pressa: se não der, vai sem. */
+async function medirArquivo(arquivo: File, tipo: TipoDeEnvio): Promise<Pick<Anexo, 'largura' | 'altura' | 'duracao'>> {
+  const nada = { largura: null, altura: null, duracao: null };
+  try {
+    if (tipo === 'image') {
+      const imagem = await createImageBitmap(arquivo);
+      const medidas = { largura: imagem.width || null, altura: imagem.height || null, duracao: null };
+      imagem.close();
+      return medidas;
+    }
+    if (tipo === 'audio' || tipo === 'video') {
+      return await new Promise((resolver) => {
+        const endereco = URL.createObjectURL(arquivo);
+        const elemento = document.createElement(tipo);
+        const terminar = (medidas: Pick<Anexo, 'largura' | 'altura' | 'duracao'>) => {
+          clearTimeout(relogio);
+          URL.revokeObjectURL(endereco);
+          resolver(medidas);
+        };
+        const relogio = setTimeout(() => terminar(nada), 4_000);
+        elemento.preload = 'metadata';
+        elemento.onloadedmetadata = () => {
+          const video = elemento instanceof HTMLVideoElement ? elemento : null;
+          terminar({
+            largura: video?.videoWidth || null,
+            altura: video?.videoHeight || null,
+            duracao: Number.isFinite(elemento.duration) && elemento.duration >= 0 ? Math.round(elemento.duration) : null,
+          });
+        };
+        elemento.onerror = () => terminar(nada);
+        elemento.src = endereco;
+      });
+    }
+  } catch {
+    // Formato que o navegador não abre: o arquivo vai do mesmo jeito, só sem as medidas.
+  }
+  return nada;
+}
+
+/**
+ * Sobe o arquivo do navegador direto para o depósito, no endereço de uso único que o painel assinou.
+ * O arquivo não passa pelo servidor do painel.
+ */
+function subirArquivo(
+  endereco: string,
+  anexo: Anexo,
+  aoProgredir: (porcento: number) => void,
+): Promise<'ok' | 'grande_demais' | 'falhou'> {
+  return new Promise((resolver) => {
+    const pedido = new XMLHttpRequest();
+    pedido.open('PUT', endereco);
+    pedido.setRequestHeader('content-type', anexo.conteudo);
+    pedido.setRequestHeader('cache-control', 'max-age=3600');
+    pedido.setRequestHeader('x-upsert', 'false');
+    pedido.upload.onprogress = (evento) => {
+      if (evento.lengthComputable && evento.total > 0) aoProgredir(Math.min(99, Math.round((evento.loaded / evento.total) * 100)));
+    };
+    pedido.onload = () => {
+      if (pedido.status >= 200 && pedido.status < 300) return resolver('ok');
+      let corpo: Record<string, unknown> | null = null;
+      try {
+        corpo = JSON.parse(pedido.responseText) as Record<string, unknown>;
+      } catch {
+        corpo = null;
+      }
+      // "Já existe": o mesmo envio subiu este arquivo antes (a pessoa tentou de novo). Está tudo certo.
+      if (depositoDizQueJaExiste(corpo)) return resolver('ok');
+      resolver(depositoDizQueEhGrandeDemais(corpo) || pedido.status === 413 ? 'grande_demais' : 'falhou');
+    };
+    pedido.onerror = () => resolver('falhou');
+    pedido.onabort = () => resolver('falhou');
+    pedido.ontimeout = () => resolver('falhou');
+    pedido.send(anexo.arquivo);
+  });
 }
 
 /** O que a pessoa estava escrevendo em cada conversa, para não perder ao trocar de conversa. */
@@ -212,14 +339,28 @@ export function PainelDaInbox({
   }, []);
 
   const enviar = useCallback(
-    async (conversa: string, texto: string, chaveExistente?: string) => {
-      const chave = chaveExistente ?? novaChave();
+    async (conversa: string, texto: string, opcoes: { chave?: string; anexo?: Anexo } = {}) => {
+      const chave = opcoes.chave ?? novaChave();
+      const anexo = opcoes.anexo;
       const agora = Date.now();
-      setPendentes((atuais) => [
+      setPendentes((atuais) => {
         // Faxina: o que o painel já respondeu há mais de dois minutos não precisa mais ficar guardado.
-        ...atuais.filter((item) => item.chave !== chave && !(item.mensagemId && agora - item.criadaEm > 120_000)),
-        { chave, conversaId: conversa, texto, hora: horaDaMensagem(new Date(agora).toISOString()), criadaEm: agora, fase: 'enviando' },
-      ]);
+        const velhos = atuais.filter((item) => item.chave !== chave && item.mensagemId && agora - item.criadaEm > 120_000);
+        for (const velho of velhos) soltarPrevia(velho.anexo);
+        return [
+          ...atuais.filter((item) => item.chave !== chave && !velhos.includes(item)),
+          {
+            chave,
+            conversaId: conversa,
+            texto,
+            hora: horaDaMensagem(new Date(agora).toISOString()),
+            criadaEm: agora,
+            fase: 'enviando',
+            anexo,
+            progresso: anexo ? 0 : null,
+          },
+        ];
+      });
       avisar(conversa, null);
 
       const mudar = (mudanca: Partial<Pendente>) =>
@@ -227,27 +368,67 @@ export function PainelDaInbox({
 
       let resultado: ResultadoDoEnvio;
       try {
-        resultado = await pedir(() => enviarMensagem({ conversaId: conversa, texto, chave }));
+        if (anexo) {
+          // 1) O painel libera um endereço de uso único. 2) O navegador sobe o arquivo direto para o depósito.
+          const preparo = await pedir(() => prepararEnvioDeArquivo({ conversaId: conversa, chave, nome: anexo.nomeNoDeposito }));
+          if (!preparo.ok) {
+            mudar({ fase: 'recusada', erro: preparo.erro, progresso: null });
+            return;
+          }
+          // Sem endereço: o arquivo deste envio já subiu numa tentativa anterior.
+          const subida = preparo.endereco ? await subirArquivo(preparo.endereco, anexo, (progresso) => mudar({ progresso })) : 'ok';
+          if (subida !== 'ok') {
+            mudar({
+              fase: 'recusada',
+              progresso: null,
+              erro:
+                subida === 'grande_demais'
+                  ? `Este arquivo passa de ${tamanhoLegivel(LIMITE_DE_DOCUMENTO)}, o máximo que o painel envia.`
+                  : 'O arquivo não subiu. Confira a internet e tente de novo.',
+            });
+            return;
+          }
+          mudar({ progresso: null });
+          // 3) Com o arquivo guardado, o painel manda a mensagem.
+          resultado = await pedir(() =>
+            enviarArquivo({
+              conversaId: conversa,
+              chave,
+              caminho: preparo.caminho,
+              tipo: anexo.tipo,
+              nome: anexo.arquivo.name,
+              legenda: texto || null,
+              duracao: anexo.duracao,
+              largura: anexo.largura,
+              altura: anexo.altura,
+            }),
+          );
+        } else {
+          resultado = await pedir(() => enviarMensagem({ conversaId: conversa, texto, chave }));
+        }
       } catch {
         // A resposta se perdeu: não dá para saber o que o servidor fez. Recarrega para ver o que está gravado.
-        mudar({ fase: 'sem_resposta' });
+        mudar({ fase: 'sem_resposta', progresso: null });
         router.refresh();
         return;
       }
 
       if (!resultado.ok) {
-        mudar({ fase: 'recusada', erro: resultado.erro });
+        mudar({ fase: 'recusada', erro: resultado.erro, progresso: null });
         return;
       }
       // A resposta do servidor já trouxe a conversa atualizada; aqui só se anota como o envio terminou.
-      mudar({ fase: 'enviando', mensagemId: resultado.mensagemId, situacao: resultado.situacao });
+      mudar({ fase: 'enviando', mensagemId: resultado.mensagemId, situacao: resultado.situacao, progresso: null });
       if (resultado.aviso) avisar(conversa, { tipo: 'erro', texto: resultado.aviso });
     },
     [avisar, router],
   );
 
   const descartar = useCallback((chave: string) => {
-    setPendentes((atuais) => atuais.filter((item) => item.chave !== chave));
+    setPendentes((atuais) => {
+      soltarPrevia(atuais.find((item) => item.chave === chave)?.anexo);
+      return atuais.filter((item) => item.chave !== chave);
+    });
   }, []);
 
   const conversa = aberta?.conversa ?? null;
@@ -584,7 +765,7 @@ interface PropsDaConversa {
   pendentes: Pendente[];
   aviso: Aviso | null;
   aoAvisar: (conversaId: string, aviso: Aviso | null) => void;
-  aoEnviar: (conversaId: string, texto: string, chaveExistente?: string) => Promise<void>;
+  aoEnviar: (conversaId: string, texto: string, opcoes?: { chave?: string; anexo?: Anexo }) => Promise<void>;
   aoDescartar: (chave: string) => void;
   ehDono: boolean;
   evolutionConfigurada: boolean;
@@ -607,6 +788,9 @@ function Conversa({
   const [ocupado, setOcupado] = useState<'resolver' | 'reabrir' | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
   const [contatoAberto, setContatoAberto] = useState(false);
+  const [fotoAberta, setFotoAberta] = useState<FotoAberta | null>(null);
+  /** Mensagem cujo arquivo está sendo buscado de novo no WhatsApp. */
+  const [buscando, setBuscando] = useState<string | null>(null);
   /** Texto colocado no campo por um "tentar de novo". Cada pedido tem um número, para o campo recomeçar. */
   const [preenchimento, setPreenchimento] = useState<{ texto: string; vez: number } | null>(null);
 
@@ -626,6 +810,18 @@ function Conversa({
     const area = rolagem.current;
     if (area && pertoDoFim.current) area.scrollTop = area.scrollHeight;
   }, [marcaDeRolagem]);
+
+  // A área das mensagens muda de altura (um arquivo foi anexado, o teclado do celular abriu...):
+  // quem estava vendo o fim da conversa continua vendo o fim.
+  useEffect(() => {
+    const area = rolagem.current;
+    if (!area || typeof ResizeObserver === 'undefined') return;
+    const observador = new ResizeObserver(() => {
+      if (pertoDoFim.current) area.scrollTop = area.scrollHeight;
+    });
+    observador.observe(area);
+    return () => observador.disconnect();
+  }, []);
 
   // No celular a lista some quando a conversa abre: o foco vai para o nome do contato.
   useEffect(() => {
@@ -696,15 +892,33 @@ function Conversa({
   const tentarDeNovo = useCallback(
     (pendente: Pendente) => {
       pertoDoFim.current = true;
-      void aoEnviar(pendente.conversaId, pendente.texto, pendente.chave);
+      void aoEnviar(pendente.conversaId, pendente.texto, { chave: pendente.chave, anexo: pendente.anexo });
     },
     [aoEnviar],
   );
 
-  function enviarDoCampo(texto: string) {
+  function enviarDoCampo(texto: string, anexo?: Anexo) {
     pertoDoFim.current = true;
-    void aoEnviar(conversa.id, texto);
+    void aoEnviar(conversa.id, texto, { anexo });
   }
+
+  /** "Tentar de novo" num arquivo recebido que o painel não conseguiu trazer do WhatsApp. */
+  const buscarDeNovo = useCallback(
+    async (mensagemId: string) => {
+      setBuscando(mensagemId);
+      aoAvisar(conversa.id, null);
+      try {
+        const resultado = await pedir(() => buscarArquivo({ mensagemId }));
+        if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+      } catch {
+        aoAvisar(conversa.id, { tipo: 'erro', texto: 'Não foi possível falar com o painel. Confira a internet e tente de novo.' });
+        router.refresh();
+      } finally {
+        setBuscando(null);
+      }
+    },
+    [aoAvisar, conversa.id, router],
+  );
 
   const anteriores = conversa.temMensagensAnteriores ? proximoLimiteDeMensagens(limiteDeMensagens) : null;
   const podeResponder = impedimento === null;
@@ -759,6 +973,11 @@ function Conversa({
             const area = evento.currentTarget;
             pertoDoFim.current = area.scrollHeight - area.scrollTop - area.clientHeight < 120;
           }}
+          // Uma foto que termina de carregar pode mudar a altura da conversa: quem estava no fim continua no fim.
+          onLoadCapture={() => {
+            const area = rolagem.current;
+            if (area && pertoDoFim.current) area.scrollTop = area.scrollHeight;
+          }}
         >
           {anteriores ? (
             <p className="inbox-anteriores">
@@ -780,8 +999,11 @@ function Conversa({
             nomeDoContato={conversa.contato.nome}
             podeResponder={podeResponder}
             decidindo={decidindo}
+            buscando={buscando}
             aoDecidir={decidir}
             aoEscreverDeNovo={escreverDeNovo}
+            aoAbrirFoto={setFotoAberta}
+            aoBuscarArquivo={buscarDeNovo}
           />
 
           {meusPendentes.length > 0 ? (
@@ -839,6 +1061,24 @@ function Conversa({
           <CartaoDoContato conversa={conversa} etapa={etapa.texto} estadoDoChip={chipRemovido ? 'Removido' : estadoDoChip.texto} />
         </Dialogo>
       ) : null}
+
+      {fotoAberta ? (
+        <Dialogo titulo="Foto" aoFechar={() => setFotoAberta(null)} largo>
+          <div className="foto-aberta">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fotoAberta.endereco} alt={fotoAberta.legenda ? `Foto: ${fotoAberta.legenda}` : 'Foto da conversa'} />
+            {fotoAberta.legenda ? <p className="foto-aberta-legenda">{fotoAberta.legenda}</p> : null}
+            {fotoAberta.enderecoParaBaixar ? (
+              <div className="dialogo-acoes">
+                <a href={fotoAberta.enderecoParaBaixar} className="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer">
+                  <Icone nome="baixar" className="icon-15" />
+                  Baixar a foto
+                </a>
+              </div>
+            ) : null}
+          </div>
+        </Dialogo>
+      ) : null}
     </>
   );
 }
@@ -882,12 +1122,26 @@ interface PropsDasMensagens {
   nomeDoContato: string;
   podeResponder: boolean;
   decidindo: string | null;
+  /** Mensagem cujo arquivo está sendo buscado de novo. */
+  buscando: string | null;
   aoDecidir: (mensagemId: string, foiEnviada: boolean) => void;
   aoEscreverDeNovo: (texto: string) => void;
+  aoAbrirFoto: (foto: FotoAberta) => void;
+  aoBuscarArquivo: (mensagemId: string) => void;
 }
 
 /** As mensagens que vêm do banco. Fica separado (e memorizado) para digitar no campo não redesenhar tudo. */
-const Mensagens = memo(function Mensagens({ mensagens, nomeDoContato, podeResponder, decidindo, aoDecidir, aoEscreverDeNovo }: PropsDasMensagens) {
+const Mensagens = memo(function Mensagens({
+  mensagens,
+  nomeDoContato,
+  podeResponder,
+  decidindo,
+  buscando,
+  aoDecidir,
+  aoEscreverDeNovo,
+  aoAbrirFoto,
+  aoBuscarArquivo,
+}: PropsDasMensagens) {
   if (mensagens.length === 0) return null;
   return (
     <ol className="inbox-baloes">
@@ -906,8 +1160,19 @@ const Mensagens = memo(function Mensagens({ mensagens, nomeDoContato, podeRespon
                 situacao === 'falhou' || situacao === 'sem_confirmacao' ? ` balao--${situacao === 'falhou' ? 'falhou' : 'incerta'}` : ''
               }${mensagem.autor === 'IA' ? ' balao--ia' : ''}`}
             >
-              <span className="so-leitor-de-tela">{mensagem.recebida ? `${nomeDoContato} escreveu:` : `${mensagem.autor ?? 'Resposta'}:`}</span>
-              <p className="balao-texto">{mensagem.texto}</p>
+              <span className="so-leitor-de-tela">
+                {mensagem.recebida ? `${nomeDoContato} ${mensagem.arquivo ? 'enviou' : 'escreveu'}:` : `${mensagem.autor ?? 'Resposta'}:`}
+              </span>
+              {mensagem.arquivo ? (
+                <ArquivoNoBalao
+                  arquivo={mensagem.arquivo}
+                  legenda={mensagem.texto}
+                  buscando={buscando === mensagem.id}
+                  aoAbrirFoto={aoAbrirFoto}
+                  aoBuscar={() => aoBuscarArquivo(mensagem.id)}
+                />
+              ) : null}
+              {mensagem.texto ? <p className="balao-texto">{mensagem.texto}</p> : null}
               <p className="balao-rodape">
                 {mensagem.autor ? <span aria-hidden="true">{mensagem.autor}</span> : null}
                 <span>{mensagem.hora}</span>
@@ -935,7 +1200,9 @@ const Mensagens = memo(function Mensagens({ mensagens, nomeDoContato, podeRespon
                 </div>
               ) : null}
 
-              {situacao === 'falhou' && podeResponder ? (
+              {situacao === 'falhou' && mensagem.arquivo ? (
+                <p className="balao-decisao">Este arquivo não foi enviado. Para tentar de novo, anexe o arquivo outra vez.</p>
+              ) : situacao === 'falhou' && podeResponder ? (
                 <div className="balao-botoes">
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => aoEscreverDeNovo(mensagem.texto)}>
                     Escrever de novo
@@ -949,6 +1216,133 @@ const Mensagens = memo(function Mensagens({ mensagens, nomeDoContato, podeRespon
     </ol>
   );
 });
+
+/** Rótulo de um arquivo que não dá para mostrar: por quê, e o que fazer. */
+function explicarArquivo(arquivo: ArquivoDaMensagem): string {
+  const oArquivo = { image: 'Esta foto', video: 'Este vídeo', audio: 'Este áudio', sticker: 'Esta figurinha', document: 'Este documento' }[arquivo.tipo];
+  if (arquivo.situacao === 'buscando') return `Trazendo ${oArquivo.replace(/^Est/, 'est')} do WhatsApp…`;
+  if (arquivo.situacao === 'grande_demais') {
+    return `${oArquivo} é grande demais para o painel guardar${arquivo.tamanho ? ` (${arquivo.tamanho})` : ''}. Veja no celular do chip.`;
+  }
+  if (arquivo.situacao === 'apagado') return `${oArquivo} já saiu do painel: passou do prazo de guarda dos arquivos.`;
+  return `O painel não conseguiu trazer ${oArquivo.replace(/^Est/, 'est')} do WhatsApp.`;
+}
+
+/** O arquivo de uma mensagem dentro do balão: foto, figurinha, áudio, vídeo ou documento. */
+function ArquivoNoBalao({
+  arquivo,
+  legenda,
+  buscando,
+  aoAbrirFoto,
+  aoBuscar,
+}: {
+  arquivo: ArquivoDaMensagem;
+  legenda: string;
+  buscando: boolean;
+  aoAbrirFoto: (foto: FotoAberta) => void;
+  aoBuscar: () => void;
+}) {
+  const detalhes = [arquivo.descricao, arquivo.duracao, arquivo.tamanho].filter(Boolean).join(' · ');
+
+  if (arquivo.situacao !== 'guardado' || !arquivo.endereco) {
+    return (
+      <div className={`balao-arquivo balao-arquivo--${arquivo.situacao}`}>
+        <span className="balao-arquivo-icone" aria-hidden="true">
+          <Icone nome={arquivo.tipo === 'audio' ? 'audios' : 'documento'} />
+        </span>
+        <div className="balao-arquivo-texto">
+          <strong>{arquivo.nome ?? arquivo.descricao}</strong>
+          <span>{explicarArquivo(arquivo)}</span>
+          {arquivo.situacao === 'falhou' ? (
+            <div className="balao-botoes">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={aoBuscar} disabled={buscando}>
+                {buscando ? 'Buscando…' : 'Buscar de novo'}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  // Com as medidas conhecidas, a foto já ocupa o espaço certo antes de carregar (a conversa não "pula").
+  const medidas = tamanhoNoBalao(arquivo.largura, arquivo.altura);
+
+  if (arquivo.tipo === 'image') {
+    const endereco = arquivo.endereco;
+    return (
+      <button
+        type="button"
+        className="balao-foto"
+        aria-label={legenda ? `Abrir a foto: ${legenda}` : 'Abrir a foto'}
+        onClick={() => aoAbrirFoto({ endereco, enderecoParaBaixar: arquivo.enderecoParaBaixar, legenda })}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={endereco} alt="" loading="lazy" decoding="async" {...(medidas ? { ...medidas, style: { width: medidas.width } } : {})} />
+      </button>
+    );
+  }
+  if (arquivo.tipo === 'sticker') {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="balao-figurinha" src={arquivo.endereco} alt="Figurinha" loading="lazy" decoding="async" />;
+  }
+  if (arquivo.tipo === 'audio') {
+    return (
+      <div className="balao-som">
+        <audio controls preload="none" src={arquivo.endereco} aria-label={detalhes} />
+        <span className="balao-arquivo-detalhe">
+          {detalhes}
+          <LinkParaBaixar endereco={arquivo.enderecoParaBaixar} oQue="o áudio" />
+        </span>
+      </div>
+    );
+  }
+  if (arquivo.tipo === 'video') {
+    return (
+      <div className="balao-video">
+        <video
+          controls
+          preload="none"
+          playsInline
+          src={arquivo.endereco}
+          aria-label={legenda ? `Vídeo: ${legenda}` : detalhes}
+          style={medidas ? { width: medidas.width, aspectRatio: `${medidas.width} / ${medidas.height}` } : undefined}
+        />
+        <span className="balao-arquivo-detalhe">
+          {detalhes}
+          <LinkParaBaixar endereco={arquivo.enderecoParaBaixar} oQue="o vídeo" />
+        </span>
+      </div>
+    );
+  }
+  return (
+    <a className="balao-arquivo balao-arquivo--guardado" href={arquivo.enderecoParaBaixar ?? arquivo.endereco} target="_blank" rel="noopener noreferrer">
+      <span className="balao-arquivo-icone" aria-hidden="true">
+        <Icone nome="documento" />
+      </span>
+      <span className="balao-arquivo-texto">
+        <strong>{arquivo.nome ?? 'Documento'}</strong>
+        <span>{['Baixar', arquivo.tamanho].filter(Boolean).join(' · ')}</span>
+      </span>
+    </a>
+  );
+}
+
+/**
+ * Áudio e vídeo tocam no próprio navegador. Quando ele não conhece o formato (acontece com mensagens
+ * de voz em aparelhos mais antigos), a pessoa baixa o arquivo e abre no aparelho.
+ */
+function LinkParaBaixar({ endereco, oQue }: { endereco: string | null; oQue: string }) {
+  if (!endereco) return null;
+  return (
+    <>
+      {' · '}
+      <a href={endereco} target="_blank" rel="noopener noreferrer" aria-label={`Baixar ${oQue}`}>
+        Baixar
+      </a>
+    </>
+  );
+}
 
 function BalaoPendente({
   pendente,
@@ -969,11 +1363,14 @@ function BalaoPendente({
         }`}
       >
         <span className="so-leitor-de-tela">Você:</span>
-        <p className="balao-texto">{pendente.texto}</p>
+        {pendente.anexo ? <AnexoNoBalao anexo={pendente.anexo} /> : null}
+        {pendente.texto ? <p className="balao-texto">{pendente.texto}</p> : null}
         <p className="balao-rodape">
           <span aria-hidden="true">Você</span>
           <span>{pendente.hora}</span>
-          {pendente.fase === 'recusada' ? (
+          {typeof pendente.progresso === 'number' && pendente.fase === 'enviando' ? (
+            <span className="balao-situacao balao-situacao--enviando">Subindo o arquivo… {pendente.progresso}%</span>
+          ) : pendente.fase === 'recusada' ? (
             <span className="balao-situacao balao-situacao--falhou">Não enviada</span>
           ) : pendente.fase === 'sem_resposta' ? (
             <span className="balao-situacao balao-situacao--sem_confirmacao">Sem resposta do painel</span>
@@ -1019,6 +1416,30 @@ function BalaoPendente({
   );
 }
 
+/** O arquivo de uma mensagem que ainda está saindo: a própria foto, ou o nome e o tamanho do arquivo. */
+function AnexoNoBalao({ anexo }: { anexo: Anexo }) {
+  if (anexo.previa) {
+    const medidas = tamanhoNoBalao(anexo.largura, anexo.altura);
+    return (
+      <span className="balao-foto balao-foto--local">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={anexo.previa} alt={`Foto ${anexo.arquivo.name}`} {...(medidas ? { ...medidas, style: { width: medidas.width } } : {})} />
+      </span>
+    );
+  }
+  return (
+    <div className="balao-arquivo balao-arquivo--local">
+      <span className="balao-arquivo-icone" aria-hidden="true">
+        <Icone nome={anexo.tipo === 'audio' ? 'audios' : 'documento'} />
+      </span>
+      <div className="balao-arquivo-texto">
+        <strong>{anexo.arquivo.name}</strong>
+        <span>{[{ image: 'Foto', video: 'Vídeo', audio: 'Mensagem de voz', document: 'Documento' }[anexo.tipo], anexo.tamanho].join(' · ')}</span>
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------- Campo de mensagem ----------------------------- */
 
 function CampoDeMensagem({
@@ -1028,12 +1449,19 @@ function CampoDeMensagem({
 }: {
   conversaId: string;
   textoInicial: string | null;
-  aoEnviar: (texto: string) => void;
+  aoEnviar: (texto: string, anexo?: Anexo) => void;
 }) {
   const [texto, setTexto] = useState(() => textoInicial ?? rascunhos.get(conversaId) ?? '');
+  const [anexo, setAnexo] = useState<Anexo | null>(null);
+  const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
+  const [soltando, setSoltando] = useState(false);
   const campo = useRef<HTMLTextAreaElement>(null);
+  const seletor = useRef<HTMLInputElement>(null);
+  /** O anexo que está no campo agora (para as medidas que chegam depois, e para a limpeza ao sair). */
+  const anexoNoCampo = useRef<Anexo | null>(null);
   const idCampo = useId();
   const idDica = useId();
+  const idAnexo = useId();
 
   // O campo cresce com o texto, até um limite; depois disso rola por dentro.
   useLayoutEffect(() => {
@@ -1052,15 +1480,83 @@ function CampoDeMensagem({
     area.setSelectionRange(area.value.length, area.value.length);
   }, [textoInicial]);
 
+  // Saiu da conversa com um arquivo anexado e não enviado: a prévia dele é solta.
+  useEffect(
+    () => () => {
+      soltarPrevia(anexoNoCampo.current);
+      anexoNoCampo.current = null;
+    },
+    [],
+  );
+
   function mudar(valor: string) {
     setTexto(valor);
     if (valor.trim()) rascunhos.set(conversaId, valor);
     else rascunhos.delete(conversaId);
   }
 
+  function definirAnexo(novo: Anexo | null) {
+    anexoNoCampo.current = novo;
+    setAnexo(novo);
+  }
+
+  function anexar(arquivo: File | null | undefined) {
+    if (!arquivo) return;
+    const avaliacao = avaliarArquivo({ nome: arquivo.name, tipoInformado: arquivo.type, tamanho: arquivo.size });
+    if (!avaliacao.ok) {
+      setErroDoAnexo(avaliacao.erro);
+      return;
+    }
+    setErroDoAnexo(null);
+    soltarPrevia(anexoNoCampo.current);
+    definirAnexo({
+      arquivo,
+      tipo: avaliacao.tipo,
+      conteudo: avaliacao.conteudo,
+      nomeNoDeposito: avaliacao.nomeNoDeposito,
+      comoVai: avaliacao.comoVai,
+      tamanho: tamanhoLegivel(arquivo.size),
+      previa: avaliacao.tipo === 'image' ? URL.createObjectURL(arquivo) : null,
+      largura: null,
+      altura: null,
+      duracao: null,
+    });
+    void medirArquivo(arquivo, avaliacao.tipo).then((medidas) => {
+      // As medidas só valem se o anexo ainda for este mesmo arquivo.
+      const atual = anexoNoCampo.current;
+      if (atual && atual.arquivo === arquivo) definirAnexo({ ...atual, ...medidas });
+    });
+    campo.current?.focus();
+  }
+
+  function removerAnexo() {
+    soltarPrevia(anexoNoCampo.current);
+    definirAnexo(null);
+    setErroDoAnexo(null);
+    if (seletor.current) seletor.current.value = '';
+    campo.current?.focus();
+  }
+
+  const semLegenda = anexo?.tipo === 'audio';
+  const limite = anexo && !semLegenda ? LEGENDA_MAXIMA : TEXTO_MAXIMO;
+  const sobrando = limite - texto.length;
+  const passouDoLimite = Boolean(anexo) && !semLegenda && sobrando < 0;
+  const podeEnviar = anexo ? !passouDoLimite : Boolean(texto.trim());
+
   function enviar() {
+    if (!podeEnviar) return;
     const limpo = texto.trim();
-    if (!limpo) return;
+    if (anexo) {
+      // Áudio vai sem legenda: o que estava escrito continua no campo, para ir depois como texto.
+      if (!semLegenda) mudar('');
+      aoEnviar(semLegenda ? '' : limpo, anexo);
+      // A prévia não é solta aqui: ela passa a ser do balão da mensagem.
+      definirAnexo(null);
+      setErroDoAnexo(null);
+      if (seletor.current) seletor.current.value = '';
+      campo.current?.focus();
+      return;
+    }
     mudar('');
     aoEnviar(limpo);
     campo.current?.focus();
@@ -1074,19 +1570,78 @@ function CampoDeMensagem({
     enviar();
   }
 
-  const sobrando = TEXTO_MAXIMO - texto.length;
+  const trazArquivo = (dados: DataTransfer | null): boolean => Boolean(dados && Array.from(dados.types).includes('Files'));
 
   return (
     <form
-      className="inbox-escrever"
+      className={`inbox-escrever${soltando ? ' inbox-escrever--soltando' : ''}`}
       onSubmit={(evento) => {
         evento.preventDefault();
         enviar();
       }}
+      onDragOver={(evento) => {
+        if (!trazArquivo(evento.dataTransfer)) return;
+        evento.preventDefault();
+        setSoltando(true);
+      }}
+      onDragLeave={(evento) => {
+        if (!evento.currentTarget.contains(evento.relatedTarget as Node | null)) setSoltando(false);
+      }}
+      onDrop={(evento) => {
+        if (!trazArquivo(evento.dataTransfer)) return;
+        evento.preventDefault();
+        setSoltando(false);
+        anexar(evento.dataTransfer.files[0]);
+      }}
     >
+      <div aria-live="polite">
+        {anexo ? (
+          <div className="inbox-anexo" id={idAnexo} role="group" aria-label="Arquivo anexado">
+            {anexo.previa ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="inbox-anexo-previa" src={anexo.previa} alt="" />
+            ) : (
+              <span className="inbox-anexo-icone" aria-hidden="true">
+                <Icone nome={anexo.tipo === 'audio' ? 'audios' : 'documento'} />
+              </span>
+            )}
+            <div className="inbox-anexo-texto">
+              <strong>{anexo.arquivo.name}</strong>
+              <span>
+                {anexo.tamanho} · {anexo.comoVai}
+              </span>
+            </div>
+            <button type="button" className="btn btn-secondary btn-sm btn-icon-only" onClick={removerAnexo}>
+              <Icone nome="fechar" className="icon-15" />
+              <span className="so-leitor-de-tela">Remover o anexo</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {erroDoAnexo ? (
+        <p className="inbox-anexo-erro" role="alert">
+          {erroDoAnexo}
+        </p>
+      ) : null}
+
       <div className="inbox-escrever-linha">
+        <input
+          ref={seletor}
+          type="file"
+          hidden
+          data-testid="arquivo-para-enviar"
+          onChange={(evento) => {
+            anexar(evento.target.files?.[0]);
+            // Escolher o mesmo arquivo de novo tem de funcionar.
+            evento.target.value = '';
+          }}
+        />
+        <button type="button" className="btn btn-secondary btn-icon-only inbox-anexar" onClick={() => seletor.current?.click()}>
+          <Icone nome="clipe" />
+          <span className="so-leitor-de-tela">Anexar arquivo</span>
+        </button>
         <label htmlFor={idCampo} className="so-leitor-de-tela">
-          Mensagem
+          {anexo ? (semLegenda ? 'Mensagem (o áudio vai sem legenda)' : 'Legenda do arquivo') : 'Mensagem'}
         </label>
         <textarea
           ref={campo}
@@ -1096,19 +1651,34 @@ function CampoDeMensagem({
           rows={1}
           value={texto}
           maxLength={TEXTO_MAXIMO}
-          placeholder="Escreva uma mensagem"
-          aria-describedby={idDica}
+          readOnly={semLegenda}
+          placeholder={anexo ? (semLegenda ? 'Áudio vai sem legenda' : 'Legenda (opcional)') : 'Escreva uma mensagem'}
+          aria-describedby={anexo ? `${idAnexo} ${idDica}` : idDica}
+          aria-invalid={passouDoLimite || undefined}
           enterKeyHint="enter"
           onChange={(evento) => mudar(evento.target.value)}
           onKeyDown={aoTeclar}
+          onPaste={(evento) => {
+            // Colar um print (Ctrl+V) anexa a imagem.
+            const colado = evento.clipboardData.files[0];
+            if (!colado) return;
+            evento.preventDefault();
+            anexar(colado);
+          }}
         />
-        <button type="submit" className="btn btn-primary" disabled={!texto.trim()}>
+        <button type="submit" className="btn btn-primary" disabled={!podeEnviar}>
           Enviar
         </button>
       </div>
       <p id={idDica} className="inbox-escrever-dica">
-        <span className="inbox-dica-do-teclado">Enter envia · Shift + Enter pula a linha</span>
-        {sobrando <= 300 ? <span>{plural(sobrando, 'letra sobrando', 'letras sobrando')}</span> : null}
+        <span className="inbox-dica-do-teclado">Enter envia · Shift + Enter pula a linha · o clipe anexa foto, áudio, vídeo ou documento</span>
+        {passouDoLimite ? (
+          <span className="inbox-escrever-excesso">
+            A legenda vai até {LEGENDA_MAXIMA.toLocaleString('pt-BR')} letras: tire {plural(-sobrando, 'letra', 'letras')}.
+          </span>
+        ) : sobrando <= 300 && !semLegenda ? (
+          <span>{plural(sobrando, 'letra sobrando', 'letras sobrando')}</span>
+        ) : null}
       </p>
     </form>
   );

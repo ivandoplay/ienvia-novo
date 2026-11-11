@@ -47,6 +47,8 @@ describe('mensagem que saiu pela Evolution (o eco do que o painel enviou)', () =
       remetente: '5585999990000@s.whatsapp.net',
       nome: 'Você',
       texto: 'Temos sim!',
+      arquivo: null,
+      paraBuscar: null,
       quando: '2026-11-11T15:00:00.000Z',
       deMim: true,
     });
@@ -71,6 +73,8 @@ describe('mensagem que chegou', () => {
       remetente: '5585999990000@s.whatsapp.net',
       nome: 'Maria Cliente',
       texto: 'Oi, tem pizza?',
+      arquivo: null,
+      paraBuscar: null,
       quando: '2026-11-11T15:00:00.000Z',
       deMim: false,
     });
@@ -84,15 +88,12 @@ describe('mensagem que chegou', () => {
   test.each([
     ['texto com link ou resposta', { extendedTextMessage: { text: 'Olha esse link' } }, 'Olha esse link'],
     ['mensagem temporária', { ephemeralMessage: { message: { conversation: 'some em 24h' } } }, 'some em 24h'],
-    ['foto com legenda', { imageMessage: { caption: 'meu comprovante' } }, '📷 Imagem: meu comprovante'],
-    ['foto sem legenda', { imageMessage: { mimetype: 'image/jpeg' } }, '📷 Imagem'],
-    ['áudio', { audioMessage: { seconds: 12 } }, '🎤 Áudio'],
-    ['documento com legenda', { documentWithCaptionMessage: { message: { documentMessage: { caption: 'contrato' } } } }, '📎 Documento: contrato'],
-    ['figurinha', { stickerMessage: {} }, 'Figurinha'],
+    // O que o painel ainda não abre entra como uma etiqueta, para a conversa não ficar com buracos.
     ['localização', { locationMessage: { degreesLatitude: -3.7 } }, '📍 Localização'],
+    ['cartão de contato', { contactMessage: { displayName: 'Zé' } }, '👤 Contato'],
   ])('%s', (_caso, mensagem, esperado) => {
     const aviso = interpretarAviso(avisoDeMensagem({ mensagem }), AGORA);
-    expect(aviso).toMatchObject({ tipo: 'mensagem', texto: esperado });
+    expect(aviso).toMatchObject({ tipo: 'mensagem', texto: esperado, arquivo: null, paraBuscar: null });
   });
 
   test('quando o WhatsApp manda um código interno (@lid), usa o número do campo alternativo', () => {
@@ -114,7 +115,124 @@ describe('mensagem que chegou', () => {
 
   test('texto gigante é cortado no limite que o banco aceita', () => {
     const aviso = interpretarAviso(avisoDeMensagem({ mensagem: { conversation: 'a'.repeat(9000) } }), AGORA);
-    expect(aviso.tipo === 'mensagem' && aviso.texto.length).toBe(8000);
+    expect(aviso.tipo === 'mensagem' && aviso.texto?.length).toBe(8000);
+  });
+});
+
+describe('mensagem com arquivo: foto, áudio, vídeo, documento e figurinha', () => {
+  const comArquivo = (mensagem: Record<string, unknown>) => {
+    const aviso = interpretarAviso(avisoDeMensagem({ mensagem }), AGORA);
+    if (aviso.tipo !== 'mensagem') throw new Error(`esperava uma mensagem, veio: ${JSON.stringify(aviso)}`);
+    return aviso;
+  };
+
+  test('foto com legenda: a legenda é o texto, e a ficha traz tipo, tamanho e medidas', () => {
+    const aviso = comArquivo({
+      imageMessage: { caption: 'meu comprovante', mimetype: 'image/jpeg', fileLength: '245000', width: 1280, height: 720 },
+    });
+    expect(aviso.texto).toBe('meu comprovante');
+    expect(aviso.arquivo).toEqual({
+      tipo: 'image',
+      conteudo: 'image/jpeg',
+      tamanho: 245000,
+      nome: null,
+      duracao: null,
+      largura: 1280,
+      altura: 720,
+      voz: false,
+    });
+  });
+
+  test('foto sem legenda: a mensagem vale mesmo sem texto', () => {
+    const aviso = comArquivo({ imageMessage: { mimetype: 'image/jpeg' } });
+    expect(aviso.texto).toBeNull();
+    expect(aviso.arquivo).toMatchObject({ tipo: 'image', tamanho: null, largura: null, altura: null });
+  });
+
+  test('áudio gravado na hora é mensagem de voz; áudio encaminhado não é', () => {
+    // O WhatsApp manda o tamanho como texto, como número ou no formato { low, high }.
+    const voz = comArquivo({ audioMessage: { mimetype: 'audio/ogg; codecs=opus', seconds: 12, ptt: true, fileLength: { low: 18000, high: 0, unsigned: true } } });
+    expect(voz.arquivo).toEqual({ tipo: 'audio', conteudo: 'audio/ogg', tamanho: 18000, nome: null, duracao: 12, largura: null, altura: null, voz: true });
+    expect(voz.texto).toBeNull();
+
+    const musica = comArquivo({ audioMessage: { mimetype: 'audio/mpeg', seconds: 201, ptt: false, fileLength: 4_800_000 } });
+    expect(musica.arquivo).toMatchObject({ tipo: 'audio', conteudo: 'audio/mpeg', duracao: 201, voz: false, tamanho: 4_800_000 });
+  });
+
+  test('vídeo, e o vídeo redondo (recado em vídeo), entram como vídeo', () => {
+    expect(comArquivo({ videoMessage: { mimetype: 'video/mp4', seconds: 21, width: 720, height: 1280, caption: 'olha isso' } })).toMatchObject({
+      texto: 'olha isso',
+      arquivo: { tipo: 'video', conteudo: 'video/mp4', duracao: 21, largura: 720, altura: 1280 },
+    });
+    expect(comArquivo({ ptvMessage: { mimetype: 'video/mp4', seconds: 8 } }).arquivo).toMatchObject({ tipo: 'video', duracao: 8 });
+  });
+
+  test('documento: vem o nome do arquivo; a legenda pode vir embrulhada ou não', () => {
+    const embrulhado = comArquivo({
+      documentWithCaptionMessage: { message: { documentMessage: { caption: 'contrato', fileName: 'Contrato Final.pdf', mimetype: 'application/pdf', fileLength: '90000' } } },
+    });
+    expect(embrulhado).toMatchObject({ texto: 'contrato', arquivo: { tipo: 'document', nome: 'Contrato Final.pdf', conteudo: 'application/pdf', tamanho: 90000 } });
+
+    // A Evolution 2.3.7 já entrega desembrulhado.
+    const direto = comArquivo({ documentMessage: { title: 'Planilha.xlsx', mimetype: 'application/vnd.ms-excel' } });
+    expect(direto).toMatchObject({ texto: null, arquivo: { tipo: 'document', nome: 'Planilha.xlsx', largura: null, duracao: null } });
+  });
+
+  test('figurinha', () => {
+    expect(comArquivo({ stickerMessage: { mimetype: 'image/webp', width: 512, height: 512, fileLength: '30000' } }).arquivo).toEqual({
+      tipo: 'sticker',
+      conteudo: 'image/webp',
+      tamanho: 30000,
+      nome: null,
+      duracao: null,
+      largura: 512,
+      altura: 512,
+      voz: false,
+    });
+  });
+
+  test('foto dentro de uma mensagem temporária também vale', () => {
+    expect(comArquivo({ ephemeralMessage: { message: { imageMessage: { mimetype: 'image/png', caption: 'some em 24h' } } } })).toMatchObject({
+      texto: 'some em 24h',
+      arquivo: { tipo: 'image', conteudo: 'image/png' },
+    });
+  });
+
+  test('valores estranhos na ficha não derrubam a mensagem: viram "não sei"', () => {
+    const aviso = comArquivo({ imageMessage: { mimetype: 'isto não é um tipo', fileLength: 'muito', width: 0, height: -5, seconds: 99 } });
+    expect(aviso.arquivo).toEqual({ tipo: 'image', conteudo: 'application/octet-stream', tamanho: null, nome: null, duracao: null, largura: null, altura: null, voz: false });
+  });
+
+  test('junto vai o pedaço do aviso que a Evolution precisa para baixar o arquivo, sem a miniatura e sem a mensagem citada', () => {
+    const chaveDoArquivo = { 0: 12, 1: 250, 2: 7 };
+    const aviso = comArquivo({
+      imageMessage: {
+        mimetype: 'image/jpeg',
+        url: 'https://mmg.whatsapp.net/v/t62/abc',
+        directPath: '/v/t62/abc',
+        mediaKey: chaveDoArquivo,
+        fileLength: '245000',
+        jpegThumbnail: { 0: 255, 1: 216, 2: 255 },
+        contextInfo: { quotedMessage: { conversation: 'mensagem citada' } },
+      },
+      messageContextInfo: { deviceListMetadataVersion: 2 },
+    });
+    expect(aviso.paraBuscar).toEqual({
+      key: { remoteJid: '5585999990000@s.whatsapp.net', fromMe: false, id: '3EB0C767D26A1B2C3D4E' },
+      message: {
+        imageMessage: { mimetype: 'image/jpeg', url: 'https://mmg.whatsapp.net/v/t62/abc', directPath: '/v/t62/abc', mediaKey: chaveDoArquivo, fileLength: '245000' },
+      },
+    });
+  });
+
+  test.each([
+    ['foto', { viewOnceMessageV2: { message: { imageMessage: { mimetype: 'image/jpeg', caption: 'só uma vez' } } } }, '📷 Foto de visualização única (só abre no celular do chip): só uma vez'],
+    ['vídeo', { viewOnceMessage: { message: { videoMessage: { mimetype: 'video/mp4' } } } }, '🎥 Vídeo de visualização única (só abre no celular do chip)'],
+    ['áudio', { viewOnceMessageV2Extension: { message: { audioMessage: { mimetype: 'audio/ogg', ptt: true } } } }, '🎤 Áudio de visualização única (só abre no celular do chip)'],
+    ['foto marcada por dentro', { imageMessage: { mimetype: 'image/jpeg', viewOnce: true } }, '📷 Foto de visualização única (só abre no celular do chip)'],
+  ])('visualização única (%s): o painel respeita, avisa e não guarda o arquivo', (_caso, mensagem, esperado) => {
+    const aviso = comArquivo(mensagem);
+    expect(aviso).toMatchObject({ texto: esperado, arquivo: null, paraBuscar: null });
   });
 });
 

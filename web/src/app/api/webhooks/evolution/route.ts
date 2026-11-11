@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
+import { after } from 'next/server';
 import { interpretarAviso } from '@/lib/evolution/aviso';
+import { trazerArquivoDaMensagem } from '@/lib/inbox/buscar-arquivo';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
 
 /**
@@ -8,9 +10,19 @@ import { criarClienteDeServico } from '@/lib/supabase/servico';
  * Não existe usuário logado aqui. Cada chip tem um segredo próprio, que a Evolution manda no
  * cabeçalho Authorization; o banco guarda só o resumo (SHA-256) desse segredo e é ele quem confere
  * se o aviso é mesmo daquele chip. Aviso sem segredo certo não grava nada.
+ *
+ * Mensagem com arquivo (foto, áudio, vídeo, documento, figurinha): a mensagem é gravada na hora e a
+ * Evolution recebe o "ok" em seguida; o arquivo em si é trazido logo depois, sem segurar a resposta.
  */
 
-const CORPO_MAXIMO = 1_000_000;
+/** Buscar um arquivo grande na Evolution e guardá-lo pode levar dezenas de segundos. */
+export const maxDuration = 60;
+
+/**
+ * Um aviso de foto ou vídeo traz junto a miniatura, e isso pesa (centenas de milhares de letras).
+ * O limite fica logo abaixo do máximo que a hospedagem aceita, para nunca perder uma mensagem por tamanho.
+ */
+const CORPO_MAXIMO = 4_000_000;
 
 const responder = (status: number, corpo: Record<string, unknown>) => Response.json(corpo, { status });
 
@@ -47,7 +59,7 @@ export async function POST(pedido: Request): Promise<Response> {
           p_provider_state: aviso.estado,
           p_connected_phone: aviso.telefone,
         })
-      : await supabase.rpc('ingest_evolution_text', {
+      : await supabase.rpc('ingest_evolution_message', {
           p_instance_name: aviso.instancia,
           p_token_sha256: resumo,
           p_event_id: aviso.idDoEvento,
@@ -55,9 +67,22 @@ export async function POST(pedido: Request): Promise<Response> {
           p_event_type: 'MESSAGES_UPSERT',
           p_sender_jid: aviso.remetente,
           p_push_name: aviso.nome,
+          // Com arquivo, o texto é a legenda (e pode não existir).
           p_body_text: aviso.texto,
           p_occurred_at: aviso.quando,
           p_from_me: aviso.deMim,
+          p_media: aviso.arquivo
+            ? {
+                kind: aviso.arquivo.tipo,
+                mime: aviso.arquivo.conteudo,
+                size: aviso.arquivo.tamanho,
+                file_name: aviso.arquivo.nome,
+                duration: aviso.arquivo.duracao,
+                width: aviso.arquivo.largura,
+                height: aviso.arquivo.altura,
+                voice: aviso.arquivo.voz,
+              }
+            : null,
         });
 
   if (error) {
@@ -65,7 +90,19 @@ export async function POST(pedido: Request): Promise<Response> {
     return responder(500, { ok: false, erro: 'não foi possível gravar' });
   }
 
-  const resultado = (data as { result?: string } | null)?.result ?? 'desconhecido';
+  const gravado = data as { result?: string; workspace_id?: string; message_id?: string; media?: { status?: string } | null } | null;
+  const resultado = gravado?.result ?? 'desconhecido';
   if (resultado === 'unauthorized') return responder(401, { ok: false, erro: 'não autorizado' });
+
+  // A mensagem já está gravada e aparece na conversa. O arquivo vem depois de responder à Evolution:
+  // se a busca falhar, a conversa mostra o aviso e o botão "tentar de novo".
+  if (aviso.tipo === 'mensagem' && resultado === 'accepted' && gravado?.media?.status === 'pending' && gravado.workspace_id && gravado.message_id) {
+    const alvo = { workspaceId: gravado.workspace_id, mensagemId: gravado.message_id };
+    const mensagemDoAviso = aviso.paraBuscar;
+    after(async () => {
+      await trazerArquivoDaMensagem(supabase, alvo, mensagemDoAviso);
+    });
+  }
+
   return responder(200, { ok: true, resultado });
 }

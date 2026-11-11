@@ -74,6 +74,9 @@ export const config = {
   //  - os avisos da Evolution (não têm sessão de usuário: cada aviso é conferido pelo segredo do
   //    próprio chip, em src/app/api/webhooks/evolution);
   //  - a pergunta "mudou alguma coisa?" da Inbox, feita a cada poucos segundos (quem confere a pessoa
-  //    ali é o banco; passar por aqui custaria uma ida a mais ao Supabase a cada pergunta).
-  matcher: ['/((?!api/webhooks/|api/inbox/versao|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)'],
+  //    ali é o banco; passar por aqui custaria uma ida a mais ao Supabase a cada pergunta);
+  //  - os arquivos da Inbox (fotos, áudios...): uma conversa pede vários de uma vez, e quem confere
+  //    a pessoa é o depósito, a cada arquivo (src/app/api/inbox/midia);
+  //  - /_deposito/, que só existe em desenvolvimento (ver next.config.ts).
+  matcher: ['/((?!api/webhooks/|api/inbox/versao|api/inbox/midia/|_deposito/|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)'],
 };

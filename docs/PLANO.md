@@ -105,7 +105,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | Fase | Nome | O que entrega | Situação |
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
-| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Quase pronta.** Feitos e testados: Instâncias, recebimento das mensagens e a **Inbox com texto** (ler, responder, resolver, reabrir, buscar, ver por chip). **Falta: fotos, áudios e documentos** (hoje chegam como etiqueta, por exemplo "📷 Imagem", e ainda não dá para enviar). **Publicação parada**: ver "Publicação" na seção 6. |
+| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Pronta no código e no banco; falta conferir no ar.** Feitos e testados: Instâncias, recebimento das mensagens e a Inbox com texto e com **arquivos** (fotos, áudios, vídeos, documentos e figurinhas). A conferência final com os serviços de verdade está **travada por dois bloqueios de conta** (Vercel e Supabase): ver o começo da seção 6. |
 | 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
@@ -135,7 +135,7 @@ trocam de lugar sem prejuízo.
   - navegador: login, sair, navegação no computador e no celular, tema, página não encontrada;
   - acessibilidade: contraste e rótulos nas telas prontas, nos dois temas.
 
-### O que a Fase 1 entregou até aqui
+### O que a Fase 1 entregou
 
 - **Instâncias**: adicionar chip (QR Code ou código de 8 dígitos), apelido, função, desconectar,
   remover. Só o dono da conta mexe nos chips; cada conta tem um limite de chips.
@@ -151,6 +151,27 @@ trocam de lugar sem prejuízo.
     recarregar a página (a tela confere a cada poucos segundos);
   - responder com texto; **resolver** e **reabrir**; ficha básica do contato;
   - no celular, a lista e a conversa ocupam a tela inteira, uma de cada vez.
+- **Arquivos na Inbox** (fotos, áudios, vídeos, documentos e figurinhas):
+  - **receber**: a Evolution avisa que chegou um arquivo; o painel grava a mensagem na hora e, logo
+    depois, busca o arquivo e guarda num **depósito fechado** (não é público). Na conversa, a foto
+    aparece (um clique abre grande, com botão de baixar), o áudio e o vídeo tocam ali mesmo (com um
+    "Baixar" ao lado, para quando o navegador não souber tocar), o documento vira um link com o nome
+    original e a figurinha aparece pequena. Enquanto o arquivo não chega, a conversa diz que está
+    trazendo; se não deu, explica o motivo e oferece **"Buscar de novo"**;
+  - **enviar**: pelo botão de anexar, arrastando o arquivo para o campo ou colando uma imagem
+    (Ctrl+V). Dá para escrever uma legenda e tirar o anexo antes de enviar. O arquivo sobe direto
+    do navegador para o depósito, mostrando o andamento; se a subida falhar, nada é enviado e
+    aparece "Tentar de novo";
+  - **limites**: foto, vídeo e áudio até 16 MB (o limite do WhatsApp); documento até 25 MB. Vídeo
+    acima de 16 MB vai como documento, e a tela avisa antes de enviar. Áudio vai como **mensagem de
+    voz**, sem legenda (o texto que estava escrito fica no campo, para ir numa mensagem seguinte).
+    Figurinha só se recebe. Foto, vídeo ou áudio de "visualização única" não são guardados: aparece
+    só o aviso de que chegou. Arquivo recebido acima de 25 MB também não é guardado: a conversa
+    manda ver no celular do chip;
+  - **quem vê**: só quem participa da empresa. O endereço de cada arquivo é emitido pelo servidor a
+    cada pedido, vale por 1 hora e só sai para quem está logado e é daquela empresa. Para qualquer
+    outra pessoa o arquivo "não existe". Ninguém troca nem apaga um arquivo já guardado;
+  - a lista de conversas mostra o que chegou: "📷 Foto: legenda", "🎤 Áudio", "📄 nome do documento".
 - **Regras do envio** (decididas nesta fase):
   - qualquer pessoa ativa da empresa responde; chips continuam sendo só do dono;
   - o painel **nunca reenvia sozinho**. Cada mensagem leva uma chave única criada no navegador;
@@ -163,6 +184,9 @@ trocam de lugar sem prejuízo.
   - o que é digitado direto no celular do chip também aparece na conversa;
   - envio comum que deu certo não vai para o registro de auditoria (seria uma linha por
     mensagem); falha, "sem confirmação", resolver e reabrir vão.
+  - **arquivo segue as mesmas regras do texto**: uma chave por envio, nunca reenvia sozinho, fica
+    "sem confirmação" quando a Evolution não responde. A diferença: um arquivo que não foi enviado
+    precisa ser anexado de novo (o painel não guarda o arquivo de um envio que falhou para reenviar).
 
 ### Diferenças pequenas em relação ao visual do branch
 
@@ -197,6 +221,22 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 
 ## 6. Pendências e cuidados
 
+- **BANCO DE DADOS BLOQUEADO POR COTA (desde a noite de 11/11/2026).** O Supabase passou a recusar
+  **todas** as chamadas dos dois projetos da organização "ZAP IA STUDIO" (o do sistema antigo e o
+  novo "Ienvia") com a resposta `402 exceed_egress_quota`: a organização passou da cota de tráfego
+  de saída do plano. Isso vale para login, dados e arquivos. Conferido às 19h35 e de novo às 19h53
+  (horário de Brasília). **Enquanto durar, ninguém entra no painel novo
+  e o sistema antigo também fica sem banco.**
+  - O que o projeto novo gastou é pouco: ele não tem clientes, só os testes de conferência (alguns
+    megabytes). De onde veio o consumo aparece no painel do Supabase, em *Organization → Usage*,
+    separado por projeto.
+  - Para voltar: (1) passar a organização para o plano Pro, ou (2) se já for paga, tirar o teto de
+    gastos (*spend cap*), ou (3) esperar a cota renovar no próximo ciclo de cobrança. A mensagem do
+    próprio Supabase pede (1) ou (2).
+  - O acesso administrativo (o que aplica migrações e roda SQL) continua funcionando. Foi por ele
+    que a migração dos arquivos foi aplicada e conferida.
+  - **Cuidado daqui para a frente:** fotos, áudios e vídeos gastam essa mesma cota cada vez que
+    alguém abre uma conversa. Com clientes de verdade, o plano gratuito não aguenta.
 - **Senha exposta.** O repositório antigo é público e tem o usuário e a senha do painel escritos
   em dois documentos (`GUIA_PARA_IA.md` e `CONTEXTO_SISTEMA.md`), além de telefones reais.
   Recomendo trocar essa senha e tornar o repositório privado.
@@ -224,6 +264,8 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   comercial; com clientes pagantes o Pro é necessário de qualquer forma.
   Enviar para o GitHub **não** publica sozinho: cada publicação é feita de propósito, depois dos
   testes.
+  Na noite de 11/11 o bloqueio continuava: `ienvia-novo.vercel.app` e `zap-ia-studio.vercel.app`
+  respondiam "Payment required" (conferido às 19h38, horário de Brasília).
 - **Conectar os chips pelo endereço publicado.** A Evolution avisa o painel pela internet, e o
   endereço da prévia só abre para quem está na conversa. Chip conectado pela prévia não entrega
   mensagens. Se um chip foi conectado por outro endereço, basta abrir a aba Instâncias no endereço
@@ -239,6 +281,28 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   segundos), confirmação automática quando o aviso de "mensagem enviada" chega, resolver, e
   conversa nova quando o cliente volta. Falta ver, com um chip seu conectado: uma mensagem real
   chegando, uma resposta saindo de verdade e o aviso da Evolution voltando sozinho.
+- **Arquivos: o que foi conferido de verdade e o que falta.**
+  - **Conferido no banco de verdade** (11/11, pelo acesso administrativo, numa operação que o banco
+    desfaz inteira no final, sem deixar nada gravado): 46 verificações, todas certas. Quem é da
+    empresa sobe arquivo só na pasta de envios de uma conversa da própria empresa e enxerga os
+    arquivos dela; pessoa de outra empresa e visitante sem login não enxergam nem sobem nada;
+    ninguém troca nem apaga arquivo; o envio lê o tipo e o tamanho que o depósito registrou; o
+    recebimento de uma foto grava a mensagem, reserva a busca do arquivo e marca como guardado.
+    O roteiro está em `apoio-da-reconstrucao/ferramentas/conferir-arquivos-no-banco-real.sql`.
+  - **Falta, por causa do bloqueio de cota:** o mesmo caminho passando pela porta de entrada do
+    Supabase (subir e abrir um arquivo pelo navegador, com uma conta logada). O roteiro está
+    pronto (`conferir-arquivos-no-ambiente-real.mjs`) e para sozinho, sem fazer nada, enquanto o
+    serviço estiver bloqueado.
+  - **Falta, por depender de um chip seu conectado:** um arquivo de verdade chegando pelo WhatsApp
+    e sendo buscado na Evolution, e um arquivo saindo de verdade para um contato.
+- **Arquivos: prazo de guarda.** Cada arquivo já é gravado com a data até quando deve ficar (30
+  dias, ou o prazo configurado na empresa), mas **a limpeza automática ainda não existe**: por
+  enquanto nada é apagado. Quando ela entrar, tem de apagar pelo serviço de arquivos do Supabase,
+  porque ele não deixa apagar arquivo direto pelo banco (conferido).
+- **Arquivos: o que o navegador toca.** Áudio e vídeo usam o tocador do próprio navegador. Mensagem
+  de voz do WhatsApp vem num formato (OGG/Opus) que navegadores mais antigos, principalmente no
+  iPhone, não tocam. Por isso há o "Baixar" ao lado de cada áudio e vídeo. Converter o áudio no
+  servidor fica para depois, se fizer falta.
 - **O que a Evolution responde quando o envio falha.** A Evolution 2.3.7 devolve o mesmo erro
   ("400") para quase tudo, inclusive quando a mensagem já saiu e o problema foi depois. Por isso o
   painel só diz "não enviada" quando tem certeza (número sem WhatsApp, chip que não existe mais,

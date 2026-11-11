@@ -13,6 +13,14 @@ const origensDev = (process.env.IENVIA_ORIGENS_DEV ?? '')
   .map((origem) => origem.trim())
   .filter(Boolean);
 
+/**
+ * Só em desenvolvimento: faz o depósito de arquivos (Supabase Storage) responder pelo próprio painel,
+ * em /_deposito/... Serve para prévias em que o navegador não alcança o Supabase diretamente.
+ * Em produção não existe: o navegador fala direto com o Supabase. (ver src/lib/supabase/deposito.ts)
+ */
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/+$/, '');
+const depositoPeloPainel = !emProducao && process.env.IENVIA_DEPOSITO_PELO_PAINEL === '1' && Boolean(supabaseUrl);
+
 const cabecalhosDeSeguranca = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -40,6 +48,9 @@ const config: NextConfig = {
   },
   async headers() {
     return [{ source: '/:path*', headers: cabecalhosDeSeguranca }];
+  },
+  async rewrites() {
+    return depositoPeloPainel ? [{ source: '/_deposito/:caminho*', destination: `${supabaseUrl}/storage/v1/:caminho*` }] : [];
   },
 };
 

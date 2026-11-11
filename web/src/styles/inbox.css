@@ -852,3 +852,235 @@
     margin-top: 5px;
   }
 }
+
+/* ---------- Arquivos nas mensagens: foto, figurinha, áudio, vídeo e documento ---------- */
+
+/* A foto ocupa o balão; clicar abre em tamanho maior. */
+.balao-foto {
+  display: block;
+  max-width: 100%;
+  margin: -3px -7px 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.14);
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.balao-foto--local {
+  cursor: default;
+}
+
+/* Quando as medidas são conhecidas, a largura vem pronta (style) e a altura sai da proporção. */
+.balao-foto img {
+  display: block;
+  max-width: min(100%, 330px);
+  height: auto;
+  max-height: 340px;
+  object-fit: contain;
+}
+
+.balao-figurinha {
+  display: block;
+  width: 132px;
+  max-width: 100%;
+  height: auto;
+  max-height: 132px;
+  margin-bottom: 4px;
+  object-fit: contain;
+}
+
+.balao-som,
+.balao-video {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.balao-som audio {
+  width: 280px;
+  max-width: 100%;
+  height: 40px;
+}
+
+.balao-video video {
+  display: block;
+  width: 330px;
+  max-width: 100%;
+  height: auto;
+  max-height: 340px;
+  border-radius: 9px;
+  background: #000;
+}
+
+.balao-arquivo-detalhe {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+/* "Baixar" ao lado do tocador: mesma cor do texto, sublinhado (não depende só da cor). */
+.balao-arquivo-detalhe a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Documento (para baixar) e os avisos de arquivo que não dá para mostrar. */
+.balao-arquivo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: min(230px, 100%);
+  margin-bottom: 5px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.14);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+a.balao-arquivo:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.balao-arquivo-icone {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 7px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.balao-arquivo-icone .icon-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.balao-arquivo-texto {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.balao-arquivo-texto strong {
+  font-size: 13px;
+  font-weight: 680;
+  overflow-wrap: anywhere;
+}
+
+/* Não deu para trazer, grande demais ou já apagado: borda tracejada, como tudo o que não está completo. */
+.balao-arquivo--falhou,
+.balao-arquivo--grande_demais,
+.balao-arquivo--apagado,
+.balao-arquivo--buscando {
+  border: 1px dashed currentColor;
+  background: transparent;
+}
+
+.balao-situacao--enviando {
+  font-weight: 620;
+}
+
+/* Foto aberta em tamanho maior. */
+.foto-aberta {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.foto-aberta img {
+  max-width: 100%;
+  max-height: calc(100dvh - 210px);
+  border-radius: var(--radius-md, 10px);
+  object-fit: contain;
+}
+
+.foto-aberta-legenda {
+  justify-self: stretch;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.foto-aberta .dialogo-acoes {
+  justify-self: stretch;
+}
+
+/* ---------- Anexar um arquivo ---------- */
+
+.inbox-anexar {
+  flex-shrink: 0;
+}
+
+.inbox-escrever--soltando {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+
+.inbox-anexo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card-subtle);
+}
+
+.inbox-anexo-previa {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.inbox-anexo-icone {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 11px;
+  border-radius: 7px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+.inbox-anexo-texto {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.inbox-anexo-texto strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: 12.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-anexo-erro,
+.inbox-escrever-excesso {
+  color: var(--danger-text);
+}
+
+.inbox-anexo-erro {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
