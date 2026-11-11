@@ -10,6 +10,7 @@ import {
   enderecoDaInbox,
   horaDaMensagem,
   iniciaisDoContato,
+  intervaloDeNovidades,
   lerBusca,
   lerLimite,
   lerLimiteDeMensagens,
@@ -69,6 +70,23 @@ describe('filtros da lista', () => {
     expect(lerBusca('   ')).toBeNull();
     expect(lerBusca(undefined)).toBeNull();
     expect(lerBusca('x'.repeat(200))).toHaveLength(80);
+  });
+});
+
+describe('ritmo das perguntas "chegou algo novo?"', () => {
+  test('rápido com a pessoa usando a tela; mais devagar quando ela está parada', () => {
+    expect(intervaloDeNovidades(0)).toBe(4_000);
+    expect(intervaloDeNovidades(119_000)).toBe(4_000);
+    expect(intervaloDeNovidades(2 * 60_000)).toBe(12_000);
+    expect(intervaloDeNovidades(14 * 60_000)).toBe(12_000);
+    expect(intervaloDeNovidades(15 * 60_000)).toBe(30_000);
+    expect(intervaloDeNovidades(8 * 60 * 60_000)).toBe(30_000);
+  });
+
+  test('uma aba esquecida aberta por um dia inteiro faz poucas perguntas', () => {
+    // 2 min no ritmo rápido + 13 min no médio + o resto do dia no lento.
+    const perguntas = (2 * 60) / 4 + (13 * 60) / 12 + (24 * 60 * 60 - 15 * 60) / 30;
+    expect(perguntas).toBeLessThan(3_000);
   });
 });
 

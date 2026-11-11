@@ -7,9 +7,10 @@ Esta é a **reescrita limpa** do sistema antigo (`zap-ia-studio`). O plano compl
 as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do que sai está em
 [docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md).
 
-**Situação:** Fase 0 (fundação) pronta. Fase 1 quase pronta e no ar: a aba **Instâncias** (conectar chips),
+**Situação:** Fase 0 (fundação) pronta. Fase 1 quase pronta: a aba **Instâncias** (conectar chips),
 o recebimento das mensagens e a **Inbox** com texto (ler, responder, resolver, buscar, ver por chip).
-Falta, da Fase 1, ver e enviar fotos, áudios e documentos.
+Falta, da Fase 1, ver e enviar fotos, áudios e documentos. A publicação está parada: a conta da Vercel
+foi bloqueada por limite de uso em 11/11/2026 (detalhes em [docs/PLANO.md](docs/PLANO.md), seção 6).
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
@@ -47,7 +48,7 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 365 testes: login, menu, datas, chips, a Inbox, a conversa com a Evolution, os avisos de mensagem e as regras do banco (acesso, envio, eco, leitura). |
+| Regras e banco | `npm test` | 367 testes: login, menu, datas, chips, a Inbox, a conversa com a Evolution, os avisos de mensagem e as regras do banco (acesso, envio, eco, leitura). |
 | Montagem | `npm run build` | O painel monta para produção. |
 | Navegador | `npm run test:e2e` | 127 testes num navegador de verdade, em tela de computador e de celular (mais 9 que só valem para uma das duas telas). |
 

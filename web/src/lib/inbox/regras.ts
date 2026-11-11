@@ -51,6 +51,21 @@ export function proximoLimiteDeMensagens(atual: number): number | null {
   return atual >= MENSAGENS_NO_MAXIMO ? null : Math.min(atual + MENSAGENS_POR_VEZ, MENSAGENS_NO_MAXIMO);
 }
 
+/**
+ * De quanto em quanto tempo a tela aberta pergunta ao painel se chegou algo novo.
+ * Com a pessoa usando a tela, a cada 4 segundos; parada há alguns minutos, mais devagar
+ * (cada pergunta é uma chamada ao servidor, e uma aba esquecida aberta não deve gastar à toa).
+ * Qualquer clique ou tecla volta ao ritmo rápido na hora.
+ */
+export function intervaloDeNovidades(msSemAtividade: number): number {
+  if (msSemAtividade < 2 * 60_000) return 4_000;
+  if (msSemAtividade < 15 * 60_000) return 12_000;
+  return 30_000;
+}
+
+/** A partir de quanto tempo parada a tela já está no ritmo lento (e vale conferir na hora quando a pessoa volta). */
+export const NOVIDADES_EM_RITMO_LENTO_APOS = 2 * 60_000;
+
 export const BUSCA_MAXIMA = 80;
 
 /** Texto de busca limpo (sem espaços nas pontas, no tamanho máximo). Vazio vira `null`. */

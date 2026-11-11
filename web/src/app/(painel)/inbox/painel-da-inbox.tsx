@@ -13,7 +13,9 @@ import {
   VISOES,
   descreverEtapa,
   enderecoDaInbox,
+  NOVIDADES_EM_RITMO_LENTO_APOS,
   horaDaMensagem,
+  intervaloDeNovidades,
   lerBusca,
   proximoLimite,
   proximoLimiteDeMensagens,
@@ -61,11 +63,24 @@ interface Aviso {
   texto: string;
 }
 
-/** De quanto em quanto tempo a tela pergunta se chegou algo novo (só com a aba visível). */
-const INTERVALO_DE_NOVIDADES = 4_000;
-
 /** O que a pessoa estava escrevendo em cada conversa, para não perder ao trocar de conversa. */
 const rascunhos = new Map<string, string>();
+
+/**
+ * Quantos pedidos ao servidor (enviar, resolver, marcar como lida...) estão no meio do caminho.
+ * Enquanto houver algum, a tela não pede recarga por conta própria: a resposta de cada pedido já traz
+ * os dados novos, e as recargas pedidas no meio ficariam na fila para rodar todas de uma vez no final.
+ */
+let pedidosEmAndamento = 0;
+
+async function pedir<T>(pedido: () => Promise<T>): Promise<T> {
+  pedidosEmAndamento += 1;
+  try {
+    return await pedido();
+  } finally {
+    pedidosEmAndamento -= 1;
+  }
+}
 
 /** Chave única de um envio. Repetir o pedido com a mesma chave nunca manda a mensagem duas vezes. */
 function novaChave(): string {
@@ -76,24 +91,32 @@ function novaChave(): string {
 
 /**
  * Pergunta ao painel, de tempos em tempos, se algo mudou; quando muda, recarrega os dados da tela
- * (sem perder o que a pessoa está escrevendo).
+ * (sem perder o que a pessoa está escrevendo). Só pergunta com a aba visível, e mais devagar quando
+ * ninguém mexe na tela há alguns minutos.
  */
 function useNovidades(workspaceId: string, versao: string | null): void {
   const router = useRouter();
   const versaoNaTela = useRef(versao);
+  /** Hora em que a tela pediu uma recarga que ainda não chegou (0 = nenhuma pendente). */
+  const recargaPedidaEm = useRef(0);
 
   useEffect(() => {
+    // Chegaram dados novos: a recarga pedida (se havia) foi atendida.
     versaoNaTela.current = versao;
+    recargaPedidaEm.current = 0;
   }, [versao]);
 
   useEffect(() => {
     let desmontado = false;
     let perguntando = false;
-    let ultimaRecarga = 0;
     let pausadoAte = 0;
+    let ultimaAtividade = Date.now();
+    let relogio: ReturnType<typeof setTimeout> | undefined;
 
     async function conferir() {
       if (desmontado || perguntando || document.visibilityState !== 'visible' || Date.now() < pausadoAte) return;
+      // Com um pedido em andamento, quem traz os dados novos é a resposta dele.
+      if (pedidosEmAndamento > 0) return;
       perguntando = true;
       try {
         const resposta = await fetch(`/api/inbox/versao?w=${encodeURIComponent(workspaceId)}`, { cache: 'no-store' });
@@ -108,12 +131,17 @@ function useNovidades(workspaceId: string, versao: string | null): void {
         const corpo = (await resposta.json()) as { versao?: unknown };
         if (desmontado || typeof corpo.versao !== 'string') return;
 
+        if (pedidosEmAndamento > 0) return;
         const conhecida = versaoNaTela.current;
-        const desdeAUltima = Date.now() - ultimaRecarga;
+        // Uma recarga por vez: só pede outra se a anterior não chegou em 15 segundos.
+        const desdeOPedido = Date.now() - recargaPedidaEm.current;
+        if (recargaPedidaEm.current !== 0 && desdeOPedido < 15_000) return;
         // Sem versão na tela (a leitura falhou ao abrir), tenta de novo de vez em quando.
-        const mudou = conhecida === null ? desdeAUltima > 30_000 : corpo.versao !== conhecida;
-        if (mudou && desdeAUltima > 2_000) {
-          ultimaRecarga = Date.now();
+        const mudou = conhecida === null ? desdeOPedido > 30_000 : corpo.versao !== conhecida;
+        if (mudou) {
+          recargaPedidaEm.current = Date.now();
+          // Chegou coisa nova: a conversa está viva, o ritmo volta a ser o rápido.
+          ultimaAtividade = Date.now();
           router.refresh();
         }
       } catch {
@@ -123,13 +151,38 @@ function useNovidades(workspaceId: string, versao: string | null): void {
       }
     }
 
-    const relogio = setInterval(() => void conferir(), INTERVALO_DE_NOVIDADES);
-    const aoVoltar = () => void conferir();
+    function agendar() {
+      clearTimeout(relogio);
+      if (desmontado) return;
+      relogio = setTimeout(() => {
+        void conferir().finally(agendar);
+      }, intervaloDeNovidades(Date.now() - ultimaAtividade));
+    }
+
+    /** A pessoa mexeu na tela (ou voltou para a aba): ritmo rápido de novo; se estava no lento, confere já. */
+    function acordar(conferirJa: boolean) {
+      const estavaLento = Date.now() - ultimaAtividade >= NOVIDADES_EM_RITMO_LENTO_APOS;
+      ultimaAtividade = Date.now();
+      if (conferirJa || estavaLento) {
+        void conferir();
+        agendar();
+      }
+    }
+    const aoMexer = () => acordar(false);
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') acordar(true);
+    };
+
+    window.addEventListener('pointerdown', aoMexer, { passive: true });
+    window.addEventListener('keydown', aoMexer);
     document.addEventListener('visibilitychange', aoVoltar);
     window.addEventListener('focus', aoVoltar);
+    agendar();
     return () => {
       desmontado = true;
-      clearInterval(relogio);
+      clearTimeout(relogio);
+      window.removeEventListener('pointerdown', aoMexer);
+      window.removeEventListener('keydown', aoMexer);
       document.removeEventListener('visibilitychange', aoVoltar);
       window.removeEventListener('focus', aoVoltar);
     };
@@ -174,8 +227,9 @@ export function PainelDaInbox({
 
       let resultado: ResultadoDoEnvio;
       try {
-        resultado = await enviarMensagem({ conversaId: conversa, texto, chave });
+        resultado = await pedir(() => enviarMensagem({ conversaId: conversa, texto, chave }));
       } catch {
+        // A resposta se perdeu: não dá para saber o que o servidor fez. Recarrega para ver o que está gravado.
         mudar({ fase: 'sem_resposta' });
         router.refresh();
         return;
@@ -185,9 +239,9 @@ export function PainelDaInbox({
         mudar({ fase: 'recusada', erro: resultado.erro });
         return;
       }
+      // A resposta do servidor já trouxe a conversa atualizada; aqui só se anota como o envio terminou.
       mudar({ fase: 'enviando', mensagemId: resultado.mensagemId, situacao: resultado.situacao });
       if (resultado.aviso) avisar(conversa, { tipo: 'erro', texto: resultado.aviso });
-      router.refresh();
     },
     [avisar, router],
   );
@@ -585,7 +639,7 @@ function Conversa({
     const marcar = () => {
       if (feito || document.visibilityState !== 'visible') return;
       feito = true;
-      mudarConversa({ conversaId: conversa.id, acao: 'marcar_lida' }).catch(() => {
+      pedir(() => mudarConversa({ conversaId: conversa.id, acao: 'marcar_lida' })).catch(() => {
         // Se falhar, as mensagens só continuam marcadas como não lidas.
       });
     };
@@ -608,13 +662,13 @@ function Conversa({
     setOcupado(acao);
     aoAvisar(conversa.id, null);
     try {
-      const resultado = await mudarConversa({ conversaId: conversa.id, acao });
+      const resultado = await pedir(() => mudarConversa({ conversaId: conversa.id, acao }));
       if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
     } catch {
       aoAvisar(conversa.id, { tipo: 'erro', texto: 'Não foi possível falar com o painel. Confira a internet e tente de novo.' });
+      router.refresh();
     } finally {
       setOcupado(null);
-      router.refresh();
     }
   }
 
@@ -623,13 +677,13 @@ function Conversa({
       setDecidindo(mensagemId);
       aoAvisar(conversa.id, null);
       try {
-        const resultado = await decidirEnvio({ mensagemId, foiEnviada });
+        const resultado = await pedir(() => decidirEnvio({ mensagemId, foiEnviada }));
         if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
       } catch {
         aoAvisar(conversa.id, { tipo: 'erro', texto: 'Não foi possível falar com o painel. Confira a internet e tente de novo.' });
+        router.refresh();
       } finally {
         setDecidindo(null);
-        router.refresh();
       }
     },
     [aoAvisar, conversa.id, router],

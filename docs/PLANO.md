@@ -105,7 +105,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | Fase | Nome | O que entrega | Situação |
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
-| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Quase pronta.** No ar desde 11/11/2026 em `https://ienvia-novo.vercel.app`: Instâncias, recebimento das mensagens e a **Inbox com texto** (ler, responder, resolver, reabrir, buscar, ver por chip). **Falta: fotos, áudios e documentos** (hoje chegam como etiqueta, por exemplo "📷 Imagem", e ainda não dá para enviar). |
+| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Quase pronta.** Feitos e testados: Instâncias, recebimento das mensagens e a **Inbox com texto** (ler, responder, resolver, reabrir, buscar, ver por chip). **Falta: fotos, áudios e documentos** (hoje chegam como etiqueta, por exemplo "📷 Imagem", e ainda não dá para enviar). **Publicação parada**: ver "Publicação" na seção 6. |
 | 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
@@ -148,7 +148,7 @@ trocam de lugar sem prejuízo.
     Histórico); busca por nome, telefone ou texto da última mensagem;
   - conversa aberta com as mensagens em balões, dizendo quem respondeu (você, a equipe, pelo
     celular do chip e, na Fase 2, a IA); abrir marca como lida; mensagem nova entra sozinha, sem
-    recarregar a página (a tela confere a cada 4 segundos);
+    recarregar a página (a tela confere a cada poucos segundos);
   - responder com texto; **resolver** e **reabrir**; ficha básica do contato;
   - no celular, a lista e a conversa ocupam a tela inteira, uma de cada vez.
 - **Regras do envio** (decididas nesta fase):
@@ -213,9 +213,15 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 - **Conta de teste no banco novo.** Existe um usuário `teste-automatico` com uma empresa
   "Teste automático (pode apagar)". Serve para conferir as telas no ambiente de verdade sem usar a
   sua conta. Será apagado antes da virada.
-- **Publicação.** O painel está no ar em `https://ienvia-novo.vercel.app`, na conta atual da
-  Vercel (plano Hobby, que é para uso não comercial). Antes de ter clientes pagantes o projeto
-  precisa ir para o plano Pro, na mesma conta ou em outra; mudar depois é simples.
+- **Publicação (parada em 11/11/2026).** O painel foi publicado em `https://ienvia-novo.vercel.app`
+  (Instâncias e recebimento) e funcionou. Na tarde do mesmo dia a Vercel **bloqueou a conta inteira**
+  por passar do limite de uso do plano gratuito (Hobby): o endereço passou a responder
+  "Payment required", e os outros projetos da mesma conta também. O que este projeto usou naquele
+  dia foi pouco (algumas montagens e algumas dezenas de acessos de teste); qual limite estourou e
+  de onde veio o consumo só aparece no painel da Vercel, em *Usage*.
+  A Inbox está no GitHub, mas **não está no ar**. Para voltar: (1) esperar o limite renovar,
+  (2) passar a conta para o plano Pro, ou (3) publicar em outra conta. O plano Hobby é para uso não
+  comercial; com clientes pagantes o Pro é necessário de qualquer forma.
   Enviar para o GitHub **não** publica sozinho: cada publicação é feita de propósito, depois dos
   testes.
 - **Conectar os chips pelo endereço publicado.** A Evolution avisa o painel pela internet, e o
@@ -225,17 +231,24 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 - **"Esperando você" (decidido).** O cartão da Visão geral e o filtro da Inbox fazem a mesma
   conta: conversas em que a próxima resposta é de uma pessoa (novas, passadas pela IA ou já em
   atendimento). Quando você responde, a conversa sai da conta até o cliente escrever de novo.
-- **Envio ainda não conferido com um chip de verdade.** O caminho inteiro foi conferido contra a
-  Evolution real até onde dá sem um WhatsApp conectado. Falta ver, com um chip seu conectado:
-  uma mensagem real chegando, uma resposta saindo e o aviso de "mensagem enviada" voltando.
+- **Envio ainda não conferido com um chip de verdade.** A Inbox foi conferida com o banco e a
+  Evolution de verdade, a partir do painel rodando aqui (não do endereço publicado, que estava
+  bloqueado), usando um chip de teste que nunca foi ligado a um WhatsApp: os avisos de mensagem
+  foram entregues à mão no painel. Funcionou: conversa aparecendo, leitura, mensagem nova entrando
+  sozinha, resposta ficando "sem confirmação" quando a Evolution não responde (cerca de 30
+  segundos), confirmação automática quando o aviso de "mensagem enviada" chega, resolver, e
+  conversa nova quando o cliente volta. Falta ver, com um chip seu conectado: uma mensagem real
+  chegando, uma resposta saindo de verdade e o aviso da Evolution voltando sozinho.
 - **O que a Evolution responde quando o envio falha.** A Evolution 2.3.7 devolve o mesmo erro
   ("400") para quase tudo, inclusive quando a mensagem já saiu e o problema foi depois. Por isso o
   painel só diz "não enviada" quando tem certeza (número sem WhatsApp, chip que não existe mais,
   chave recusada). No resto, fica "sem confirmação" e a pessoa decide.
 - **Mensagens novas aparecem por consulta, não por conexão permanente.** A Inbox aberta pergunta ao
-  painel a cada 4 segundos se algo mudou (só com a aba visível). É simples e resistente, mas cada
-  pergunta é uma chamada ao servidor. Com muitos atendentes ao mesmo tempo, vale trocar pelo canal
-  em tempo real do Supabase.
+  painel se algo mudou: a cada 4 segundos com a pessoa usando a tela, a cada 12 depois de 2 minutos
+  parada e a cada 30 depois de 15 minutos; com a aba escondida, não pergunta. É simples e
+  resistente, mas cada pergunta é uma chamada ao servidor (um atendente trabalhando 8 horas faz
+  até umas 7 mil por dia). Com muitos atendentes ao mesmo tempo, vale trocar pelo canal em tempo
+  real do Supabase, que não gasta chamadas enquanto nada acontece.
 - **Endereço de uma conversa depois do login.** Quem abre o endereço de uma conversa sem estar
   logado volta, depois do login, para a Inbox, e não direto para aquela conversa.
 - **Botão verde com letra branca.** A cor da marca com letra branca não atinge o contraste mínimo
