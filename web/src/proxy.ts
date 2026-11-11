@@ -69,6 +69,7 @@ function redirecionarMantendoCookies(destino: URL, origem: NextResponse) {
 }
 
 export const config = {
-  // Tudo, menos arquivos estáticos e imagens.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)'],
+  // Tudo, menos arquivos estáticos, imagens e os avisos da Evolution (que não têm sessão de usuário:
+  // cada aviso é conferido pelo segredo do próprio chip, em src/app/api/webhooks/evolution).
+  matcher: ['/((?!api/webhooks/|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)'],
 };

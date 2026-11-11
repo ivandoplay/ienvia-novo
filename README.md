@@ -7,7 +7,7 @@ Esta é a **reescrita limpa** do sistema antigo (`zap-ia-studio`). O plano compl
 as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do que sai está em
 [docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md).
 
-**Situação:** Fase 0 (fundação) pronta. Fase 1 em andamento: a aba **Instâncias** (conectar chips) está pronta; falta a Inbox.
+**Situação:** Fase 0 (fundação) pronta. Fase 1 em andamento: a aba **Instâncias** (conectar chips) e o recebimento das mensagens estão prontos; falta a tela da Inbox.
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
@@ -45,7 +45,7 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 190 testes: login, menu, datas, chips, a conversa com a Evolution e as regras de acesso do banco. |
+| Regras e banco | `npm test` | 229 testes: login, menu, datas, chips, a conversa com a Evolution, os avisos de mensagem e as regras de acesso do banco. |
 | Montagem | `npm run build` | O painel monta para produção. |
 | Navegador | `npm run test:e2e` | 68 testes num navegador de verdade, em tela de computador e de celular. |
 

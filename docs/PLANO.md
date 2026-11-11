@@ -105,7 +105,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | Fase | Nome | O que entrega | Situação |
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
-| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido, função do chip, ligar/desligar. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, assumir e devolver para a IA, ficha básica do contato. Recebimento das mensagens. | **Em andamento.** Instâncias pronta em 11/11/2026 (conferida com a Evolution e o banco de verdade). Falta: receber as mensagens e a Inbox. |
+| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido, função do chip, ligar/desligar. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, assumir e devolver para a IA, ficha básica do contato. Recebimento das mensagens. | **Em andamento.** Prontos em 11/11/2026, conferidos com a Evolution e o banco de verdade: a aba Instâncias e a porta de entrada das mensagens (texto; foto, áudio e documento entram como etiqueta). Falta: a tela da Inbox, responder, e gravar o que é enviado pelo próprio celular. |
 | 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. | |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
@@ -181,9 +181,12 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   sua conta. Será apagado antes da virada.
 - **Publicação.** O projeto `ienvia-novo` foi criado na Vercel, mas ainda não está no ar: a
   publicação ficou esperando você decidir em qual conta da Vercel o sistema vai morar.
-- **Endereço dos avisos.** Cada chip é criado dizendo à Evolution para onde avisar quando chega
-  mensagem. Enquanto o painel roda só na prévia, esse endereço é o da prévia; quando o painel for
-  publicado, basta abrir a aba Instâncias que cada chip passa a avisar o endereço novo sozinho.
+- **As mensagens só chegam com o painel publicado.** A Evolution avisa o painel pela internet, e o
+  endereço da prévia só abre para quem está na conversa. Por isso, na prévia o chip conecta mas as
+  mensagens não chegam (a aba Instâncias mostra esse alerta). Quando o painel for publicado, basta
+  abrir a aba Instâncias uma vez: cada chip passa a avisar o endereço novo sozinho.
+- **"Esperando você" na Visão geral.** Hoje conta só conversas marcadas como "aguardando humano".
+  Conversa nova com mensagem não lida ainda não entra nessa conta; isso é acertado junto com a Inbox.
 
 ## 7. Como saber que uma fase está pronta
 
