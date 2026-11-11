@@ -31,11 +31,23 @@ export interface Sessao {
   workspaceAtivo: WorkspaceDaSessao | null;
   /** Administrador da plataforma (enxerga a área "Clientes SaaS"). */
   ehMaster: boolean;
+  /**
+   * `true` quando o login valeu, mas a leitura das empresas falhou (banco fora do ar, por exemplo).
+   * Serve para a tela não dizer "você não tem workspace" quando o problema é outro.
+   */
+  falhouAoCarregar: boolean;
+}
+
+interface WorkspaceBruto {
+  id: string;
+  name: string;
+  status: string;
 }
 
 interface LinhaDeParticipacao {
   role: Papel;
-  workspaces: { id: string; name: string; status: string } | null;
+  /** O Supabase devolve um objeto aqui; por garantia aceitamos também uma lista de um item. */
+  workspaces: WorkspaceBruto | WorkspaceBruto[] | null;
 }
 
 /**
@@ -62,13 +74,18 @@ export const obterSessao = cache(async (): Promise<Sessao | null> => {
     supabase.rpc('is_my_platform_master'),
   ]);
 
-  const workspaces: WorkspaceDaSessao[] = (participacoes.data ?? [])
-    .filter((linha) => linha.workspaces !== null && linha.workspaces.status === 'active')
-    .map((linha) => ({
-      id: linha.workspaces!.id,
-      nome: linha.workspaces!.name,
-      papel: linha.role,
-    }));
+  // Uma falha aqui não pode passar por "conta sem workspace" sem deixar rastro.
+  if (participacoes.error) console.error('[sessão] não foi possível ler as participações:', participacoes.error);
+  if (perfil.error) console.error('[sessão] não foi possível ler o perfil:', perfil.error);
+  if (master.error) console.error('[sessão] não foi possível conferir o administrador:', master.error);
+
+  const workspaces: WorkspaceDaSessao[] = [];
+  for (const linha of participacoes.data ?? []) {
+    const workspace = Array.isArray(linha.workspaces) ? linha.workspaces[0] : linha.workspaces;
+    if (workspace && workspace.status === 'active') {
+      workspaces.push({ id: workspace.id, nome: workspace.name, papel: linha.role });
+    }
+  }
 
   const workspaceAtivo = workspaces[0] ?? null;
 
@@ -80,6 +97,7 @@ export const obterSessao = cache(async (): Promise<Sessao | null> => {
     workspaces,
     workspaceAtivo,
     ehMaster: master.data === true,
+    falhouAoCarregar: Boolean(participacoes.error),
   };
 });
 

@@ -165,6 +165,7 @@ function rotasDeDados(req, res, url) {
   }
 
   if (recurso === 'workspace_memberships') {
+    if (usuario.bancoFalha) return responder(res, 500, { message: 'falha simulada do banco' });
     const linhas = PARTICIPACOES.filter((p) => p.user_id === usuario.id && p.status === 'active').map((p) => ({
       role: p.role,
       workspaces: WORKSPACES.find((w) => w.id === p.workspace_id) ?? null,

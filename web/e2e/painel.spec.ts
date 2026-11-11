@@ -38,6 +38,12 @@ test.describe('Visão geral', () => {
     await entrar(page, 'novato');
     await expect(page.getByRole('heading', { name: 'Sua conta ainda não tem um workspace' })).toBeVisible();
   });
+
+  test('se o banco falhar, a tela diz isso em vez de dizer que a conta não tem workspace', async ({ page }) => {
+    await entrar(page, 'azarado');
+    await expect(page.getByRole('heading', { name: 'Não foi possível carregar sua conta agora' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sua conta ainda não tem um workspace' })).toHaveCount(0);
+  });
 });
 
 test.describe('Navegação', () => {

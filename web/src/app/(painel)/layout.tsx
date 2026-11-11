@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { apelidoDoLogin, iniciais } from '@ienvia/shared';
@@ -40,8 +41,27 @@ export default async function LayoutDoPainel({ children }: { children: ReactNode
       conexao={conexao}
       temaInicial={lerTema(cookieStore.get(COOKIE_TEMA)?.value)}
     >
-      {workspace ? children : <SemWorkspace />}
+      {sessao.falhouAoCarregar ? <FalhaAoCarregar /> : workspace ? children : <SemWorkspace />}
     </Casca>
+  );
+}
+
+/** O login valeu, mas o banco não respondeu ao buscar as empresas da pessoa. */
+function FalhaAoCarregar() {
+  return (
+    <div className="apoio">
+      <div className="page-header">
+        <div>
+          <h1>Não foi possível carregar sua conta agora</h1>
+          <p>O login funcionou, mas os dados não chegaram. Nada foi alterado. Espere um instante e tente de novo.</p>
+        </div>
+      </div>
+      <div className="apoio-acoes">
+        <Link href="/visao-geral" className="btn btn-primary">
+          Tentar de novo
+        </Link>
+      </div>
+    </div>
   );
 }
 

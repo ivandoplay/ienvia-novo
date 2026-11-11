@@ -47,7 +47,7 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | Estilo | `npm run lint` | Padrões do código do painel. |
 | Regras e banco | `npm test` | 136 testes: login, menu, datas, e as regras de acesso do banco. |
 | Montagem | `npm run build` | O painel monta para produção. |
-| Navegador | `npm run test:e2e` | 48 testes num navegador de verdade, em tela de computador e de celular. |
+| Navegador | `npm run test:e2e` | 50 testes num navegador de verdade, em tela de computador e de celular. |
 
 Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`.
 

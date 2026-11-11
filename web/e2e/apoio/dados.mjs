@@ -26,6 +26,14 @@ export const USUARIOS = [
     nome: '',
     master: false,
   },
+  {
+    // Para esta conta o "banco" falha ao listar as empresas (simula o banco fora do ar).
+    id: 'b0000000-0000-4000-8000-000000000004',
+    email: 'azarado@zapia.local',
+    nome: '',
+    master: false,
+    bancoFalha: true,
+  },
 ];
 
 export const WORKSPACES = [
