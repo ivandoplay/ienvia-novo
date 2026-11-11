@@ -100,15 +100,16 @@ describe('mensagem que chega', () => {
     });
   });
 
-  test('grupo e mensagem enviada pelo próprio chip ficam de fora (por enquanto)', async () => {
+  test('mensagem de grupo fica de fora', async () => {
     await banco.comoUsuario(DONA_A, async () => {
       const chip = await prepararChip();
       expect((await receber('msg-1', 'no grupo', { remetente: '120363000000000000@g.us' })).result).toBe('ignored');
-      expect((await receber('msg-2', 'resposta pelo celular', { deMim: true })).result).toBe('ignored');
       const { rows } = await banco.db.query('select id from public.messages where instance_id = $1', [chip]);
       expect(rows).toHaveLength(0);
     });
   });
+
+  // Mensagens enviadas pelo próprio chip (pelo celular ou pelo painel): ver conversa.test.ts.
 
   test('a conversa nova aparece para a dona da loja e não para a outra empresa', async () => {
     await banco.comoUsuario(DONA_A, async () => {
