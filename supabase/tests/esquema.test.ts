@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { criarBanco, type BancoDeTeste } from './helpers/banco';
+import { beforeAll, describe, expect, test } from 'vitest';
+import { bancoDaRodada, type BancoDeTeste } from './helpers/banco';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,11 +13,7 @@ interface Retrato {
 let banco: BancoDeTeste;
 
 beforeAll(async () => {
-  banco = await criarBanco();
-});
-
-afterAll(async () => {
-  await banco.fechar();
+  banco = await bancoDaRodada();
 });
 
 describe('esquema do banco', () => {

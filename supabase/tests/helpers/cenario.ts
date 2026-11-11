@@ -8,7 +8,7 @@
  *
  * Cada loja tem 1 chip, 1 contato, 1 conversa, 1 mensagem e 1 campanha.
  */
-import type { BancoDeTeste } from './banco';
+import { bancoDaRodada, type BancoDeTeste } from './banco';
 
 export const LOJA_A = '11111111-1111-4111-8111-111111111111';
 export const LOJA_B = '22222222-2222-4222-8222-222222222222';
@@ -29,6 +29,16 @@ export const CONVERSA_B = '22222222-0000-4000-8000-0000000000b3';
 
 /** Tabelas que guardam dados de uma empresa. Todas têm 1 linha de cada loja no cenário. */
 export const TABELAS_DA_EMPRESA = ['instances', 'contacts', 'conversations', 'messages', 'campaigns'] as const;
+
+let cenarioCarregado: Promise<void> | undefined;
+
+/** O banco da rodada, já com as duas lojas dentro (o cenário é carregado uma vez só). */
+export async function bancoComCenario(): Promise<BancoDeTeste> {
+  const banco = await bancoDaRodada();
+  cenarioCarregado ??= montarCenario(banco);
+  await cenarioCarregado;
+  return banco;
+}
 
 export async function montarCenario(banco: BancoDeTeste): Promise<void> {
   // Roda como administrador do banco (fora de qualquer papel), igual a uma carga inicial.

@@ -12,8 +12,8 @@ const itens = listarItensDoMenu();
 const rotas = itens.map((item) => item.rota);
 
 describe('menu do painel', () => {
-  test('tem as 14 abas do sistema, sem rota repetida', () => {
-    expect(rotas).toHaveLength(14);
+  test('tem as 13 abas do sistema, sem rota repetida', () => {
+    expect(rotas).toHaveLength(13);
     expect(new Set(rotas).size).toBe(rotas.length);
   });
 
@@ -44,7 +44,7 @@ describe('menuParaUsuario', () => {
 
   test('cliente comum não vê "Clientes SaaS"', () => {
     expect(rotasDe(false)).not.toContain('/contas');
-    expect(rotasDe(false)).toHaveLength(13);
+    expect(rotasDe(false)).toHaveLength(12);
   });
 
   test('administrador da plataforma vê tudo', () => {
@@ -67,6 +67,10 @@ describe('buscarItemPorRota', () => {
   test('endereço desconhecido não devolve nada', () => {
     expect(buscarItemPorRota('/nao-existe')).toBeUndefined();
     expect(buscarItemPorRota('/login')).toBeUndefined();
+  });
+
+  test('"Histórico" não é mais uma aba: virou filtro da Inbox', () => {
+    expect(buscarItemPorRota('/historico')).toBeUndefined();
   });
 });
 

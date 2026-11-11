@@ -39,8 +39,14 @@ export default defineConfig({
           name: 'banco',
           include: ['supabase/tests/**/*.test.ts'],
           environment: 'node',
-          // Cada arquivo sobe um Postgres inteiro na memória; um de cada vez para não faltar memória.
+          // O Postgres em memória é pesado (uns 400 MB, com pico de ~1 GB ao subir). Para caber em
+          // máquinas pequenas: um processo só, sem isolar os arquivos (assim todos usam o mesmo
+          // banco — ver `bancoDaRodada`), e sem a compilação otimizada de WebAssembly do Node,
+          // que é o que causa o pico. Os testes ficam um pouco mais lentos e bem mais leves.
           maxWorkers: 1,
+          fileParallelism: false,
+          isolate: false,
+          execArgv: ['--liftoff-only'],
           testTimeout: 120_000,
           hookTimeout: 120_000,
         },

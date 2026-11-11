@@ -49,7 +49,7 @@ export const MENU: GrupoMenu[] = [
         rota: '/inbox',
         rotulo: 'Inbox',
         icone: 'inbox',
-        descricao: 'Caixa de entrada do WhatsApp: conversas, contatos, Kanban e ficha do cliente.',
+        descricao: 'Caixa de entrada do WhatsApp: conversas, contatos, Kanban, ficha do cliente e o histórico de cada chip.',
         fase: 1,
       },
       {
@@ -74,7 +74,7 @@ export const MENU: GrupoMenu[] = [
             rota: '/treinamento',
             rotulo: 'Treinamento',
             icone: 'treinamento',
-            descricao: 'Ensine o atendente: identidade do negócio, regras, perguntas frequentes e arquivos.',
+            descricao: 'Ensine o atendente: identidade do negócio, regras, perguntas frequentes, arquivos e skills.',
             fase: 2,
           },
           {
@@ -125,13 +125,6 @@ export const MENU: GrupoMenu[] = [
             icone: 'conexoes',
             descricao: 'O motor local que roda no seu aparelho: versão instalada, atualização e download.',
             fase: 4,
-          },
-          {
-            rota: '/historico',
-            rotulo: 'Histórico',
-            icone: 'historico',
-            descricao: 'Conversas e mensagens guardadas, separadas por instância.',
-            fase: 3,
           },
         ],
       },

@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { criarBanco, type BancoDeTeste } from './helpers/banco';
+import { beforeAll, describe, expect, test } from 'vitest';
+import type { BancoDeTeste } from './helpers/banco';
 import {
   ATENDENTE_A,
   DONA_A,
@@ -10,18 +10,13 @@ import {
   MASTER,
   SUSPENSO_A,
   TABELAS_DA_EMPRESA,
-  montarCenario,
+  bancoComCenario,
 } from './helpers/cenario';
 
 let banco: BancoDeTeste;
 
 beforeAll(async () => {
-  banco = await criarBanco();
-  await montarCenario(banco);
-});
-
-afterAll(async () => {
-  await banco.fechar();
+  banco = await bancoComCenario();
 });
 
 /** Quais empresas aparecem para quem está perguntando, em cada tabela. */

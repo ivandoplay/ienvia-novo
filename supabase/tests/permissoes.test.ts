@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { criarBanco, type BancoDeTeste } from './helpers/banco';
+import { beforeAll, describe, expect, test } from 'vitest';
+import type { BancoDeTeste } from './helpers/banco';
 import {
   ATENDENTE_A,
   CHIP_A,
@@ -12,18 +12,13 @@ import {
   LOJA_A,
   LOJA_B,
   MASTER,
-  montarCenario,
+  bancoComCenario,
 } from './helpers/cenario';
 
 let banco: BancoDeTeste;
 
 beforeAll(async () => {
-  banco = await criarBanco();
-  await montarCenario(banco);
-});
-
-afterAll(async () => {
-  await banco.fechar();
+  banco = await bancoComCenario();
 });
 
 const executar = (sql: string) => () => banco.db.query(sql);

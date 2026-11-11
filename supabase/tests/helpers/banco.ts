@@ -70,6 +70,23 @@ export interface BancoDeTeste {
   fechar(): Promise<void>;
 }
 
+let bancoCompartilhado: Promise<BancoDeTeste> | undefined;
+
+/**
+ * O banco de teste da rodada, criado na primeira vez que alguém pede.
+ *
+ * Subir um Postgres em memória é caro (chega a ~1 GB de pico por alguns instantes), então todos
+ * os arquivos de teste usam o mesmo. Isso é seguro porque cada teste roda dentro de uma transação
+ * que é desfeita no final (`comoUsuario`, `comoServico`, `comoAnonimo`): um não vê a sujeira do outro.
+ *
+ * Um teste que precise mudar a ESTRUTURA do banco deve usar `criarBanco()` e fechar o seu no final.
+ */
+export function bancoDaRodada(): Promise<BancoDeTeste> {
+  bancoCompartilhado ??= criarBanco();
+  return bancoCompartilhado;
+}
+
+/** Cria um banco novo, só seu. Prefira `bancoDaRodada()`; lembre de chamar `fechar()` no final. */
 export async function criarBanco(opcoes: { ate?: string } = {}): Promise<BancoDeTeste> {
   const db = new PGlite({ extensions: { pg_trgm } });
   await db.exec(AMBIENTE_SUPABASE);

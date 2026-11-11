@@ -45,7 +45,7 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 136 testes: login, menu, datas, e as regras de acesso do banco. |
+| Regras e banco | `npm test` | 137 testes: login, menu, datas, e as regras de acesso do banco. |
 | Montagem | `npm run build` | O painel monta para produção. |
 | Navegador | `npm run test:e2e` | 50 testes num navegador de verdade, em tela de computador e de celular. |
 
@@ -66,7 +66,8 @@ Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`
 1. **Segredo não vai para o Git.** Só `web/.env.example` é versionado. No painel só entra a chave
    *pública* do Supabase; a chave secreta (service_role) nunca aparece no código do navegador.
 2. **Migração aplicada não se edita.** Toda mudança no banco é um arquivo novo em
-   `supabase/migrations/`, com teste, e só é aplicada no banco real com autorização do dono.
+   `supabase/migrations/`, com teste. Só vai para o banco real depois de passar nos testes daqui;
+   se a mudança apagar algum dado que já existe, o dono é consultado antes.
 3. **Uma coisa, um lugar.** Menu em `web/src/lib/navegacao.ts`, moldura em
    `web/src/components/casca/`, cada tela na sua pasta em `web/src/app/`.
 4. **Nada finge funcionar.** Tela que ainda não foi refeita diz isso com clareza.

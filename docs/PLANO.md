@@ -14,7 +14,7 @@ O antigo fica intacto, como referência e como cópia de segurança, até a vira
 
 ## 2. Decisões já tomadas
 
-Respondidas por você nos dois questionários:
+Respondidas por você nos três questionários:
 
 | Assunto | Decisão |
 | --- | --- |
@@ -27,7 +27,13 @@ Respondidas por você nos dois questionários:
 | Visual | O do branch `feat/modernizacao-painel-oficial`. |
 | Pessoas por conta | Um login por cliente agora; o banco já está pronto para equipe depois. |
 | Chaves de IA | Cada cliente usa as suas (Gemini e OpenRouter), como hoje. |
-| Repositório | Novo, local. Depois de todos os testes você diz o próximo passo. Nada foi enviado a lugar nenhum. |
+| Repositório | Novo e **privado** no GitHub: `ivandoplay/ienvia-novo`. O repositório antigo e a primeira tentativa (`ivandoplay/ienvia`) não foram tocados. |
+| Lista de cortes | Aprovada em 11/11/2026, como está em [O-QUE-FICA-E-O-QUE-SAI.md](./O-QUE-FICA-E-O-QUE-SAI.md). |
+| Skills | Ficam: Estúdio de Skills, "Cérebro completo" e "Pacote Turbo" (você usa). Entram com o Treinamento. |
+| Ligar a IA | Em cada chip. No topo, só o botão de emergência "Pausar tudo". Religar é sempre chip por chip. |
+| Histórico | Deixa de ser aba: vira o filtro "ver por chip" dentro da Inbox (decisão que você deixou comigo). |
+| Mudanças no banco novo | Você deixou comigo. Regra: testo aqui primeiro, aplico no banco "Ienvia" e aviso no resumo da entrega. Se a mudança **apagar** algum dado que já existe, eu pergunto antes. No banco antigo eu só leio, nunca escrevo. |
+| Credenciais | Tudo o que você me mandar fica guardado num arquivo `.env` **fora** deste repositório (nunca vai para o GitHub) e pode ser usado nos testes e nas publicações sem eu pedir de novo. |
 
 Regras suas que já estavam escritas nos documentos antigos e que continuam valendo:
 
@@ -39,7 +45,7 @@ Regras suas que já estavam escritas nos documentos antigos e que continuam vale
 - Quem cria as contas é o administrador (não existe cadastro aberto).
 - Campanha é um disparo único, com prévia e confirmação.
 - Mensagens guardadas por 60 dias e mídias por 30 (ajustável por empresa).
-- Nenhuma mudança no banco de produção nem publicação sem a sua autorização.
+- No banco **antigo** (o que está em produção hoje) nada muda. No banco novo vale a regra da tabela acima.
 
 ## 3. Como o novo está organizado
 
@@ -121,8 +127,8 @@ trocam de lugar sem prejuízo.
   gaveta e barra inferior no celular, menu da conta com "Sair".
 - **Visão geral** com números reais do banco: conversas esperando você, IA ligada, campanhas
   ativas, chips online, mensagens de hoje, contatos e o funil.
-- **As outras 13 abas** aparecem no menu e avisam, com honestidade, em que fase ficam prontas.
-  Nenhuma finge funcionar.
+- **As outras 12 abas** aparecem no menu e avisam, com honestidade, em que fase ficam prontas.
+  Nenhuma finge funcionar. (Eram 13: o "Histórico" virou um filtro da Inbox.)
 - **Testes** (os números exatos estão no [README](../README.md)):
   - regras do painel e do login;
   - banco: uma empresa não vê a outra, o que o navegador não pode fazer, o que cada papel pode;
@@ -133,7 +139,8 @@ trocam de lugar sem prejuízo.
 
 - O cartão "Na fila segura" virou "Contatos" até a fila existir (Fase 5).
 - No lugar de "Controle rápido" entrou "Para começar a atender" (três passos).
-- O botão "IA Ativa" e a busca (Ctrl+K) do topo ainda não aparecem: entram quando funcionarem de verdade.
+- O botão "IA Ativa" do topo dá lugar ao "Pausar tudo" (emergência), que entra na Fase 1 junto com
+  o liga/desliga de cada chip. A busca (Ctrl+K) entra quando houver o que buscar.
 - No tema claro, o cinza do texto pequeno ficou um pouco mais escuro, para dar leitura
   (o original não atingia o contraste mínimo recomendado).
 
@@ -169,5 +176,6 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 
 1. `npm run verificar` passa inteiro (tipos, estilo de código, testes, montagem e navegador).
 2. As telas novas foram comparadas com as do branch visual, no computador e no celular.
-3. O que mudou no banco está em uma migração nova, testada, e só é aplicada com a sua autorização.
+3. O que mudou no banco está em uma migração nova, testada aqui antes de ir para o banco "Ienvia",
+   e aparece no resumo da entrega (regra completa na seção 2).
 4. Este plano foi atualizado.

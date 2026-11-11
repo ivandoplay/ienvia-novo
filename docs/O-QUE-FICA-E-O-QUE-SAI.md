@@ -1,6 +1,7 @@
 # O que fica e o que sai
 
-> **Situação: proposta aguardando a sua aprovação.** Nada desta lista foi cortado ainda.
+> **Situação: aprovada por você em 11/11/2026.** O que está como "Sai" não será reconstruído;
+> o que está como "Depois" entra numa segunda rodada, com o sistema já funcionando.
 > O sistema antigo continua inteiro, no repositório e no banco antigos, como cópia de segurança.
 
 Olhei as 14 abas do painel antigo, botão por botão. A ideia do enxugamento é simples:
@@ -84,7 +85,7 @@ Se algum item marcado como "sai" ou "depois" for importante para você, é só d
 | Mensagens aprovadas (M01–M13) | **Fica**, com o nome "Mensagens prontas" | Usadas em Nova conversa e em Campanhas. |
 | "Ensinar / corrigir resposta em 1 clique" | **Fica** | É o jeito mais rápido de melhorar a IA no dia a dia. |
 | Várias bases de treinamento (uma por chip) | **Fica** | Decisão sua que já estava registrada. |
-| Estúdio de Skills, "Cérebro completo", "Pacote Turbo" | **Preciso da sua opinião** | Proposta: simplificar para Identidade + Regras + FAQ + Arquivos. Se você usa as Skills de verdade, elas ficam. |
+| Estúdio de Skills, "Cérebro completo", "Pacote Turbo" | **Fica** | Você respondeu que usa e quer manter. Entram junto com o Treinamento (Fase 2). |
 | "Treinar com ChatGPT / Vibe Coding" (copiar e colar de fora) | **Depois** | |
 
 ## Catálogo & PIX · Áudios · Simulador
@@ -104,7 +105,7 @@ Se algum item marcado como "sai" ou "depois" for importante para você, é só d
 | Provedor principal, rota e reserva | **Fica** | |
 | Comportamento: simular "digitando", dividir mensagens longas, pausar quando você responde | **Fica** | Passa a morar só aqui. |
 | "Controle rápido da IA" | **Junta** | Repetido. |
-| Botão "IA Ativa" no topo do painel | **Preciso da sua opinião** | Existe no visual novo, mas numa decisão anterior você tinha dito "sem botão geral, só por chip". |
+| Botão "IA Ativa" no topo do painel | **Fica, de outro jeito** | Decisão sua: a IA liga e desliga **em cada chip**. No topo fica só um botão de emergência, **"Pausar tudo"**, que desliga a IA de todos os chips de uma vez. Para religar, é chip por chip (nada volta a responder sozinho). |
 
 ## Instâncias · Conexões / Motor · Histórico
 
@@ -116,7 +117,7 @@ Se algum item marcado como "sai" ou "depois" for importante para você, é só d
 | Ligar e desligar a IA por chip (todo chip novo nasce desligado) | **Fica** | |
 | Motor local: versão, atualização automática, download para PC e Termux | **Fica** | |
 | Dispositivos conectados | **Fica** | |
-| Histórico por instância | **Preciso da sua opinião** | Proposta: virar um filtro dentro da Inbox, em vez de uma aba separada. |
+| Histórico por instância | **Junta** com a Inbox | Você deixou a decisão comigo. Deixa de ser uma aba separada: na Inbox entra o filtro "ver por chip", que mostra as conversas e mensagens guardadas de cada um. Um lugar só para procurar conversa. |
 
 ## Segurança
 
