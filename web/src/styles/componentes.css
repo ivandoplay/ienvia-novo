@@ -459,3 +459,173 @@
     max-width: 98px;
   }
 }
+
+/* ───────── Campos de formulário ───────── */
+.campo {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 14px;
+}
+.campo::placeholder {
+  color: var(--text-muted);
+}
+.campo-dica {
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.linha-de-campo {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.linha-de-campo .campo {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  /* Abaixo de 16px o iPhone dá zoom sozinho ao tocar no campo. */
+  .campo {
+    font-size: 16px;
+  }
+}
+
+/* Opções em cartão (um botão de rádio por linha, com explicação). */
+.opcoes {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+.opcoes legend {
+  margin-bottom: 5px;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 12.8px;
+  font-weight: 600;
+}
+.opcao {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card-subtle);
+  cursor: pointer;
+}
+.opcao:has(input:checked) {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+.opcao input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+.opcao strong {
+  display: block;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 680;
+}
+.opcao small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.aviso--ok {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-bright);
+}
+
+/* ───────── Janela de diálogo ───────── */
+.dialogo {
+  width: min(480px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  box-shadow: var(--shadow-lg);
+}
+.dialogo::backdrop {
+  background: rgba(3, 10, 12, 0.66);
+}
+.dialogo-caixa {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+.dialogo-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dialogo-topo h2 {
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.dialogo-texto {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.dialogo-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Etiqueta de estado (conectado, aguardando, desconectado...). */
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.estado::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+.estado--ok {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+.estado--atencao {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: var(--warning-soft);
+  color: var(--warning-bright);
+}
+.estado--erro {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--danger-soft);
+  color: var(--danger);
+}

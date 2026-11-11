@@ -1,0 +1,148 @@
+/* Tela de Instâncias (chips). */
+.instancias-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+}
+.instancias-contagem {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+.instancias-limite {
+  margin: -4px 0 14px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.instancias-avisos {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+.chip-identidade {
+  min-width: 0;
+}
+.chip-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.chip-titulo h2 {
+  min-width: 0;
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.chip-dados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  list-style: none;
+}
+.chip-dados li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chip-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip-ia {
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.chip-conexao {
+  display: grid;
+  gap: 14px;
+  margin-top: 13px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.chip-conexao-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.chip-conexao-dica {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.chip-qr {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+.chip-qr img {
+  display: block;
+  width: 208px;
+  height: 208px;
+  padding: 8px;
+  border-radius: 12px;
+  /* O QR Code precisa de fundo branco para a câmera ler, nos dois temas. */
+  background: #fff;
+}
+.chip-qr ol {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.chip-codigo {
+  color: var(--accent-bright);
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+}
+.chip-espera {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 620;
+}
+.chip-sem-camera {
+  max-width: 520px;
+}
+@media (max-width: 640px) {
+  .chip-qr {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+  .chip-acoes .btn,
+  .chip-conexao-acoes .btn {
+    flex: 1 1 auto;
+  }
+}

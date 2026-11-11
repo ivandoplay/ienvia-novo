@@ -58,6 +58,7 @@ export const resumirInstancias = cache(async (workspaceId: string): Promise<Resu
     .from('instances')
     .select('status, is_enabled')
     .eq('workspace_id', workspaceId)
+    .neq('status', 'revoked')
     .returns<Array<{ status: string; is_enabled: boolean }>>();
 
   if (error) {

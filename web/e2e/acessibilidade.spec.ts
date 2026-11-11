@@ -7,6 +7,8 @@ import { abrirMenuDaConta, entrar } from './apoio/sessao';
  * Não substitui um teste com leitor de tela, mas pega os erros mais comuns.
  */
 async function problemasGraves(page: Page) {
+  // Só mede quando a página assentou (o título é a última coisa que o Next coloca no lugar).
+  await expect(page).toHaveTitle(/.+/);
   const resultado = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   return resultado.violations
     .filter((violacao) => violacao.impact === 'serious' || violacao.impact === 'critical')
@@ -14,6 +16,11 @@ async function problemasGraves(page: Page) {
 }
 
 test.describe('Acessibilidade', () => {
+  // Sem animações, a troca de tema não deixa cores "no meio do caminho" na hora da medição.
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+  });
+
   test('tela de login', async ({ page }) => {
     await page.goto('/login');
     expect(await problemasGraves(page)).toEqual([]);

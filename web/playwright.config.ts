@@ -3,16 +3,20 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Testes de ponta a ponta: abrem o painel num navegador de verdade e usam como uma pessoa usaria.
  *
- * Nenhum teste encosta no Supabase real. O painel é montado apontando para um
- * "Supabase de mentira" (e2e/apoio/supabase-falso.mjs), numa pasta de montagem separada.
+ * Nenhum teste encosta no Supabase real nem cria chip de verdade. O painel é montado apontando
+ * para um "Supabase de mentira" e uma "Evolution de mentira" (e2e/apoio), numa pasta de montagem separada.
  */
 const PORTA_PAINEL = 3100;
 const PORTA_SUPABASE_FALSO = 54399;
+const PORTA_EVOLUTION_FALSA = 54398;
 
 const ambienteDoPainel = {
   IENVIA_PASTA_DE_MONTAGEM: '.next-e2e',
   NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${PORTA_SUPABASE_FALSO}`,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'chave-publica-de-teste',
+  EVOLUTION_API_URL: `http://127.0.0.1:${PORTA_EVOLUTION_FALSA}`,
+  EVOLUTION_API_KEY: 'chave-da-evolution-de-teste',
+  IENVIA_URL_PUBLICA: 'https://painel.teste.invalid',
   NEXT_TELEMETRY_DISABLED: '1',
 };
 
@@ -41,6 +45,13 @@ export default defineConfig({
       command: 'node e2e/apoio/supabase-falso.mjs',
       url: `http://127.0.0.1:${PORTA_SUPABASE_FALSO}/saude`,
       env: { PORTA_SUPABASE_FALSO: String(PORTA_SUPABASE_FALSO) },
+      reuseExistingServer: false,
+      timeout: 20_000,
+    },
+    {
+      command: 'node e2e/apoio/evolution-falsa.mjs',
+      url: `http://127.0.0.1:${PORTA_EVOLUTION_FALSA}/`,
+      env: { PORTA_EVOLUTION_FALSA: String(PORTA_EVOLUTION_FALSA) },
       reuseExistingServer: false,
       timeout: 20_000,
     },

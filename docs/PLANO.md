@@ -105,7 +105,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | Fase | Nome | O que entrega | Situação |
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
-| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido, função do chip, ligar/desligar. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, assumir e devolver para a IA, ficha básica do contato. Recebimento das mensagens. | A seguir |
+| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido, função do chip, ligar/desligar. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, assumir e devolver para a IA, ficha básica do contato. Recebimento das mensagens. | **Em andamento.** Instâncias pronta em 11/11/2026 (conferida com a Evolution e o banco de verdade). Falta: receber as mensagens e a Inbox. |
 | 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. | |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
@@ -139,8 +139,9 @@ trocam de lugar sem prejuízo.
 
 - O cartão "Na fila segura" virou "Contatos" até a fila existir (Fase 5).
 - No lugar de "Controle rápido" entrou "Para começar a atender" (três passos).
-- O botão "IA Ativa" do topo dá lugar ao "Pausar tudo" (emergência), que entra na Fase 1 junto com
-  o liga/desliga de cada chip. A busca (Ctrl+K) entra quando houver o que buscar.
+- O botão "IA Ativa" do topo dá lugar ao "Pausar tudo" (emergência). Ele e o liga/desliga de cada
+  chip entram na Fase 2, junto com o atendente de IA: antes disso não haveria o que ligar.
+  A busca (Ctrl+K) entra quando houver o que buscar.
 - No tema claro, o cinza do texto pequeno ficou um pouco mais escuro, para dar leitura
   (o original não atingia o contraste mínimo recomendado).
 
@@ -169,8 +170,20 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   um limite próprio por usuário, para ninguém ficar tentando senhas.
 - **Política de segurança de conteúdo (CSP).** Os cabeçalhos básicos já estão ativos; a política
   completa entra antes da virada.
-- **O que significa "ligado" num chip.** O banco tem um único botão por chip (`is_enabled`). Na
-  Fase 1 fica definido, com você, se ele liga só a IA ou o chip inteiro.
+- **O que significa "ligado" num chip (decidido).** O botão de cada chip (`is_enabled`) liga e desliga
+  **só a IA** daquele chip. Com a IA desligada o chip continua recebendo e guardando as mensagens,
+  e você responde à mão pela Inbox. Todo chip nasce com a IA desligada.
+- **Limite de chips por conta.** Cada conta nasce podendo ter 1 chip, como no sistema antigo
+  (`workspaces.max_instances`). A sua conta foi ajustada para 3. Quem muda o limite é o
+  administrador, na aba Clientes SaaS (Fase 7).
+- **Conta de teste no banco novo.** Existe um usuário `teste-automatico` com uma empresa
+  "Teste automático (pode apagar)". Serve para conferir as telas no ambiente de verdade sem usar a
+  sua conta. Será apagado antes da virada.
+- **Publicação.** O projeto `ienvia-novo` foi criado na Vercel, mas ainda não está no ar: a
+  publicação ficou esperando você decidir em qual conta da Vercel o sistema vai morar.
+- **Endereço dos avisos.** Cada chip é criado dizendo à Evolution para onde avisar quando chega
+  mensagem. Enquanto o painel roda só na prévia, esse endereço é o da prévia; quando o painel for
+  publicado, basta abrir a aba Instâncias que cada chip passa a avisar o endereço novo sozinho.
 
 ## 7. Como saber que uma fase está pronta
 

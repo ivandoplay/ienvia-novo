@@ -11,6 +11,8 @@ export interface WorkspaceDaSessao {
   id: string;
   nome: string;
   papel: Papel;
+  /** Quantos chips esta conta pode ter (definido pelo administrador da plataforma). */
+  limiteDeChips: number;
 }
 
 export interface Sessao {
@@ -42,6 +44,7 @@ interface WorkspaceBruto {
   id: string;
   name: string;
   status: string;
+  max_instances: number | null;
 }
 
 interface LinhaDeParticipacao {
@@ -65,7 +68,7 @@ export const obterSessao = cache(async (): Promise<Sessao | null> => {
   const [participacoes, perfil, master] = await Promise.all([
     supabase
       .from('workspace_memberships')
-      .select('role, workspaces(id, name, status)')
+      .select('role, workspaces(id, name, status, max_instances)')
       .eq('user_id', usuario.id)
       .eq('status', 'active')
       .order('created_at', { ascending: true })
@@ -83,7 +86,12 @@ export const obterSessao = cache(async (): Promise<Sessao | null> => {
   for (const linha of participacoes.data ?? []) {
     const workspace = Array.isArray(linha.workspaces) ? linha.workspaces[0] : linha.workspaces;
     if (workspace && workspace.status === 'active') {
-      workspaces.push({ id: workspace.id, nome: workspace.name, papel: linha.role });
+      workspaces.push({
+        id: workspace.id,
+        nome: workspace.name,
+        papel: linha.role,
+        limiteDeChips: workspace.max_instances ?? 1,
+      });
     }
   }
 

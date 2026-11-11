@@ -6,6 +6,7 @@
  *   - login, sessão e sair            (/auth/v1/...)
  *   - leitura simples de tabelas       (/rest/v1/<tabela>?coluna=eq.valor)
  *   - contagem de linhas               (HEAD + Prefer: count=exact)
+ *   - as ações dos chips               (/rest/v1/rpc/create_my_evolution_instance e afins)
  *
  * Ele respeita a regra mais importante do banco real: cada pessoa só enxerga as linhas
  * dos workspaces de que participa. As regras de verdade (RLS) são testadas à parte,
@@ -88,6 +89,7 @@ function workspacesDoUsuario(usuario) {
 function passaNoFiltro(linha, coluna, expressao) {
   const valor = linha[coluna];
   if (expressao.startsWith('eq.')) return String(valor) === expressao.slice(3);
+  if (expressao.startsWith('neq.')) return String(valor) !== expressao.slice(4);
   if (expressao.startsWith('gte.')) return String(valor) >= expressao.slice(4);
   if (expressao === 'is.null') return valor === null || valor === undefined;
   throw new Error(`Filtro não suportado pelo Supabase de mentira: ${coluna}=${expressao}`);
@@ -154,11 +156,76 @@ async function rotasDeLogin(req, res, url) {
   return responder(res, 404, { msg: `Rota de login não imitada: ${req.method} ${url.pathname}` });
 }
 
-function rotasDeDados(req, res, url) {
+const ESTADOS_DA_EVOLUTION = { open: 'connected', connecting: 'connecting', close: 'disconnected', closed: 'disconnected', error: 'error' };
+
+/**
+ * As ações dos chips, com as mesmas regras do banco de verdade: só o dono da empresa executa,
+ * o limite de chips é respeitado e chip removido ("revoked") deixa de existir para as demais ações.
+ */
+function acoesDosChips(res, usuario, nome, corpo) {
+  const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
+  const workspaceId = corpo.p_workspace_id;
+  const ehDono = PARTICIPACOES.some(
+    (p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.role === 'owner' && p.status === 'active',
+  );
+  if (!ehDono) return erro(403, '42501', 'Workspace owner required');
+
+  const chips = tabelas.instances;
+  if (nome === 'create_my_evolution_instance') {
+    const limite = WORKSPACES.find((w) => w.id === workspaceId)?.max_instances ?? 1;
+    const emUso = chips.filter((chip) => chip.workspace_id === workspaceId && chip.status !== 'revoked').length;
+    if (emUso >= limite) return erro(400, 'P0001', 'instance_limit_reached');
+    const novo = {
+      id: crypto.randomUUID(),
+      workspace_id: workspaceId,
+      display_name: String(corpo.p_display_name).trim(),
+      purpose: corpo.p_purpose,
+      engine: 'evolution',
+      status: 'disconnected',
+      connected_phone: null,
+      is_enabled: false,
+      provider_instance_name: corpo.p_provider_instance_name,
+      created_at: new Date().toISOString(),
+    };
+    chips.push(novo);
+    return responder(res, 200, { id: novo.id, provider_instance_name: novo.provider_instance_name, status: novo.status });
+  }
+
+  const chip = chips.find((item) => item.id === corpo.p_instance_id && item.workspace_id === workspaceId && item.status !== 'revoked');
+  if (!chip) return erro(400, 'P0002', 'Instance not found');
+
+  if (nome === 'update_my_instance_settings') {
+    chip.display_name = String(corpo.p_display_name).trim();
+    chip.purpose = corpo.p_purpose;
+    return responder(res, 200, { id: chip.id, display_name: chip.display_name, purpose: chip.purpose });
+  }
+  if (nome === 'sync_my_evolution_instance') {
+    const estado = ESTADOS_DA_EVOLUTION[corpo.p_provider_state];
+    if (!estado) return erro(400, '22023', 'Unsupported provider state');
+    chip.status = estado;
+    if (estado === 'connected' && corpo.p_connected_phone) chip.connected_phone = corpo.p_connected_phone;
+    return responder(res, 200, { id: chip.id, status: chip.status, connected_phone: chip.connected_phone, last_seen_at: null });
+  }
+  if (nome === 'rotate_my_evolution_webhook_token') {
+    return responder(res, 200, { id: chip.id });
+  }
+  if (nome === 'remove_my_instance') {
+    chip.status = 'revoked';
+    chip.is_enabled = false;
+    return responder(res, 200, { id: chip.id, provider_instance_name: chip.provider_instance_name });
+  }
+  return erro(404, 'PGRST202', `Função não imitada: ${nome}`);
+}
+
+async function rotasDeDados(req, res, url) {
   const usuario = usuarioDaRequisicao(req);
   if (!usuario) return naoAutorizado(res);
   const permitidos = workspacesDoUsuario(usuario);
   const recurso = url.pathname.replace('/rest/v1/', '');
+
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && recurso !== 'rpc/is_my_platform_master') {
+    return acoesDosChips(res, usuario, recurso.slice(4), await lerCorpo(req));
+  }
 
   if (req.method === 'POST' && recurso === 'rpc/is_my_platform_master') {
     return responder(res, 200, usuario.master === true);
@@ -207,8 +274,14 @@ const servidor = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
   try {
     if (url.pathname === '/saude') return responder(res, 200, { ok: true });
+    if (url.pathname === '/controle/reiniciar-chips') {
+      // Só para os testes: apaga os chips de uma empresa, para cada teste começar do zero.
+      const workspace = url.searchParams.get('workspace');
+      tabelas.instances = tabelas.instances.filter((chip) => chip.workspace_id !== workspace);
+      return responder(res, 200, { ok: true });
+    }
     if (url.pathname.startsWith('/auth/v1/')) return await rotasDeLogin(req, res, url);
-    if (url.pathname.startsWith('/rest/v1/')) return rotasDeDados(req, res, url);
+    if (url.pathname.startsWith('/rest/v1/')) return await rotasDeDados(req, res, url);
     return responder(res, 404, { message: `Rota não imitada: ${req.method} ${url.pathname}` });
   } catch (erro) {
     console.error('[supabase de mentira] erro:', erro);

@@ -26,6 +26,9 @@ export default defineConfig({
           alias: {
             '@': path.join(raiz, 'web', 'src'),
             '@ienvia/shared': path.join(raiz, 'shared', 'src', 'index.ts'),
+            // "server-only" é uma trava do Next (impede o navegador de importar código do servidor);
+            // nos testes, que rodam fora do Next, ela vira um arquivo vazio.
+            'server-only': path.join(raiz, 'web', 'test', 'apoio', 'vazio.ts'),
           },
         },
         test: {

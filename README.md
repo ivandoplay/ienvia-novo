@@ -7,7 +7,7 @@ Esta é a **reescrita limpa** do sistema antigo (`zap-ia-studio`). O plano compl
 as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do que sai está em
 [docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md).
 
-**Situação:** Fase 0 (fundação) pronta — login, moldura do painel, Visão geral e testes.
+**Situação:** Fase 0 (fundação) pronta. Fase 1 em andamento: a aba **Instâncias** (conectar chips) está pronta; falta a Inbox.
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
@@ -45,9 +45,9 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 137 testes: login, menu, datas, e as regras de acesso do banco. |
+| Regras e banco | `npm test` | 190 testes: login, menu, datas, chips, a conversa com a Evolution e as regras de acesso do banco. |
 | Montagem | `npm run build` | O painel monta para produção. |
-| Navegador | `npm run test:e2e` | 50 testes num navegador de verdade, em tela de computador e de celular. |
+| Navegador | `npm run test:e2e` | 68 testes num navegador de verdade, em tela de computador e de celular. |
 
 Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`.
 
@@ -58,8 +58,9 @@ Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`
   não lê nada e que o navegador não consegue fazer o que é trabalho do servidor.
 - **Retrato do banco real** (`impressao-digital.remoto.json`): um teste compara o banco montado a
   partir do Git com o banco real. Se alguém mudar o banco por fora, o teste acusa.
-- **Navegador** (`web/e2e`): usam um "Supabase de mentira" com contas inventadas. Nenhum teste
-  encosta no banco real.
+- **Navegador** (`web/e2e`): usam um "Supabase de mentira" com contas inventadas e uma "Evolution
+  de mentira" que responde no mesmo formato da verdadeira. Nenhum teste encosta no banco real nem
+  cria chip de verdade no WhatsApp.
 
 ## Regras da casa
 
