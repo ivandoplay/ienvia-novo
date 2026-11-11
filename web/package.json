@@ -10,7 +10,7 @@
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
-    "check": "next typegen && tsc --noEmit",
+    "check": "next typegen && tsc --noEmit && tsc --noEmit -p tsconfig.testes.json",
     "lint": "eslint .",
     "test:e2e": "playwright test"
   },
