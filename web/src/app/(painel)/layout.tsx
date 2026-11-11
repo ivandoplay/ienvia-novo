@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -10,7 +9,6 @@ import { lerConfigSupabase } from '@/lib/env';
 import { resumoDeConexao } from '@/lib/formato';
 import { menuParaUsuario } from '@/lib/navegacao';
 import { obterSessao, rotuloDoPapel } from '@/lib/sessao';
-import { COOKIE_TEMA, lerTema } from '@/lib/tema';
 
 /** Moldura de todas as abas do painel. Só entra quem está logado. */
 export default async function LayoutDoPainel({ children }: { children: ReactNode }) {
@@ -25,7 +23,6 @@ export default async function LayoutDoPainel({ children }: { children: ReactNode
     ? resumoDeConexao(instancias.conectadas, instancias.total)
     : { texto: 'Sem informação', conectado: false };
 
-  const cookieStore = await cookies();
 
   return (
     <Casca
@@ -39,7 +36,6 @@ export default async function LayoutDoPainel({ children }: { children: ReactNode
       }}
       workspace={workspace?.nome ?? 'Nenhum workspace'}
       conexao={conexao}
-      temaInicial={lerTema(cookieStore.get(COOKIE_TEMA)?.value)}
     >
       {sessao.falhouAoCarregar ? <FalhaAoCarregar /> : workspace ? children : <SemWorkspace />}
     </Casca>

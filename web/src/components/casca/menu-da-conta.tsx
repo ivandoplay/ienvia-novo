@@ -1,31 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { definirTema, sair } from '@/app/acoes-de-sessao';
+import { useEffect, useRef, type MouseEvent } from 'react';
+import { sair } from '@/app/acoes-de-sessao';
+import { useTema } from '@/components/tema/raiz-do-tema';
 import { Icone } from '@/components/ui/icone';
-import type { Tema } from '@/lib/tema';
 
 interface PropsDoMenuDaConta {
   aberto: boolean;
   aoFechar: () => void;
   usuario: { nome: string; login: string; papel: string };
   workspace: string;
-  temaInicial: Tema;
-}
-
-/** Troca a cor na hora, sem esperar o servidor. */
-function pintarTema(tema: Tema) {
-  if (tema === 'claro') document.documentElement.setAttribute('data-theme', 'light');
-  else document.documentElement.removeAttribute('data-theme');
 }
 
 /**
  * Folha "Conta e preferências": quem está logado, troca de tema e sair.
  * Usa o <dialog> nativo do navegador, que já cuida do foco e da tecla Esc.
  */
-export function MenuDaConta({ aberto, aoFechar, usuario, workspace, temaInicial }: PropsDoMenuDaConta) {
+export function MenuDaConta({ aberto, aoFechar, usuario, workspace }: PropsDoMenuDaConta) {
   const dialogo = useRef<HTMLDialogElement>(null);
-  const [tema, setTema] = useState<Tema>(temaInicial);
+  const { tema, alternar: alternarTema } = useTema();
 
   useEffect(() => {
     const elemento = dialogo.current;
@@ -33,14 +26,6 @@ export function MenuDaConta({ aberto, aoFechar, usuario, workspace, temaInicial 
     if (aberto && !elemento.open) elemento.showModal();
     if (!aberto && elemento.open) elemento.close();
   }, [aberto]);
-
-  function alternarTema() {
-    const novo: Tema = tema === 'claro' ? 'escuro' : 'claro';
-    setTema(novo);
-    pintarTema(novo);
-    // A escolha é guardada pelo servidor; se a gravação falhar, a cor já trocada continua valendo nesta visita.
-    void definirTema(novo).catch(() => undefined);
-  }
 
   /** Clique fora do cartão (no fundo escurecido) fecha a folha. */
   function aoClicar(evento: MouseEvent<HTMLDialogElement>) {

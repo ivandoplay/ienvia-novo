@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
+import { RaizDoTema } from '@/components/tema/raiz-do-tema';
 import { COOKIE_TEMA, lerTema } from '@/lib/tema';
 import './globals.css';
 
@@ -26,10 +27,6 @@ export default async function LayoutRaiz({ children }: { children: ReactNode }) 
   const cookieStore = await cookies();
   const tema = lerTema(cookieStore.get(COOKIE_TEMA)?.value);
 
-  return (
-    // data-scroll-behavior: a rolagem suave vale para âncoras, não para a troca de aba.
-    <html lang="pt-BR" data-theme={tema === 'claro' ? 'light' : undefined} data-scroll-behavior="smooth">
-      <body>{children}</body>
-    </html>
-  );
+  // <html> e <body> são desenhados pela RaizDoTema, que cuida da cor dali em diante.
+  return <RaizDoTema temaInicial={tema}>{children}</RaizDoTema>;
 }

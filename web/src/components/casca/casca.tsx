@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Icone } from '@/components/ui/icone';
 import { ATALHOS_CELULAR, buscarItemPorRota, rotaEstaAtiva, type GrupoMenu, type ItemMenu } from '@/lib/navegacao';
-import type { Tema } from '@/lib/tema';
 import { MenuDaConta } from './menu-da-conta';
 
 export interface PropsDaCasca {
@@ -23,7 +22,6 @@ export interface PropsDaCasca {
   };
   workspace: string;
   conexao: { texto: string; conectado: boolean };
-  temaInicial: Tema;
   children: ReactNode;
 }
 
@@ -46,7 +44,7 @@ function useTelaDeCelular(): boolean {
  * A moldura do painel: menu lateral, barra do topo, conteúdo e navegação do celular.
  * Tudo que é comum a todas as abas mora aqui; cada aba só entrega o seu miolo (`children`).
  */
-export function Casca({ menu, usuario, workspace, conexao, temaInicial, children }: PropsDaCasca) {
+export function Casca({ menu, usuario, workspace, conexao, children }: PropsDaCasca) {
   const caminho = usePathname();
   const ehCelular = useTelaDeCelular();
   const [gavetaAberta, setGavetaAberta] = useState(false);
@@ -215,7 +213,6 @@ export function Casca({ menu, usuario, workspace, conexao, temaInicial, children
         aoFechar={() => setContaAberta(false)}
         usuario={usuario}
         workspace={workspace}
-        temaInicial={temaInicial}
       />
     </div>
   );
