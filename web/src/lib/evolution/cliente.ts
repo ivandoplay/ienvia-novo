@@ -136,13 +136,17 @@ function corpoDoAviso(aviso: Aviso) {
   };
 }
 
-/** Cria a instância na Evolution e já devolve o primeiro QR Code. */
-export async function criarInstancia(dados: { nome: string; aviso: Aviso | null }): Promise<QrCode> {
+/**
+ * Cria a instância na Evolution e já devolve o primeiro QR Code. Informando `numero` (só dígitos,
+ * com código do país), a Evolution já devolve também o código de 8 dígitos para conectar sem câmera.
+ */
+export async function criarInstancia(dados: { nome: string; aviso: Aviso | null; numero?: string }): Promise<QrCode> {
   const resposta = await chamar<{ qrcode?: unknown }>('POST', '/instance/create', {
     corpo: {
       instanceName: dados.nome,
       integration: 'WHATSAPP-BAILEYS',
       qrcode: true,
+      ...(dados.numero ? { number: dados.numero } : {}),
       // Grupos ficam de fora: o Ienvia atende conversas individuais.
       groupsIgnore: true,
       rejectCall: false,
@@ -158,8 +162,10 @@ export async function criarInstancia(dados: { nome: string; aviso: Aviso | null 
 }
 
 /**
- * Pede um QR Code novo. Informando o número (só dígitos, com código do país), a Evolution
- * devolve também o código de 8 dígitos para conectar sem câmera.
+ * Pede um QR Code novo. Quando a instância está fechada ("close") e `numero` é informado (só
+ * dígitos, com código do país), a Evolution devolve também o código de 8 dígitos para conectar sem
+ * câmera; enquanto já estiver em "connecting", a Evolution 2.3.7 ignora `numero` e devolve o
+ * QR/código que já estava aguardando leitura.
  */
 export async function pedirQrCode(nome: string, numero?: string): Promise<QrCode & { jaConectado: boolean }> {
   const consulta = numero ? `?number=${encodeURIComponent(numero)}` : '';

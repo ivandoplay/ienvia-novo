@@ -262,9 +262,10 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
             aoPedirQr={() => pedirConexao(chip)}
             aoPedirCodigo={(numero) => pedirConexao(chip, numero)}
             aoFecharConexao={() => setConexao(null)}
-            aoDesconectar={() =>
-              executar(`desconectar:${chip.id}`, chip, () => desconectarChip(chip.id), 'Chip desconectado.')
-            }
+            aoDesconectar={() => {
+              if (conexao?.chipId === chip.id) setConexao(null);
+              executar(`desconectar:${chip.id}`, chip, () => desconectarChip(chip.id), 'Chip desconectado.');
+            }}
             aoEditar={() => setJanela({ tipo: 'editar', chip })}
             aoRemover={() => setJanela({ tipo: 'remover', chip })}
             ia={ia}

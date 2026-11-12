@@ -80,14 +80,26 @@ describe('criar e conectar', () => {
     expect(await motivoDoErro(criarInstancia({ nome: 'ienvia-teste-01', aviso: null }))).toBe('nome_em_uso');
   });
 
-  test('sem número vem a imagem; com número vem também o código de 8 dígitos', async () => {
+  test('com número na criação vem também o código de 8 dígitos', async () => {
+    const qr = await criarInstancia({ nome: 'ienvia-teste-02', aviso: AVISO, numero: '5585999990000' });
+    expect(qr.imagem).toMatch(/^data:image\/png;base64,/);
+    expect(qr.codigoDePareamento).toBe(CODIGO_DE_PAREAMENTO);
+  });
+
+  test('enquanto "connecting", pedir código não devolve código novo; fechado ("close"), devolve', async () => {
     await criarInstancia({ nome: 'ienvia-teste-01', aviso: null });
     const semNumero = await pedirQrCode('ienvia-teste-01');
     expect(semNumero).toMatchObject({ codigoDePareamento: null, jaConectado: false });
     expect(semNumero.imagem).toMatch(/^data:image\/png/);
 
-    const comNumero = await pedirQrCode('ienvia-teste-01', '5585999990000');
-    expect(comNumero.codigoDePareamento).toBe(CODIGO_DE_PAREAMENTO);
+    // Comportamento real da Evolution 2.3.7: enquanto "connecting", ?number= não gera código.
+    const duranteConnecting = await pedirQrCode('ienvia-teste-01', '5585999990000');
+    expect(duranteConnecting.codigoDePareamento).toBeNull();
+
+    await controle('conectar');
+    await desconectarInstancia('ienvia-teste-01');
+    const depoisDeFechar = await pedirQrCode('ienvia-teste-01', '5585999990000');
+    expect(depoisDeFechar.codigoDePareamento).toBe(CODIGO_DE_PAREAMENTO);
   });
 
   test('pedir QR Code de um chip que já conectou avisa que já está conectado', async () => {
@@ -116,6 +128,10 @@ describe('estado do chip', () => {
     expect(await motivoDoErro(consultarChip('ienvia-teste-01'))).toBe('nao_encontrada');
     // Apagar de novo não é erro: o que importa é que não existe mais.
     await expect(apagarInstancia('ienvia-teste-01')).resolves.toBeUndefined();
+  });
+
+  test('desconectar um chip que já estava fechado devolve recusa (como na Evolution 2.3.7)', async () => {
+    expect(await motivoDoErro(desconectarInstancia('ienvia-fixo-desconectado'))).toBe('recusada');
   });
 
   test('chip que não existe é reconhecido como "não encontrado"', async () => {

@@ -171,14 +171,14 @@ async function garantirAviso(contexto: Contexto, chip: LinhaDoChip): Promise<voi
 }
 
 /** Cria a instância na Evolution para um chip que já existe no banco (com segredo novo). */
-async function criarNaEvolution(contexto: Contexto, chip: LinhaDoChip): Promise<QrCode> {
+async function criarNaEvolution(contexto: Contexto, chip: LinhaDoChip, numero?: string): Promise<QrCode> {
   const url = enderecoDoAviso();
   let aviso: Aviso | null = null;
   if (url) {
     const token = await trocarSegredo(contexto, chip.id);
     if (token) aviso = { url, token };
   }
-  return criarInstancia({ nome: chip.provider_instance_name!, aviso });
+  return criarInstancia({ nome: chip.provider_instance_name!, aviso, ...(numero ? { numero } : {}) });
 }
 
 // ───────────────────────────── ações ─────────────────────────────
@@ -284,13 +284,54 @@ export async function gerarQrCode(
   const nome = chip.provider_instance_name;
   try {
     let resposta: QrCode & { jaConectado?: boolean };
-    try {
-      resposta = await pedirQrCode(nome, numero);
-      await garantirAviso(contexto, chip);
-    } catch (erro) {
-      if (!(erro instanceof ErroEvolution) || erro.motivo !== 'nao_encontrada') throw erro;
-      resposta = await criarNaEvolution(contexto, chip);
-      if (numero) resposta = await pedirQrCode(nome, numero);
+    if (numero) {
+      // Na Evolution 2.3.7, GET /instance/connect só gera código de 8 dígitos quando a instância está
+      // fechada ("close"): se já estiver em "connecting" (por exemplo, criada antes para QR Code ou
+      // com um código que venceu), ela devolve o estado anterior sem código novo.
+      // Conferimos primeiro para nunca apagar um chip já conectado; não estando "open", recriamos lá
+      // (ou pedimos direto se estiver "close") para garantir um código de 8 dígitos novo e válido.
+      let atual: { estado: EstadoNaEvolution; telefone: string | null } | null = null;
+      try {
+        atual = await consultarChip(nome);
+      } catch (erro) {
+        if (!(erro instanceof ErroEvolution) || erro.motivo !== 'nao_encontrada') throw erro;
+      }
+
+      if (atual?.estado === 'open') {
+        await garantirAviso(contexto, chip);
+        await gravarEstado(contexto, chip.id, 'open', atual.telefone);
+        atualizarTelas();
+        return { ok: true, conectado: true, qr: { imagem: null, codigoDePareamento: null } };
+      }
+
+      if (atual?.estado === 'close') {
+        resposta = await pedirQrCode(nome, numero);
+        if (resposta.jaConectado) {
+          const chipNaEvolution = await consultarChip(nome);
+          await garantirAviso(contexto, chip);
+          await gravarEstado(contexto, chip.id, chipNaEvolution.estado, chipNaEvolution.telefone);
+          atualizarTelas();
+          return { ok: true, conectado: true, qr: { imagem: null, codigoDePareamento: null } };
+        }
+        if (resposta.codigoDePareamento) {
+          await garantirAviso(contexto, chip);
+        } else {
+          // O connect com instância "close" na 2.3.7 espera só 2 s; se o código não saiu a tempo, recriar dá 5 s.
+          await apagarInstancia(nome);
+          resposta = await criarNaEvolution(contexto, chip, numero);
+        }
+      } else {
+        if (atual) await apagarInstancia(nome);
+        resposta = await criarNaEvolution(contexto, chip, numero);
+      }
+    } else {
+      try {
+        resposta = await pedirQrCode(nome);
+        await garantirAviso(contexto, chip);
+      } catch (erro) {
+        if (!(erro instanceof ErroEvolution) || erro.motivo !== 'nao_encontrada') throw erro;
+        resposta = await criarNaEvolution(contexto, chip);
+      }
     }
 
     if (resposta.jaConectado) {
@@ -299,8 +340,13 @@ export async function gerarQrCode(
       atualizarTelas();
       return { ok: true, conectado: true, qr: { imagem: null, codigoDePareamento: null } };
     }
-    if (!resposta.imagem && !resposta.codigoDePareamento) {
-      return { ok: false, erro: 'A Evolution não devolveu o código. Tente de novo em instantes.' };
+    if (numero ? !resposta.codigoDePareamento : !resposta.imagem) {
+      return {
+        ok: false,
+        erro: numero
+          ? 'A Evolution não devolveu o código de 8 dígitos. Tente de novo em instantes.'
+          : 'A Evolution não devolveu o código. Tente de novo em instantes.',
+      };
     }
     if (chip.status !== 'connecting') {
       await gravarEstado(contexto, chip.id, 'connecting', null);
@@ -362,6 +408,15 @@ export async function desconectarChip(chipId: string): Promise<Resultado> {
   try {
     await desconectarInstancia(chip.provider_instance_name);
   } catch (erro) {
+    if (erro instanceof ErroEvolution && erro.motivo === 'recusada') {
+      // Na Evolution 2.3.7, DELETE /logout devolve 400 quando o chip já caiu para "close".
+      const atual = await consultarChip(chip.provider_instance_name).catch(() => null);
+      if (atual?.estado === 'close') {
+        await gravarEstado(contexto, chip.id, 'close', null);
+        atualizarTelas();
+        return { ok: true };
+      }
+    }
     if (!(erro instanceof ErroEvolution) || erro.motivo !== 'nao_encontrada') {
       registrarErro('não foi possível desconectar o chip', erro);
       return { ok: false, erro: mensagemDaEvolution(erro) };

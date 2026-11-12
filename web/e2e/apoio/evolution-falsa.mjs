@@ -56,6 +56,7 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas 
         dono: fixa.telefone ? `${fixa.telefone}@s.whatsapp.net` : null,
         aviso: null,
         qr: 1,
+        codigoDePareamento: null,
         fixa: true,
       });
     }
@@ -167,7 +168,9 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas 
       if (instancias.has(novoNome)) {
         return responder(res, 403, { status: 403, error: 'Forbidden', response: { message: [`This name "${novoNome}" is already in use.`] } });
       }
-      const nova = { nome: novoNome, id: crypto.randomUUID(), estado: 'connecting', dono: null, aviso: corpo.webhook ?? null, qr: 1 };
+      const numero = typeof corpo.number === 'string' && corpo.number.trim() ? corpo.number.trim() : null;
+      const codigoDePareamento = numero ? CODIGO_DE_PAREAMENTO : null;
+      const nova = { nome: novoNome, id: crypto.randomUUID(), estado: 'connecting', dono: null, aviso: corpo.webhook ?? null, qr: 1, codigoDePareamento };
       instancias.set(novoNome, nova);
       return responder(res, 201, {
         instance: { instanceName: novoNome, instanceId: nova.id, integration: 'WHATSAPP-BAILEYS', webhookWaBusiness: null, accessTokenWaBusiness: '', status: 'connecting' },
@@ -178,7 +181,7 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas 
         nats: {},
         sqs: {},
         settings: { rejectCall: false, msgCall: '', groupsIgnore: true, alwaysOnline: false, readMessages: false, readStatus: false, syncFullHistory: false, wavoipToken: '' },
-        qrcode: { pairingCode: null, code: '2@qr-de-teste-1', base64: IMAGEM_DO_QR, count: 1 },
+        qrcode: { pairingCode: codigoDePareamento, code: '2@qr-de-teste-1', base64: IMAGEM_DO_QR, count: 1 },
       });
     }
 
@@ -322,18 +325,32 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas 
       }
       if (req.method === 'GET' && grupo === 'instance' && acao === 'connect') {
         if (instancia.estado === 'open') return responder(res, 200, { instance: { instanceName: instancia.nome, state: 'open' } });
+        if (instancia.estado === 'connecting') {
+          // Igual à Evolution 2.3.7: quando já está em "connecting", ?number= é ignorado e volta o QR/código anterior.
+          return responder(res, 200, {
+            pairingCode: instancia.codigoDePareamento ?? null,
+            code: `2@qr-de-teste-${instancia.qr}`,
+            base64: IMAGEM_DO_QR,
+            count: instancia.qr,
+          });
+        }
         instancia.estado = 'connecting';
         instancia.qr += 1;
+        instancia.codigoDePareamento = url.searchParams.get('number') ? CODIGO_DE_PAREAMENTO : null;
         return responder(res, 200, {
-          pairingCode: url.searchParams.get('number') ? CODIGO_DE_PAREAMENTO : null,
+          pairingCode: instancia.codigoDePareamento,
           code: `2@qr-de-teste-${instancia.qr}`,
           base64: IMAGEM_DO_QR,
           count: instancia.qr,
         });
       }
       if (req.method === 'DELETE' && grupo === 'instance' && acao === 'logout') {
+        if (instancia.estado === 'close') {
+          return pedidoInvalido(`The "${instancia.nome}" instance is not connected`);
+        }
         instancia.estado = 'close';
         instancia.dono = null;
+        instancia.codigoDePareamento = null;
         return responder(res, 200, { status: 'SUCCESS', error: false, response: { message: 'Instance logged out' } });
       }
       if (req.method === 'DELETE' && grupo === 'instance' && acao === 'delete') {

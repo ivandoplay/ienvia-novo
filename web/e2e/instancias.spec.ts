@@ -84,7 +84,7 @@ test.describe('Instâncias', () => {
     await expect(page.getByText(`1 de ${LIMITE_DE_CHIPS} chips em uso`)).toBeVisible();
   });
 
-  test('conecta sem câmera, pelo código de 8 dígitos', async ({ page }) => {
+  test('conecta sem câmera, pelo código de 8 dígitos', async ({ page, request }) => {
     await abrirInstancias(page);
     await expect(await adicionarChip(page, 'Suporte')).toBeHidden();
     const chip = cartao(page, 'Suporte');
@@ -99,6 +99,19 @@ test.describe('Instâncias', () => {
     await chip.getByRole('button', { name: 'Gerar código' }).click();
     await expect(chip.getByText('ABCD-1234')).toBeVisible();
     await expect(chip.getByText('Conectar com número de telefone')).toBeVisible();
+
+    // Mesmo recriando a instância na Evolution para gerar o código, o aviso de mensagens continua configurado.
+    const [naEvolution] = await chipsNaEvolution(request);
+    expect(naEvolution?.aviso?.url).toBe('https://painel.teste.invalid/api/webhooks/evolution');
+
+    // Pedir um código novo (quando o anterior vence, por exemplo) também funciona.
+    await chip.getByRole('button', { name: 'Fechar' }).click();
+    await chip.getByRole('button', { name: 'Gerar código' }).click();
+    await expect(chip.getByText('ABCD-1234')).toBeVisible();
+
+    await lerOQrCodeNoCelular(request);
+    await expect(chip.getByText('Chip conectado!')).toBeVisible({ timeout: 15_000 });
+    await expect(chip.getByText('Conectado', { exact: true })).toBeVisible();
   });
 
   test('muda o apelido e a função de um chip', async ({ page }) => {
@@ -129,6 +142,20 @@ test.describe('Instâncias', () => {
     await expect(chip.getByText('Chip desconectado.')).toBeVisible();
     await expect(chip.getByText('Desconectado', { exact: true })).toBeVisible();
     expect((await chipsNaEvolution(request))[0]?.estado).toBe('close');
+
+    // Reconectar, cair direto na Evolution (logout antes da tela saber) e clicar em Desconectar na tela.
+    await chip.getByLabel('Conectar sem câmera (código de 8 dígitos)').fill('(85) 99999-0000');
+    await chip.getByRole('button', { name: 'Gerar código' }).click();
+    await expect(chip.getByText('ABCD-1234')).toBeVisible();
+    await lerOQrCodeNoCelular(request);
+    await expect(chip.getByText('Conectado', { exact: true })).toBeVisible({ timeout: 15_000 });
+    const [naEvolution] = await chipsNaEvolution(request);
+    await request.delete(`${EVOLUTION}/instance/logout/${naEvolution!.nome}`, {
+      headers: { apikey: 'chave-da-evolution-de-teste' },
+    });
+    await chip.getByRole('button', { name: 'Desconectar' }).click();
+    await expect(chip.getByText('Chip desconectado.')).toBeVisible();
+    await expect(chip.getByText('Desconectado', { exact: true })).toBeVisible();
 
     await chip.getByRole('button', { name: 'Remover' }).click();
     const janela = page.getByRole('dialog', { name: 'Remover chip' });
