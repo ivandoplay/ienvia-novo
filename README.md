@@ -5,7 +5,9 @@ campanhas e contas separadas por cliente.
 
 Esta é a **reescrita limpa** do sistema antigo (`zap-ia-studio`). O plano completo, com as fases e
 as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do que sai está em
-[docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md).
+[docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md). Para ver tudo num lugar só (como o
+trabalho é feito, o que já foi feito e testado, o que falta e o que é cada arquivo), leia
+[docs/DOCUMENTACAO-DO-PROJETO.md](docs/DOCUMENTACAO-DO-PROJETO.md).
 
 **Situação:** Fase 0 (fundação) pronta. Fase 1 pronta no código e no banco: a aba **Instâncias**
 (conectar chips), o recebimento das mensagens e a **Inbox** com texto e com arquivos (fotos, áudios,
@@ -26,7 +28,7 @@ As outras abas aparecem no menu e avisam em que fase ficam prontas.
 web/        O painel (Next.js). É o que o cliente abre no navegador.
 shared/     Regras usadas pelo painel e pelo motor local (código puro, sem rede).
 supabase/   O banco: migrações em ordem e os testes de segurança.
-docs/       O plano e a lista do que fica e do que sai.
+docs/       O plano, a lista do que fica e do que sai e a documentação do projeto.
 ```
 
 O motor local do WhatsApp (pasta `motor/`) entra na Fase 4.

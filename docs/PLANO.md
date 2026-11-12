@@ -3,6 +3,9 @@
 Este documento é o mapa do trabalho: o que está sendo feito, em que ordem e com quais regras.
 É atualizado a cada fase concluída.
 
+Para uma visão de tudo num lugar só (o processo, a linha do tempo, o que foi testado, o que falta e
+o que é cada arquivo), veja [DOCUMENTACAO-DO-PROJETO.md](./DOCUMENTACAO-DO-PROJETO.md).
+
 ## 1. O que estamos fazendo
 
 O Ienvia antigo (`zap-ia-studio`, versão 5.8) funciona, mas cresceu sem ordem: um arquivo só com
@@ -57,7 +60,7 @@ ienvia/
 ├── shared/     Regras usadas pelo painel e pelo motor local. Código puro, sem rede.
 ├── supabase/   O banco: as migrações (cada mudança, em ordem) e os testes de segurança.
 ├── motor/      O motor local do WhatsApp — entra na Fase 4.
-└── docs/       Este plano e a lista do que fica e do que sai.
+└── docs/       Este plano, a lista do que fica e do que sai e a documentação do projeto.
 ```
 
 Dentro do painel (`web/src`), cada coisa tem um endereço previsível:
