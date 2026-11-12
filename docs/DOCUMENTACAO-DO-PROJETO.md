@@ -43,8 +43,8 @@ antigo e reescrevendo limpo, fase por fase.
 | Banco do sistema novo | Supabase, projeto `ienvia-001` (`rhcabqlwazvjcjjdknsc`), organização "ienvia", São Paulo, plano gratuito | 17 migrações aplicadas (incluindo canal de Realtime da Inbox), Edge Function `evolution-webhook` publicada com segredos configurados, idêntico ao Git. |
 | Banco anterior do sistema novo | Supabase, projeto "Ienvia" (`jazvdlkyvwquoednmljf`), organização "ZAP IA STUDIO" | Pausado em 12/11. Não tinha dado de cliente. Pode ser apagado. |
 | Banco do sistema antigo | Supabase, projeto `iuysmojhaxplnhfrxqkv`, organização "ZAP IA STUDIO" | Bloqueado por cota até 26/11/2026. Nele só se lê, nunca se escreve. |
-| Porteiro + Webhooks + IA | Cloudflare Workers (porteiro `cloudflare/porteiro/`) -> Supabase Edge Function (`evolution-webhook`) | Plano gratuito sem cartão (uso comercial permitido). Faz filtro de ruído na borda e failover automático para as rotas `/api/webhooks/evolution` do painel na Netlify/Render. |
-| Hospedagem do painel | Netlify Free (principal, `netlify.toml`) + Render Free (reserva, `render.yaml`) | Zero cartão, uso comercial permitido na Netlify. Vercel excluída do projeto pelo dono em 12/11. |
+| Porteiro + Webhooks + IA | Cloudflare Workers (`ienvia-porteiro`) -> Supabase Edge Function (`evolution-webhook`) | Plano gratuito sem cartão (uso comercial permitido). Descarta ruídos na borda e faz failover automático para `/api/webhooks/evolution` na Vercel e na Netlify. |
+| Hospedagem do painel | Vercel (`ienvia-novo-dusky.vercel.app`, conta `jeffersonivan748-7132`, São Paulo `gru1`) + Netlify (`superb-tapioca-aaf330.netlify.app`) + `render.yaml` | Sem marca d'água na Vercel (aliviada de webhooks/polling); para uso comercial contínuo, regularizar no Vercel Pro ou usar Render (`render.yaml`). A conta antiga (`ivandoplay`) segue pausada até 11/12/2026. |
 | Chips do WhatsApp | Servidor Evolution API 2.3.7 (endereço e chave no `.env`) | Falta confirmar se o servidor é do próprio dono. |
 | Chaves de IA do dono (para testes) | Gemini, OpenRouter e NVIDIA, no `.env` | A do Gemini está bloqueada pelo Google. |
 | Cópia de segurança | Google Drive do dono, pasta "Ienvia — cópia de segurança e documentação" | <https://drive.google.com/drive/folders/170L0zRiKjBpkUecpLHrUAdr6QoviplLQ> |
@@ -447,7 +447,7 @@ Sobem um Postgres de verdade na memória, aplicam as migrações e conferem as r
 | `web/eslint.config.mjs` | Regras de estilo do código. |
 | `web/tsconfig.json`, `web/tsconfig.testes.json` | Regras do TypeScript do painel e dos testes dele. |
 | `web/package.json` | Dependências e comandos do painel. |
-| `netlify.toml`, `render.yaml` | Configuração pronta de publicação do painel na Netlify (principal) e na Render (reserva), sem Vercel. |
+| `web/vercel.json`, `netlify.toml`, `render.yaml` | Região `gru1` (São Paulo) na Vercel e publicação pronta também na Netlify e na Render. |
 | `cloudflare/porteiro/` | Porteiro Cloudflare Worker (`worker.ts`, `wrangler.toml`, `README.md`) com failover automático entre Edge Function e painéis reserva. |
 | `supabase/functions/evolution-webhook/` | Supabase Edge Function que executa o núcleo compartilhado de recebimento, mídia e atendente de IA em Deno. |
 | `web/public/ienvia-icone.png`, `ienvia-logo.png`, `pwa/192.png`, `pwa/512.png` | A marca e os ícones do aplicativo. |

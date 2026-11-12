@@ -17,10 +17,12 @@ pessoa quando precisa e para quando alguém responde) e o **corrigir resposta em
 guardar no Treinamento o jeito certo de responder) estão prontos no código e no banco. Faltam: as
 Mensagens prontas e as Skills.
 O banco voltou a funcionar em 12/11/2026, num projeto Supabase novo e só dele (`ienvia-001`), já com
-a Edge Function `evolution-webhook` no ar e o canal de Realtime da Inbox aplicado. A arquitetura foi
-blindada fora da Vercel: webhooks e atendente de IA rodam na Supabase Edge Function protegidos por um
-porteiro Cloudflare Worker (`cloudflare/porteiro/`) com failover automático para o painel na Netlify
-(principal) e na Render (reserva), e a Inbox atualiza em tempo real via Supabase Realtime Broadcast.
+a Edge Function `evolution-webhook` no ar e o canal de Realtime da Inbox aplicado. Os webhooks e o
+atendente de IA rodam 24h na Supabase Edge Function protegidos pelo porteiro Cloudflare Worker
+(`cloudflare/porteiro/`) com failover automático para as rotas reserva da Vercel e da Netlify; a Inbox
+atualiza em tempo real via Supabase Realtime Broadcast, deixando a Vercel (`web/vercel.json`, região
+`gru1`) leve só para servir as telas sem marca d'água (com `netlify.toml` e `render.yaml` prontos
+como alternativas/reservas).
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
