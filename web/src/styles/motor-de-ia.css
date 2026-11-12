@@ -113,6 +113,49 @@
   min-height: 32px;
   accent-color: var(--accent);
 }
+.motor-eventos-dossie {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+}
+.motor-eventos-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.motor-evento-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-subtle);
+  cursor: pointer;
+}
+.motor-evento-item input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+.motor-evento-item span {
+  display: grid;
+  gap: 2px;
+}
+.motor-evento-item strong {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+}
+.motor-evento-item small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.motor-dossie-teste-sem-chip {
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
 
 /* Barra de salvar: acompanha a rolagem para a pessoa nunca perder o botão de vista. */
 .motor-rodape,

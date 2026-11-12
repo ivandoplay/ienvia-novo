@@ -45,6 +45,10 @@ const PADROES = {
   split_long_messages: true,
   pause_on_human_reply: true,
   human_pause_minutes: 60,
+  admin_alert_enabled: false,
+  admin_alert_whatsapp: '',
+  admin_alert_events: ['handoff', 'silent_handoff', 'uncertain_send', 'error', 'safety'],
+  admin_alert_include_messages: true,
 };
 
 const BASE_VAZIA = {
@@ -57,9 +61,15 @@ const BASE_VAZIA = {
   commercial_terms: '',
   golden_rules: '',
   extra_instructions: '',
+  escalation_rules: '',
   lock_until_manual_resume: false,
   prompt_shield_enabled: true,
   robot_question_policy: 'handoff',
+  approved_messages: [],
+  operational_skills: [],
+  humanization_skills: [],
+  objections: [],
+  brain_pack: {},
 };
 
 const LIMITES_DE_TEXTO = {
@@ -71,6 +81,7 @@ const LIMITES_DE_TEXTO = {
   commercial_terms: 4000,
   golden_rules: 8000,
   extra_instructions: 4000,
+  escalation_rules: 4000,
 };
 const LIGA_DESLIGA = ['solo_identity', 'lock_until_manual_resume', 'prompt_shield_enabled'];
 const TONS = ['consultivo', 'acolhedor', 'descontraido', 'profissional', 'formal'];
@@ -305,9 +316,16 @@ export function criarIaDoBanco({ tabelas, responder }) {
       if (!inteiroEntre(novo.max_history_messages, 4, 60)) return invalido('max_history_messages');
       if (!inteiroEntre(novo.debounce_seconds, 1, 20)) return invalido('debounce_seconds');
       if (!inteiroEntre(novo.human_pause_minutes, 5, 1440)) return invalido('human_pause_minutes');
-      for (const campo of ['simulate_typing', 'split_long_messages', 'pause_on_human_reply']) {
+      for (const campo of ['simulate_typing', 'split_long_messages', 'pause_on_human_reply', 'admin_alert_enabled', 'admin_alert_include_messages']) {
         if (typeof novo[campo] !== 'boolean') return invalido(campo);
       }
+      if (typeof novo.admin_alert_whatsapp !== 'string' || (novo.admin_alert_whatsapp !== '' && !/^[0-9]{10,15}$/.test(novo.admin_alert_whatsapp))) {
+        return invalido('admin_alert_whatsapp');
+      }
+      if (!Array.isArray(novo.admin_alert_events)) return invalido('admin_alert_events');
+      const EVENTOS_VALIDOS = new Set(['handoff', 'silent_handoff', 'uncertain_send', 'error', 'safety']);
+      if (novo.admin_alert_events.some((ev) => !EVENTOS_VALIDOS.has(ev))) return invalido('admin_alert_events');
+      novo.admin_alert_events = Array.from(new Set(novo.admin_alert_events));
       novo.temperature = Math.round(novo.temperature * 100) / 100;
       estado.configuracoes.set(workspaceId, { ...novo, updated_at: agora() });
       return responder(res, 200, lerConfiguracoes(workspaceId, true));
@@ -363,6 +381,12 @@ export function criarIaDoBanco({ tabelas, responder }) {
         } else if (campo === 'robot_question_policy') {
           if (!['handoff', 'disclose'].includes(valor)) return invalido('robot_question_policy');
           limpos.robot_question_policy = valor;
+        } else if (['approved_messages', 'operational_skills', 'humanization_skills', 'objections'].includes(campo)) {
+          if (!Array.isArray(valor)) return invalido(campo);
+          limpos[campo] = valor;
+        } else if (campo === 'brain_pack') {
+          if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return invalido('brain_pack');
+          limpos.brain_pack = valor;
         } else if (campo === 'faqs') {
           if (!Array.isArray(valor) || valor.length > 100) return invalido('faqs');
           perguntas = [];

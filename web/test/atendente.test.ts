@@ -221,3 +221,137 @@ describe('o que ficou para trás', () => {
     expect(await atenderSobras(ambienteCom(banco, relogio()), EMPRESA)).toEqual([]);
   });
 });
+
+describe('dossiê administrativo pelo próprio chip', () => {
+  test('em handoff e falha de envio, envia dossiê estruturado ao WhatsApp administrativo pelo mesmo chip da conversa', async () => {
+    vi.stubEnv('EVOLUTION_API_URL', 'http://127.0.0.1:59999');
+    vi.stubEnv('EVOLUTION_API_KEY', 'chave-evo-teste');
+    const envios: Array<{ url: string; body: Json }> = [];
+    vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? (JSON.parse(String(init.body)) as Json) : {};
+      if (url.includes('/message/sendText/')) {
+        envios.push({ url, body });
+        return new Response(JSON.stringify({ key: { id: `evo-${envios.length}` } }), { status: 201 });
+      }
+      // Resposta do provedor NVIDIA com [[CHAMAR_HUMANO:...]]
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'Vou confirmar os valores certinhos. [[CHAMAR_HUMANO:Cenário: Cliente B2B | Gatilho: Pediu valor | Próxima jogada: Passar escopo]]' }, finish_reason: 'stop' }],
+          model: 'x',
+          usage: {},
+        }),
+        { status: 200 },
+      );
+    });
+
+    const banco = bancoDeRoteiro({
+      claim_ai_turn: [
+        pacote({
+          settings: {
+            provider: 'nvidia',
+            fallback_provider: 'none',
+            second_fallback_provider: 'none',
+            admin_alert_enabled: true,
+            admin_alert_whatsapp: '5586981303979',
+            admin_alert_events: ['handoff', 'silent_handoff', 'uncertain_send', 'error', 'safety'],
+            admin_alert_include_messages: true,
+          },
+          conversation: {
+            id: 'conv-1',
+            contact_name: 'Carlos',
+            contact_phone: '+5586999887766',
+            recipient: '5586999887766@s.whatsapp.net',
+            instance_id: 'inst-1',
+            instance_label: 'Chip Vendas',
+            instance_phone: '5586981303979',
+            provider_instance_name: 'ienvia-teste',
+          },
+          messages: [{ id: 'm1', direction: 'inbound', actor_type: 'contact', status: 'received', body_text: 'Quanto custa a gestão?', attachment: null }],
+        }),
+      ],
+      start_ai_message: [{ result: 'started', message_id: 'msg-out-1', recipient: '5586999887766@s.whatsapp.net', provider_instance_name: 'ienvia-teste' }],
+      finish_ai_message: [{ result: 'ok' }],
+      finish_ai_turn: [{ result: 'finished' }],
+      start_admin_alert_delivery: () => 'delivery-uuid-1' as unknown as Json,
+      finish_admin_alert_delivery: [{ ok: true }],
+    });
+
+    const res = await atenderVez(ambienteCom(banco, relogio()), pedido());
+    expect(res).toEqual({ desfecho: 'passou', motivo: 'a_ia_pediu' });
+    expect(banco.nomes()).toContain('start_admin_alert_delivery');
+    expect(banco.nomes()).toContain('finish_admin_alert_delivery');
+    // 1º envio: resposta ao cliente; 2º envio: dossiê ao administrador no mesmo chip.
+    expect(envios).toHaveLength(2);
+    expect(envios[1]!.url).toContain('/message/sendText/ienvia-teste');
+    expect(envios[1]!.body.number).toBe('5586981303979');
+    expect(String(envios[1]!.body.text)).toContain('DOSSIÊ DE ATENDIMENTO');
+    expect(String(envios[1]!.body.text)).toContain('Pediu valor');
+    expect(String(envios[1]!.body.text)).toContain('Chip Vendas');
+
+    vi.unstubAllGlobals();
+  });
+
+  test('parada de segurança (rate_limit) dispara read_admin_alert_context e envia dossiê quando safety está habilitado', async () => {
+    vi.stubEnv('EVOLUTION_API_URL', 'http://127.0.0.1:59999');
+    vi.stubEnv('EVOLUTION_API_KEY', 'chave-evo-teste');
+    const envios: Json[] = [];
+    vi.stubGlobal('fetch', async (_input: unknown, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(String(init.body)) as Json) : {};
+      envios.push(body);
+      return new Response(JSON.stringify({ key: { id: 'evo-safety-1' } }), { status: 201 });
+    });
+
+    const banco = bancoDeRoteiro({
+      claim_ai_turn: [{ result: 'handed_off', reason: 'rate_limit' }],
+      read_admin_alert_context: [
+        {
+          settings: {
+            provider: 'nvidia',
+            admin_alert_enabled: true,
+            admin_alert_whatsapp: '5586981303979',
+            admin_alert_events: ['safety'],
+            admin_alert_include_messages: true,
+          },
+          conversation: {
+            id: 'conv-1',
+            contact_name: 'Robô Visitante',
+            recipient: '5586999112233@s.whatsapp.net',
+            instance_id: 'inst-1',
+            instance_label: 'Chip Teste',
+            provider_instance_name: 'ienvia-teste',
+          },
+          messages: [{ id: 'm1', direction: 'inbound', actor_type: 'contact', status: 'received', body_text: 'Oi oi oi', attachment: null }],
+        },
+      ],
+      start_admin_alert_delivery: () => 'delivery-safety-1' as unknown as Json,
+      finish_admin_alert_delivery: [{ ok: true }],
+    });
+
+    expect(await atenderVez(ambienteCom(banco, relogio()), pedido())).toEqual({ desfecho: 'nada', motivo: 'handed_off:rate_limit' });
+    expect(banco.nomes()).toEqual(['claim_ai_turn', 'read_admin_alert_context', 'start_admin_alert_delivery', 'finish_admin_alert_delivery']);
+    expect(envios).toHaveLength(1);
+    expect(String(envios[0]!.text)).toContain('PARADA DE SEGURANÇA');
+
+    vi.unstubAllGlobals();
+  });
+
+  test('evento desmarcado ou alerta desligado não envia nada nem chama start_admin_alert_delivery', async () => {
+    const banco = bancoDeRoteiro({
+      claim_ai_turn: [
+        pacote({
+          settings: {
+            provider: 'nvidia',
+            admin_alert_enabled: true,
+            admin_alert_whatsapp: '5586981303979',
+            admin_alert_events: ['handoff'], // error NÃO está marcado!
+          },
+          keys: {}, // força no_key -> error
+        }),
+      ],
+      finish_ai_turn: [{ result: 'finished' }],
+    });
+    expect(await atenderVez(ambienteCom(banco, relogio()), pedido())).toEqual({ desfecho: 'falhou', motivo: 'no_key' });
+    expect(banco.nomes()).toEqual(['claim_ai_turn', 'finish_ai_turn']);
+  });
+});

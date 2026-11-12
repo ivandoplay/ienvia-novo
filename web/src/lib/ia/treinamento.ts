@@ -5,6 +5,12 @@
  * O banco confere tudo de novo ao gravar (supabase/migrations/20261112002400_ai_engine_and_training.sql).
  */
 import { MODELOS_PRONTOS_DADOS } from '@/lib/ia/modelos-prontos';
+import {
+  ESTUDIO_VAZIO,
+  conferirEstudio,
+  lerEstudioDoBanco,
+  type DadosDoEstudio,
+} from '@/lib/ia/estudio';
 
 export type Tom = 'consultivo' | 'acolhedor' | 'descontraido' | 'profissional' | 'formal';
 
@@ -71,11 +77,15 @@ export interface CamposDaBase {
   condicoes: string;
   regras: string;
   instrucoesExtras: string;
+  /** Regras e gatilhos que levam a IA a chamar uma pessoa (repasse ou pausa silenciosa). */
+  gatilhosDeRepasse: string;
   /** Depois de passar para uma pessoa, a IA só volta quando alguém mandar (um "ok" do contato não reabre). */
   travaAteRetomar: boolean;
   blindagem: boolean;
   perguntaSobreRobo: PerguntaSobreRobo;
   perguntas: PerguntaFrequente[];
+  /** Mensagens prontas, Estúdio de Skills, Objeções e Cérebro completo da base. */
+  estudio: DadosDoEstudio;
 }
 
 export interface BaseDeTreinamento extends CamposDaBase {
@@ -121,6 +131,7 @@ export const LIMITES_DO_TREINAMENTO = {
   condicoes: 4000,
   regras: 8000,
   instrucoesExtras: 4000,
+  gatilhosDeRepasse: 4000,
   pergunta: 500,
   resposta: 2000,
   /** Uma regra ensinada pela conversa (uma linha das regras de ouro). */
@@ -144,10 +155,12 @@ export const BASE_EM_BRANCO: CamposDaBase = {
   condicoes: '',
   regras: '',
   instrucoesExtras: '',
+  gatilhosDeRepasse: '',
   travaAteRetomar: false,
   blindagem: true,
   perguntaSobreRobo: 'handoff',
   perguntas: [],
+  estudio: ESTUDIO_VAZIO,
 };
 
 type Json = Record<string, unknown>;
@@ -206,6 +219,7 @@ export function lerBase(resposta: unknown): BaseDeTreinamento | null {
     condicoes: texto(dados.commercial_terms),
     regras: texto(dados.golden_rules),
     instrucoesExtras: texto(dados.extra_instructions),
+    gatilhosDeRepasse: texto(dados.escalation_rules),
     travaAteRetomar: dados.lock_until_manual_resume === true,
     // A blindagem só fica desligada quando o banco diz, com todas as letras, que está desligada.
     blindagem: dados.prompt_shield_enabled !== false,
@@ -218,6 +232,7 @@ export function lerBase(resposta: unknown): BaseDeTreinamento | null {
         resposta: texto(item.answer),
         origem: ORIGENS.includes(item.source as OrigemDaPergunta) ? (item.source as OrigemDaPergunta) : 'manual',
       })),
+    estudio: lerEstudioDoBanco(dados),
     arquivos: lista(dados.documents)
       .map((item) => objeto(item))
       .filter((item) => typeof item.id === 'string' && item.id !== '')
@@ -247,10 +262,18 @@ export function camposDaBase(base: BaseDeTreinamento): CamposDaBase {
     condicoes: base.condicoes,
     regras: base.regras,
     instrucoesExtras: base.instrucoesExtras,
+    gatilhosDeRepasse: base.gatilhosDeRepasse,
     travaAteRetomar: base.travaAteRetomar,
     blindagem: base.blindagem,
     perguntaSobreRobo: base.perguntaSobreRobo,
     perguntas: base.perguntas.map((item) => ({ ...item })),
+    estudio: {
+      mensagensAprovadas: base.estudio.mensagensAprovadas.map((m) => ({ ...m })),
+      habilidadesOperacionais: base.estudio.habilidadesOperacionais.map((s) => ({ ...s })),
+      habilidadesDeHumanizacao: base.estudio.habilidadesDeHumanizacao.map((h) => ({ ...h })),
+      objecoes: base.estudio.objecoes.map((o) => ({ ...o })),
+      cerebroCompleto: base.estudio.cerebroCompleto ? structuredClone(base.estudio.cerebroCompleto) : null,
+    },
   };
 }
 
@@ -263,11 +286,14 @@ const CAMPOS_DE_TEXTO: ReadonlyArray<{ campo: keyof CamposDaBase & keyof typeof 
   { campo: 'condicoes', noBanco: 'commercial_terms', nome: 'O texto "Pagamentos, entrega, endereço e horários"' },
   { campo: 'regras', noBanco: 'golden_rules', nome: 'O texto das regras de ouro' },
   { campo: 'instrucoesExtras', noBanco: 'extra_instructions', nome: 'O texto das instruções extras' },
+  { campo: 'gatilhosDeRepasse', noBanco: 'escalation_rules', nome: 'O texto de regras e gatilhos de repasse' },
 ];
 
 const milhar = (valor: number) => valor.toLocaleString('pt-BR');
 
-export type ConferenciaDaBase = { ok: true; paraOBanco: Json } | { ok: false; erro: string; aba: 'identidade' | 'regras' | 'perguntas' };
+export type AbaDeErroDoTreinamento = 'identidade' | 'regras' | 'perguntas' | 'mensagens' | 'skills' | 'cerebro';
+
+export type ConferenciaDaBase = { ok: true; paraOBanco: Json } | { ok: false; erro: string; aba: AbaDeErroDoTreinamento };
 
 /**
  * Confere o que veio da tela (nunca confie no navegador) e devolve a base no formato que o banco espera
@@ -278,7 +304,12 @@ export function conferirBase(entrada: unknown): ConferenciaDaBase {
   const paraOBanco: Json = {};
 
   for (const { campo, noBanco, nome } of CAMPOS_DE_TEXTO) {
-    const aba = campo === 'regras' || campo === 'instrucoesExtras' ? 'regras' : 'identidade';
+    const aba: AbaDeErroDoTreinamento =
+      campo === 'regras' || campo === 'instrucoesExtras' || campo === 'gatilhosDeRepasse' ? 'regras' : 'identidade';
+    if (campo === 'gatilhosDeRepasse' && dados[campo] === undefined) {
+      paraOBanco[noBanco] = '';
+      continue;
+    }
     if (typeof dados[campo] !== 'string') return { ok: false, erro: 'Não foi possível ler o formulário. Atualize a página.', aba };
     const valor = aparar(dados[campo]);
     const limite = LIMITES_DO_TREINAMENTO[campo];
@@ -328,6 +359,10 @@ export function conferirBase(entrada: unknown): ConferenciaDaBase {
     return { ok: false, erro: `Cabem até ${LIMITES_DO_TREINAMENTO.perguntasPorBase} perguntas frequentes por base.`, aba: 'perguntas' };
   }
   paraOBanco.faqs = perguntas;
+
+  const estudoConferido = conferirEstudio((dados.estudio as Partial<DadosDoEstudio>) ?? ESTUDIO_VAZIO);
+  if (!estudoConferido.ok) return { ok: false, erro: estudoConferido.erro, aba: estudoConferido.aba };
+  Object.assign(paraOBanco, estudoConferido.paraOBanco);
 
   return { ok: true, paraOBanco };
 }
@@ -417,6 +452,18 @@ export function explicarErroDoTreinamento(mensagem: string | undefined): string 
       return `Esta base já tem ${LIMITES_DO_TREINAMENTO.perguntasPorBase} perguntas frequentes. Remova alguma no Treinamento para guardar outra.`;
     case 'rules_limit_reached':
       return `As regras de ouro desta base estão cheias (cabem ${milhar(LIMITES_DO_TREINAMENTO.regras)} caracteres). Resuma alguma regra no Treinamento para guardar outra.`;
+    case 'Invalid escalation_rules':
+      return `As regras e gatilhos de repasse passam do limite de ${milhar(LIMITES_DO_TREINAMENTO.gatilhosDeRepasse)} caracteres.`;
+    case 'Invalid approved_messages':
+      return 'Uma das mensagens prontas (M) está sem texto ou passou do limite suportado.';
+    case 'Invalid operational_skills':
+      return 'Uma das skills operacionais (S) está sem nome ou passou do limite suportado.';
+    case 'Invalid humanization_skills':
+      return 'Uma das skills de humanização (H) está sem nome ou passou do limite suportado.';
+    case 'Invalid objections':
+      return 'Uma das objeções (O) está sem frase/padrão ou passou do limite suportado.';
+    case 'Invalid brain_pack':
+      return 'O Cérebro completo passou do limite máximo de tamanho desta base.';
     case 'ai_training_missing':
       return 'Esta conta ainda não tem uma base de treinamento. Crie a primeira na aba Treinamento.';
     case 'Message not found':
@@ -436,7 +483,9 @@ export interface ModeloPronto {
   icone: string;
   nome: string;
   descricao: string;
-  base: Omit<CamposDaBase, 'rotulo' | 'blindagem' | 'perguntaSobreRobo' | 'perguntas'> & { perguntas: Array<{ pergunta: string; resposta: string }> };
+  base: Omit<CamposDaBase, 'rotulo' | 'blindagem' | 'perguntaSobreRobo' | 'perguntas' | 'gatilhosDeRepasse' | 'estudio'> & {
+    perguntas: Array<{ pergunta: string; resposta: string }>;
+  };
 }
 
 /** Os modelos por ramo de negócio, trazidos do painel antigo (os textos são os mesmos). */

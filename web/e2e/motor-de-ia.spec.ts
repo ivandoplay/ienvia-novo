@@ -346,6 +346,44 @@ test.describe('Motor de IA', () => {
     for (const provedor of ['Google Gemini', 'OpenRouter', 'NVIDIA'] as const) await expect(cartao(page, provedor)).toContainText('Sem chave');
   });
 
+  test('dossiê administrativo no WhatsApp: validação, persistência e visão somente leitura da atendente', async ({ page }) => {
+    await abrirMotor(page);
+
+    const ativar = page.getByRole('switch', { name: 'Enviar dossiê completo quando a IA repassar ou parar' });
+    const incluirMensagens = page.getByRole('switch', { name: 'Incluir as últimas mensagens do cliente no dossiê' });
+    const campoWhatsapp = page.getByLabel('WhatsApp administrativo (DDI + DDD + número)');
+
+    await expect(ativar).not.toBeChecked();
+    await expect(incluirMensagens).toBeDisabled();
+
+    // Ativar sem número exige WhatsApp administrativo.
+    await ativar.check();
+    await expect(incluirMensagens).toBeEnabled();
+    await salvar(page).click();
+    await expect(rodape(page)).toHaveText('Digite o WhatsApp administrativo antes de ativar o envio automático de dossiês.');
+
+    // Digitar letras e símbolos é limpo na hora; salva só dígitos.
+    await campoWhatsapp.fill('+55 (86) 98130-3979');
+    await expect(campoWhatsapp).toHaveValue('5586981303979');
+    await incluirMensagens.uncheck();
+    await page.getByRole('checkbox', { name: /Parada de segurança/ }).uncheck();
+    await salvar(page).click();
+    await expect(rodape(page)).toHaveText('Alterações salvas.');
+
+    await page.reload();
+    await expect(ativar).toBeChecked();
+    await expect(campoWhatsapp).toHaveValue('5586981303979');
+    await expect(incluirMensagens).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: /Parada de segurança/ })).not.toBeChecked();
+
+    // Atendente vê tudo desabilitado.
+    const folha = await abrirMenuDaConta(page);
+    await folha.getByRole('button', { name: 'Sair desta conta' }).click();
+    await abrirMotor(page, 'colega');
+    await expect(page.getByRole('switch', { name: 'Enviar dossiê completo quando a IA repassar ou parar' })).toBeDisabled();
+    await expect(page.getByLabel('WhatsApp administrativo (DDI + DDD + número)')).toBeDisabled();
+  });
+
   test('no celular, nada passa da largura da tela', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'Só vale para tela de celular.');
     await abrirMotor(page);

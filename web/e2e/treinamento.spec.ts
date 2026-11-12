@@ -47,17 +47,25 @@ test.describe('Treinamento', () => {
     await expect(bases(page).locator('.treino-base')).toHaveText([/^Principal\s*padrão\s*3 perguntas · 1 arquivo$/i, /^Suporte\s*0 perguntas · 0 arquivos$/]);
     await expect(bases(page).locator('[aria-current="page"]')).toContainText('Principal');
 
-    await expect(page.getByRole('tab')).toHaveText(['Identidade', 'Regras', 'Perguntas frequentes (3)', 'Arquivos (1)']);
+    await expect(page.getByRole('tab')).toHaveText([
+      'Identidade',
+      'Regras',
+      'Perguntas frequentes (3)',
+      'Mensagens prontas',
+      'Estúdio de Skills',
+      'Cérebro e Pacote',
+      'Arquivos (1)',
+    ]);
     await expect(aba(page, 'Identidade')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByLabel('Nome da empresa ou do profissional')).toHaveValue('Flor de Sal Moda');
     await expect(page.getByLabel('Nome de quem atende no WhatsApp')).toHaveValue('Lia');
     await expect(page.getByLabel('Tom de voz nas conversas')).toHaveValue('acolhedor');
     await expect(page.getByLabel('Nome desta base de treinamento')).toHaveValue('Principal');
 
-    // Sem alterações, não há o que salvar; e a tela não finge o que ainda não foi refeito.
+    // Sem alterações, não há o que salvar; todas as 7 abas do Estúdio estão ativas (sem aviso de reconstrução).
     await expect(salvar(page)).toBeDisabled();
-    await expect(page.getByRole('heading', { name: 'Ainda em reconstrução nesta aba' })).toBeVisible();
-    await expect(page.getByText('Estúdio de Skills')).toBeVisible();
+    await expect(page.getByText('Ainda em reconstrução nesta aba')).toHaveCount(0);
+    await expect(aba(page, 'Estúdio de Skills')).toBeVisible();
   });
 
   test('identidade e regras: o que se muda fica gravado; desfazer volta ao que estava', async ({ page }) => {
@@ -136,7 +144,15 @@ test.describe('Treinamento', () => {
 
     // Nada foi gravado no caminho.
     await page.reload();
-    await expect(page.getByRole('tab')).toHaveText(['Identidade', 'Regras', 'Perguntas frequentes (3)', 'Arquivos (1)']);
+    await expect(page.getByRole('tab')).toHaveText([
+      'Identidade',
+      'Regras',
+      'Perguntas frequentes (3)',
+      'Mensagens prontas',
+      'Estúdio de Skills',
+      'Cérebro e Pacote',
+      'Arquivos (1)',
+    ]);
     await expect(page.getByLabel('Nicho ou área de atuação')).toHaveValue('Moda feminina');
   });
 
@@ -216,7 +232,15 @@ test.describe('Treinamento', () => {
     await expect(arquivos(page).getByRole('listitem')).toHaveCount(1);
 
     await page.reload();
-    await expect(page.getByRole('tab')).toHaveText(['Identidade', 'Regras', 'Perguntas frequentes (3)', 'Arquivos (1)']);
+    await expect(page.getByRole('tab')).toHaveText([
+      'Identidade',
+      'Regras',
+      'Perguntas frequentes (3)',
+      'Mensagens prontas',
+      'Estúdio de Skills',
+      'Cérebro e Pacote',
+      'Arquivos (1)',
+    ]);
   });
 
   test('ver instruções geradas: o texto que a IA recebe, com o negócio, as perguntas, o arquivo e a regra de honestidade', async ({ page }) => {
@@ -287,7 +311,15 @@ test.describe('Treinamento', () => {
     await expect(page).toHaveURL(new RegExp(`/treinamento\\?base=${suporte}$`));
     await expect(page.getByLabel('Nome desta base de treinamento')).toHaveValue('Suporte');
     await expect(page.getByLabel('Tom de voz nas conversas')).toHaveValue('profissional');
-    await expect(page.getByRole('tab')).toHaveText(['Identidade', 'Regras', 'Perguntas frequentes', 'Arquivos']);
+    await expect(page.getByRole('tab')).toHaveText([
+      'Identidade',
+      'Regras',
+      'Perguntas frequentes',
+      'Mensagens prontas',
+      'Estúdio de Skills',
+      'Cérebro e Pacote',
+      'Arquivos',
+    ]);
 
     // Criar uma base nova; nome repetido é recusado.
     await page.getByRole('button', { name: 'Nova base' }).click();
@@ -363,7 +395,15 @@ test.describe('Treinamento', () => {
     await page.getByRole('button', { name: 'Começar em branco' }).click();
     await expect(page.getByLabel('Nome desta base de treinamento')).toHaveValue('Principal');
     await expect(page.getByLabel('Nome da empresa ou do profissional')).toHaveValue('');
-    await expect(page.getByRole('tab')).toHaveText(['Identidade', 'Regras', 'Perguntas frequentes', 'Arquivos']);
+    await expect(page.getByRole('tab')).toHaveText([
+      'Identidade',
+      'Regras',
+      'Perguntas frequentes',
+      'Mensagens prontas',
+      'Estúdio de Skills',
+      'Cérebro e Pacote',
+      'Arquivos',
+    ]);
     // Com uma base só e nenhum chip com base própria, a lista de chips nem aparece.
     await expect(page.getByText('Qual base cada chip usa')).toHaveCount(0);
   });
@@ -403,10 +443,84 @@ test.describe('Treinamento', () => {
     await expect(page.getByText('Flor de Sal Moda')).toHaveCount(0);
   });
 
+  test('Estúdio de Skills, Mensagens prontas, gatilhos de repasse e Pacote (.json/.zip)', async ({ page }) => {
+    await abrirTreinamento(page);
+
+    // 1. Gatilhos de repasse na aba Regras.
+    await aba(page, 'Regras').click();
+    await page
+      .getByLabel('Regras e gatilhos de repasse (quando chamar você ou pausar)')
+      .fill('Sempre passar para pessoa quando o cliente pedir nota fiscal.');
+
+    // 2. Mensagem pronta (M01).
+    await aba(page, /^Mensagens prontas/).click();
+    await page.getByRole('button', { name: 'Adicionar mensagem pronta' }).click();
+    await page.getByLabel('Título da M01').fill('Abertura oficial');
+    await page.getByLabel('Texto da mensagem M01').fill('Olá! Como posso ajudar você hoje?');
+
+    // 3. Estúdio de Skills: Operacional (S01), Humanização (H01) e Objeção (O001).
+    await aba(page, /^Estúdio de Skills/).click();
+    await page.getByRole('button', { name: 'Adicionar skill operacional' }).click();
+    await page.getByLabel('Nome da S01').fill('Qualificação inicial');
+    await page.getByLabel('Quando acionar S01').fill('Primeira mensagem do cliente');
+    await page.getByLabel('Exemplo de resposta (S01)').fill('Que bom falar com você!');
+
+    await page.getByRole('button', { name: /^Humanização/ }).click();
+    await page.getByRole('button', { name: 'Adicionar skill de humanização' }).click();
+    await page.getByLabel('Nome (H01)').fill('Frase curta e natural');
+
+    await page.getByRole('button', { name: /^Objeções/ }).click();
+    await page.getByRole('button', { name: 'Adicionar objeção' }).click();
+    await page.getByLabel('Quando o cliente disser / padrão (O001)').fill('Está muito caro');
+    await page.getByLabel('Estratégia de resposta (O001)').fill('Explicar o retorno antes de falar em desconto.');
+
+    // 4. Cérebro e Pacote + backup .zip + importação .json com prévia.
+    await aba(page, 'Cérebro e Pacote').click();
+    await page.getByLabel('Playbook central do cérebro').fill('Sempre acolher e perguntar o tamanho desejado.');
+
+    await salvar(page).click();
+    await expect(barraDeSalvar(page)).toHaveText('Treinamento salvo.');
+
+    // Recarrega e confere tudo salvo no servidor + nas instruções geradas.
+    await page.reload();
+    await expect(aba(page, /^Mensagens prontas/)).toHaveText('Mensagens prontas (1)');
+    await expect(aba(page, /^Estúdio de Skills/)).toHaveText('Estúdio de Skills (3)');
+
+    // Download do backup .zip.
+    await aba(page, 'Cérebro e Pacote').click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Exportar backup completo (.zip)' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('ienvia-treinamento-principal.zip');
+
+    // Importação de Pacote JSON com prévia e confirmação.
+    const pacoteJson = JSON.stringify({
+      brain_pack: { name: 'Pacote Importado', version: '2.0', playbook_central: 'Playbook novo' },
+      approved_messages: [{ id: 'M01', title: 'Saudação Pacote', category: 'Abertura', text: 'Oi, tudo bem por aí?', enabled: true }],
+      operational_skills: [{ id: 'S01', name: 'Abertura rápida', when: 'Oi', example_response: 'Tudo ótimo!', enabled: true }],
+    });
+    await page.getByLabel('Importar Pacote Turbo (.zip, .json ou .md)').setInputFiles({
+      name: 'pacote.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(pacoteJson, 'utf8'),
+    });
+    const previa = page.getByRole('dialog', { name: 'Prévia do Pacote Turbo' });
+    await expect(previa).toBeVisible();
+    await previa.getByRole('button', { name: 'Substituir Estúdio' }).click();
+    await salvar(page).click();
+    await expect(barraDeSalvar(page)).toHaveText('Treinamento salvo.');
+
+    await page.getByRole('button', { name: 'Ver instruções geradas' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Instruções geradas' });
+    await expect(dialogo.getByLabel('Texto das instruções')).toContainText('REGRAS E GATILHOS DE REPASSE');
+    await expect(dialogo.getByLabel('Texto das instruções')).toContainText('Saudação Pacote');
+    await expect(dialogo.getByLabel('Texto das instruções')).toContainText('Abertura rápida');
+  });
+
   test('no celular, nada passa da largura da tela', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'Só vale para tela de celular.');
     await abrirTreinamento(page);
-    for (const nome of ['Identidade', 'Regras', /^Perguntas frequentes/, /^Arquivos/]) {
+    for (const nome of ['Identidade', 'Regras', /^Perguntas frequentes/, /^Mensagens prontas/, /^Estúdio de Skills/, 'Cérebro e Pacote', /^Arquivos/]) {
       await aba(page, nome).click();
       const larguras = await page.evaluate(() => ({ pagina: document.documentElement.scrollWidth, janela: window.innerWidth }));
       expect(larguras.pagina, String(nome)).toBeLessThanOrEqual(larguras.janela);
@@ -428,14 +542,14 @@ test.describe('Treinamento: acessibilidade', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
-  test('tema escuro: as quatro partes, com alterações por salvar e um erro à mostra', async ({ page }) => {
+  test('tema escuro: todas as sete abas, com alterações por salvar e um erro à mostra', async ({ page }) => {
     await abrirTreinamento(page);
     expect(await problemasGraves(page), 'identidade').toEqual([]);
     await page.getByLabel('Nicho ou área de atuação').fill('x'.repeat(121));
     await salvar(page).click();
     await expect(barraDeSalvar(page)).toContainText('passou do limite');
     expect(await problemasGraves(page), 'identidade com erro').toEqual([]);
-    for (const nome of ['Regras', /^Perguntas frequentes/, /^Arquivos/]) {
+    for (const nome of ['Regras', /^Perguntas frequentes/, /^Mensagens prontas/, /^Estúdio de Skills/, 'Cérebro e Pacote', /^Arquivos/]) {
       await aba(page, nome).click();
       expect(await problemasGraves(page), String(nome)).toEqual([]);
     }
@@ -448,8 +562,10 @@ test.describe('Treinamento: acessibilidade', () => {
     await folha.getByRole('button', { name: 'Fechar' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     expect(await problemasGraves(page), 'identidade').toEqual([]);
-    await aba(page, 'Regras').click();
-    expect(await problemasGraves(page), 'regras').toEqual([]);
+    for (const nome of ['Regras', /^Mensagens prontas/, /^Estúdio de Skills/, 'Cérebro e Pacote']) {
+      await aba(page, nome).click();
+      expect(await problemasGraves(page), String(nome)).toEqual([]);
+    }
     await aba(page, /^Arquivos/).click();
     await anexar(page, 'catalogo.pdf', 'application/pdf', Buffer.from('%PDF'));
     await expect(recadoDosArquivos(page)).toContainText('Só servem arquivos de texto');

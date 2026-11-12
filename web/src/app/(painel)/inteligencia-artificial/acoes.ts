@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { montarDossieParaAdmin } from '@/lib/atendente/dossie';
+import { enviarTexto } from '@/lib/evolution/cliente';
 import { cifrar, contextoDaChaveDeIa, decifrar, finalDaChave, lerChaveDoCofre } from '@/lib/ia/cofre';
 import { ErroDeIa, listarModelos, testarConexao, type ModeloDisponivel } from '@/lib/ia/provedores';
 import {
@@ -12,10 +14,12 @@ import {
   ehProvedor,
   explicarErroDeIa,
   lerMotor,
+  whatsappSomenteDigitos,
   type MotorDeIa,
   type Provedor,
 } from '@/lib/ia/regras';
 import { obterSessao } from '@/lib/sessao';
+import { criarClienteDeServico } from '@/lib/supabase/servico';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 
 /**
@@ -176,3 +180,96 @@ export async function buscarModelos(provedor: unknown): Promise<Resultado<{ mode
     return { ok: false, erro: ALGO_DEU_ERRADO };
   }
 }
+
+/** Envia um dossiê de simulação ao WhatsApp administrativo pelo chip conectado escolhido (sem alterar nenhuma conversa real). */
+export async function enviarDossieDeTeste(whatsapp: unknown, chipId?: unknown): Promise<Resultado<{ mensagem: string }>> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+
+  const numero = whatsappSomenteDigitos(whatsapp);
+  if (!/^[0-9]{10,15}$/.test(numero)) {
+    return { ok: false, erro: 'Digite um número de WhatsApp administrativo válido (DDI + DDD + número, com 10 a 15 dígitos).' };
+  }
+
+  const { data: chips, error: erroChips } = await contexto.supabase
+    .from('instances')
+    .select('id, display_name, status, connected_phone, provider_instance_name')
+    .eq('workspace_id', contexto.workspaceId)
+    .neq('status', 'revoked')
+    .order('created_at', { ascending: true });
+
+  if (erroChips) return { ok: false, erro: mensagemDoBanco('listar chips para teste', erroChips) };
+  const conectados = (chips ?? []).filter((c) => c.status === 'connected' && typeof c.provider_instance_name === 'string' && c.provider_instance_name !== '');
+  const escolhido =
+    typeof chipId === 'string' && chipId
+      ? conectados.find((c) => c.id === chipId)
+      : conectados[0];
+
+  if (!escolhido?.provider_instance_name) {
+    return { ok: false, erro: 'Nenhum chip conectado no momento para enviar o dossiê de teste. Conecte um chip em Instâncias primeiro.' };
+  }
+
+  const agora = new Date();
+  const texto = montarDossieParaAdmin({
+    tipo: 'test',
+    agora,
+    nomeDoContato: 'Lead de Exemplo (Teste)',
+    telefoneDoContato: '5586999990000',
+    nomeDoChip: escolhido.display_name,
+    telefoneDoChip: escolhido.connected_phone,
+    recado:
+      'Cenário: Interessado perguntando como funciona e pedindo condições comerciais | Gatilho: Simulação manual do dossiê administrativo | Próxima jogada: Cumprimentar pelo nome e conduzir o diagnóstico.',
+    mensagens: [
+      {
+        id: 'teste-1',
+        recebida: true,
+        autor: 'contact',
+        texto: 'Oi! Vi seu trabalho e queria entender como funciona e qual o investimento.',
+        arquivo: null,
+      },
+    ],
+    incluirMensagens: true,
+  });
+
+  const servico = criarClienteDeServico();
+  let deliveryId: string | null = null;
+  if (servico) {
+    const { data } = await servico.rpc('start_admin_alert_delivery', {
+      p_workspace_id: contexto.workspaceId,
+      p_turn_id: null,
+      p_conversation_id: null,
+      p_instance_id: escolhido.id,
+      p_kind: 'test',
+      p_recipient_whatsapp: numero,
+      p_body_prefix: texto.slice(0, 120),
+    });
+    if (typeof data === 'string') deliveryId = data;
+  }
+
+  const envio = await enviarTexto(escolhido.provider_instance_name, numero, texto, { digitandoMs: 0, tempoLimite: 15_000 });
+
+  if (servico && deliveryId) {
+    await servico.rpc('finish_admin_alert_delivery', {
+      p_workspace_id: contexto.workspaceId,
+      p_delivery_id: deliveryId,
+      p_status: envio.situacao === 'enviada' ? 'sent' : envio.situacao === 'nao_enviada' ? 'failed' : 'uncertain',
+      p_provider_message_id: envio.situacao === 'enviada' ? envio.idNoWhatsApp : null,
+      p_error_detail: envio.situacao === 'nao_enviada' ? envio.motivo : envio.situacao === 'incerta' ? envio.detalhe : null,
+    });
+  }
+
+  if (envio.situacao === 'enviada') {
+    return { ok: true, mensagem: `Dossiê de teste enviado pelo chip "${escolhido.display_name}" para +${numero}. Confira no WhatsApp.` };
+  }
+  if (envio.situacao === 'nao_enviada') {
+    return {
+      ok: false,
+      erro:
+        envio.motivo === 'sem_whatsapp'
+          ? 'Esse número não possui WhatsApp ativo na Evolution. Confira o DDI e o DDD.'
+          : 'Não foi possível enviar pela Evolution agora. Confira se o chip continua conectado em Instâncias.',
+    };
+  }
+  return { ok: false, erro: 'A Evolution respondeu sem confirmar o envio. Confira o WhatsApp do administrador.' };
+}
+

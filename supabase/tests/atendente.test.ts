@@ -1170,6 +1170,9 @@ describe('quem pode o quê', () => {
     ['finish_ai_turn', [LOJA_A, '99999999-9999-4999-8999-999999999999', 'answered', null, null, false, {}]],
     ['sweep_ai_turns', [LOJA_A]],
     ['read_ai_attachment', [LOJA_A, '99999999-9999-4999-8999-999999999999']],
+    ['read_admin_alert_context', [LOJA_A, '99999999-9999-4999-8999-999999999999']],
+    ['start_admin_alert_delivery', [LOJA_A, null, null, CHIP_A, 'test', '5586981303979', 'Teste']],
+    ['finish_admin_alert_delivery', [LOJA_A, '99999999-9999-4999-8999-999999999999', 'sent', null, null]],
   ];
 
   test('as funções do servidor não aceitam chamada de pessoa nem de visitante', async () => {
@@ -1256,6 +1259,68 @@ describe('quem pode o quê', () => {
       expect(await banco.esperarErro(() => repetir('waiting'))).toMatch(/ai_turns_one_waiting_uq/);
       await repetir('running');
       expect(await banco.esperarErro(() => repetir('running'))).toMatch(/ai_turns_one_running_uq/);
+    });
+  });
+});
+
+describe('dossiê administrativo e filtro de eco na Evolution', () => {
+  test('eco from_me de dossiê enviado ao admin é ignorado na Inbox; mensagem inbound do mesmo número entra normalmente', async () => {
+    await banco.comoUsuario(DONA_A, async () => {
+      await prepararIa();
+      const deliveryId = await servidor<string>('start_admin_alert_delivery', [
+        LOJA_A,
+        null,
+        null,
+        CHIP_A,
+        'handoff',
+        '5586981303979',
+        '🚨 *DOSSIÊ DE ATENDIMENTO*',
+      ]);
+      expect(deliveryId).toBeTruthy();
+
+      // Enquanto está 'sending', um webhook from_me com o mesmo prefixo e número é ignorado como duplicado (não vira conversa nem pausa IA).
+      const ecoEnviando = await avisar('EVT-ECHO-ADMIN-1', '🚨 *DOSSIÊ DE ATENDIMENTO* completo...', {
+        deMim: true,
+        contato: '5586981303979@s.whatsapp.net',
+      });
+      expect(ecoEnviando).toEqual({ result: 'duplicate' });
+
+      // Depois de finalizado com provider_message_id, outro eco com mesmo provider_message_id também é ignorado.
+      await servidor('finish_admin_alert_delivery', [LOJA_A, deliveryId, 'sent', 'EVT-ECHO-ADMIN-2', null]);
+      const ecoSent = await avisar('EVT-ECHO-ADMIN-2', 'texto qualquer', {
+        deMim: true,
+        contato: '5586981303979@s.whatsapp.net',
+      });
+      expect(ecoSent).toEqual({ result: 'duplicate' });
+
+      // Mas uma mensagem REAL enviada PELO admin (from_me = false) entra normalmente como conversa inbound!
+      const inboundAdmin = await avisar('EVT-INBOUND-ADMIN-1', 'Oi, testando do meu celular', {
+        deMim: false,
+        contato: '5586981303979@s.whatsapp.net',
+      });
+      expect(inboundAdmin.result).toBe('accepted');
+
+      // Segunda tentativa para o mesmo (turn_id, kind) devolve null sem duplicar envio ao administrador.
+      const { vez } = await vezEmAndamento('WA-IN-DUP-1', 'Oi');
+      const primeira = await servidor<string>('start_admin_alert_delivery', [LOJA_A, vez, CONVERSA_A, CHIP_A, 'handoff', '5586981303979', 'Dossiê']);
+      const segunda = await servidor<string | null>('start_admin_alert_delivery', [LOJA_A, vez, CONVERSA_A, CHIP_A, 'handoff', '5586981303979', 'Dossiê']);
+      expect(primeira).toBeTruthy();
+      expect(segunda).toBeNull();
+    });
+  });
+
+  test('read_admin_alert_context devolve configurações, contato e mensagens mesmo após rate_limit', async () => {
+    await banco.comoUsuario(DONA_A, async () => {
+      await prepararIa();
+      await chamar('save_my_ai_settings', [LOJA_A, { admin_alert_enabled: true, admin_alert_whatsapp: '5586981303979' }]);
+      const { vez } = await vezEmAndamento('WA-IN-1', 'Oi');
+      await fecharVez(vez, 'answered');
+
+      const ctx = await servidor<Json>('read_admin_alert_context', [LOJA_A, vez]);
+      expect(ctx).toMatchObject({
+        settings: { admin_alert_enabled: true, admin_alert_whatsapp: '5586981303979' },
+        conversation: { id: CONVERSA_A, instance_id: CHIP_A, provider_instance_name: CHIP_NA_EVOLUTION },
+      });
     });
   });
 });

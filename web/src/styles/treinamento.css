@@ -269,6 +269,150 @@ a.treino-base:hover {
   margin-bottom: 0;
 }
 
+/* Estúdio de Mensagens, Skills, Objeções, Cérebro e Pacote Turbo. */
+.estudio-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  margin-bottom: 14px;
+}
+.estudio-barra .form-group {
+  flex: 1 1 240px;
+  margin-bottom: 0;
+}
+.estudio-subgrupos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.estudio-lista {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  list-style: none;
+}
+.estudio-card {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+.estudio-card .form-group:last-child {
+  margin-bottom: 0;
+}
+.estudio-card-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.estudio-codigo {
+  padding: 2px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 750;
+}
+.estudio-ativa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  color: var(--text-main);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.estudio-ativa input {
+  accent-color: var(--accent);
+}
+.estudio-pacote-caixa {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+.estudio-pacote-caixa .linha-de-campo {
+  flex-wrap: wrap;
+}
+.estudio-pacote-caixa .linha-de-campo .campo {
+  flex: 1 1 240px;
+}
+.estudio-acoes-backup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.estudio-cerebro-resumo {
+  margin: 12px 0;
+}
+.estudio-detalhes {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+.estudio-detalhes summary {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.estudio-detalhes ul {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  list-style: none;
+}
+.estudio-detalhes li {
+  display: grid;
+  gap: 2px;
+  font-size: 12.5px;
+}
+.estudio-detalhes small {
+  color: var(--text-secondary);
+}
+.estudio-previa-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+  list-style: none;
+}
+.estudio-previa-grade li {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-subtle);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.estudio-previa-grade strong {
+  display: block;
+  color: var(--text-main);
+  font-size: 16px;
+}
+.estudio-previa-opcao {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 14px;
+  color: var(--text-main);
+  font-size: 13px;
+  cursor: pointer;
+}
+.estudio-previa-opcao input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
 @media (max-width: 640px) {
   .treino-perguntas li {
     grid-template-columns: minmax(0, 1fr);

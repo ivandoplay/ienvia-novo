@@ -6,6 +6,11 @@
  * ("Ver instruções geradas"), e o atendente usa o mesmo texto: o que o dono vê é o que a IA recebe.
  */
 import { TONS, type BaseDeTreinamento } from '@/lib/ia/treinamento';
+import {
+  ESTUDIO_VAZIO,
+  selecionarContextoDoTurno,
+  type DadosDoEstudio,
+} from '@/lib/ia/estudio';
 
 export interface ContextoDaConversa {
   /** O momento da conversa. */
@@ -14,6 +19,12 @@ export interface ContextoDaConversa {
   fuso?: string;
   /** O nome que o contato usa no WhatsApp. Vem de fora: é limpo antes de entrar nas instruções. */
   nomeDoContato?: string | null;
+  /** Mensagem atual do contato neste turno (para o seletor inteligente do Cérebro/Skills). */
+  mensagemAtual?: string;
+  /** Mensagens recentes da conversa para dar contexto ao seletor inteligente. */
+  historicoRecente?: readonly string[];
+  temAudio?: boolean;
+  temFoto?: boolean;
 }
 
 type DadosDaBase = Pick<
@@ -31,7 +42,10 @@ type DadosDaBase = Pick<
   | 'perguntaSobreRobo'
   | 'perguntas'
   | 'arquivos'
->;
+> & {
+  gatilhosDeRepasse?: string;
+  estudio?: DadosDoEstudio;
+};
 
 const FUSO_PADRAO = 'America/Fortaleza';
 
@@ -169,6 +183,107 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
   }
 
   if (base.instrucoesExtras.trim()) blocos.push(`=== INSTRUÇÕES COMPLEMENTARES ===\n${base.instrucoesExtras.trim()}`);
+  if (base.gatilhosDeRepasse?.trim()) blocos.push(`=== REGRAS E GATILHOS DE REPASSE ===\n${base.gatilhosDeRepasse.trim()}`);
+
+  const estudio = base.estudio ?? ESTUDIO_VAZIO;
+  const temEstudio =
+    estudio.mensagensAprovadas.some((m) => m.ativa) ||
+    estudio.habilidadesOperacionais.some((s) => s.ativa) ||
+    estudio.habilidadesDeHumanizacao.some((h) => h.ativa) ||
+    estudio.objecoes.some((o) => o.ativa) ||
+    estudio.cerebroCompleto !== null;
+
+  if (temEstudio) {
+    const sel = selecionarContextoDoTurno(estudio, {
+      mensagemAtual: contexto.mensagemAtual,
+      historicoRecente: contexto.historicoRecente,
+      temAudio: contexto.temAudio,
+      temFoto: contexto.temFoto,
+    });
+    if (sel.playbookCentral || sel.regrasCanonicas || sel.filtrosDeVoz.length > 0 || sel.personas.length > 0 || sel.paresBomRuim.length > 0) {
+      const partesCerebro: string[] = [`=== CÉREBRO COMPLETO (${sel.modo === 'completo' ? 'modo completo' : 'seleção inteligente para este turno'}) ===`];
+      if (sel.playbookCentral) partesCerebro.push(`[Playbook central]\n${sel.playbookCentral}`);
+      if (sel.regrasCanonicas) partesCerebro.push(`[Regras canônicas]\n${sel.regrasCanonicas}`);
+      if (sel.filtrosDeVoz.length > 0) partesCerebro.push(`[Filtros de voz]\n${sel.filtrosDeVoz.map((f) => `- ${f}`).join('\n')}`);
+      if (sel.personas.length > 0) {
+        partesCerebro.push(
+          `[Perfis de interlocutor relevantes]\n${sel.personas
+            .map((p) => `- ${p.id} (${p.nome})${p.sinais ? ` · sinais: ${p.sinais}` : ''}${p.conteudoMd ? `\n  ${p.conteudoMd.slice(0, 600)}` : ''}`)
+            .join('\n')}`,
+        );
+      }
+      if (sel.paresBomRuim.length > 0) {
+        partesCerebro.push(
+          `[Exemplos bom vs. ruim]\n${sel.paresBomRuim
+            .map((b) => `- ${b.titulo}: NÃO diga "${b.naoUsar}" | Prefira "${b.melhorResposta}"${b.licao ? ` (${b.licao})` : ''}`)
+            .join('\n')}`,
+        );
+      }
+      if (sel.respostasReferencia.length > 0) {
+        partesCerebro.push(
+          `[Respostas de referência]\n${sel.respostasReferencia
+            .map((r) => `- ${r.id} (${r.titulo}) · quando: ${r.quando} · conduta: ${r.comportamento}${r.cuidado ? ` · cuidado: ${r.cuidado}` : ''}`)
+            .join('\n')}`,
+        );
+      }
+      blocos.push(partesCerebro.join('\n\n'));
+    }
+    if (sel.mensagens.length > 0) {
+      blocos.push(
+        `=== MENSAGENS APROVADAS (USE COMO BASE FIEL QUANDO COUBER) ===\n${sel.mensagens
+          .map((m) => `[${m.id}] ${m.titulo}${m.categoria ? ` (${m.categoria})` : ''}\n${m.texto}`)
+          .join('\n\n')}`,
+      );
+    }
+    if (sel.skillsOperacionais.length > 0) {
+      blocos.push(
+        `=== SKILLS OPERACIONAIS ===\n${sel.skillsOperacionais
+          .map((s) =>
+            [
+              `[${s.id}] ${s.nome}`,
+              s.quando ? `Quando acionar: ${s.quando}` : '',
+              s.exemploDeResposta ? `Exemplo de resposta: ${s.exemploDeResposta}` : '',
+              s.conteudoMd ? s.conteudoMd.slice(0, 1200) : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          )
+          .join('\n\n')}`,
+      );
+    }
+    if (sel.skillsHumanizacao.length > 0) {
+      blocos.push(
+        `=== SKILLS DE HUMANIZAÇÃO ===\n${sel.skillsHumanizacao
+          .map((h) =>
+            [
+              `[${h.id}] ${h.nome}`,
+              h.gatilho ? `Gatilho: ${h.gatilho}` : '',
+              h.objetivo ? `Objetivo: ${h.objetivo}` : '',
+              h.evitar ? `Evitar: ${h.evitar}` : '',
+              h.respostaMelhor ? `Preferir: ${h.respostaMelhor}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          )
+          .join('\n\n')}`,
+      );
+    }
+    if (sel.objecoes.length > 0) {
+      blocos.push(
+        `=== MATRIZ DE OBJEÇÕES E RESPOSTAS ===\n${sel.objecoes
+          .map((o) =>
+            [
+              `[${o.id}] "${o.padraoDeEntrada}"${o.skillId ? ` (skill ${o.skillId})` : ''}`,
+              o.estrategiaDeResposta ? `Como responder: ${o.estrategiaDeResposta}` : '',
+              o.evitar ? `Não fazer: ${o.evitar}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          )
+          .join('\n\n')}`,
+      );
+    }
+  }
 
   // ----- se perguntarem se é um robô -----
   // Fica DEPOIS de tudo o que o dono escreveu (regras, perguntas frequentes, instruções extras) e diz que vale

@@ -137,11 +137,17 @@ describe('conferir a base antes de gravar', () => {
         commercial_terms: '',
         golden_rules: '- Nunca invente preço.',
         extra_instructions: '',
+        escalation_rules: '',
         tone: 'acolhedor',
         robot_question_policy: 'disclose',
         solo_identity: true,
         lock_until_manual_resume: false,
         prompt_shield_enabled: true,
+        approved_messages: [],
+        operational_skills: [],
+        humanization_skills: [],
+        objections: [],
+        brain_pack: {},
         // A linha em branco some; as outras ficam na ordem.
         faqs: [
           { question: 'Entregam?', answer: 'Sim, em Piracuruca.', source: 'manual' },

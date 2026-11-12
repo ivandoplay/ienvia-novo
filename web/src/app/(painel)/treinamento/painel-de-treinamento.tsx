@@ -27,7 +27,18 @@ import {
   type Tom,
 } from '@/lib/ia/treinamento';
 import { dataCurta } from '@/lib/inbox/regras';
-import { anexarArquivo, apagarArquivo, apagarBase, criarBase, definirBaseDoChip, salvarBase, tornarPadrao, verInstrucoes } from './acoes';
+import {
+  anexarArquivo,
+  apagarArquivo,
+  apagarBase,
+  criarBase,
+  definirBaseDoChip,
+  extrairEstudioDosArquivos,
+  salvarBase,
+  tornarPadrao,
+  verInstrucoes,
+} from './acoes';
+import { AbasDoEstudio } from './estudio-abas';
 
 interface Props {
   lista: ListaDeBases | null;
@@ -40,7 +51,7 @@ interface Recado {
   texto: string;
 }
 
-type Aba = 'identidade' | 'regras' | 'perguntas' | 'arquivos';
+type Aba = 'identidade' | 'regras' | 'perguntas' | 'mensagens' | 'skills' | 'cerebro' | 'arquivos';
 
 type Janela =
   | null
@@ -280,10 +291,19 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
     setRecadoDosArquivos({ tipo: 'ok', texto: `Arquivo "${titulo}" apagado.` });
   }
 
+  const totalMensagensProntas = rascunho.estudio.mensagensAprovadas.length;
+  const totalSkillsEObjecoes =
+    rascunho.estudio.habilidadesOperacionais.length +
+    rascunho.estudio.habilidadesDeHumanizacao.length +
+    rascunho.estudio.objecoes.length;
+
   const ABAS: Array<{ id: Aba; rotulo: string }> = [
     { id: 'identidade', rotulo: 'Identidade' },
     { id: 'regras', rotulo: 'Regras' },
     { id: 'perguntas', rotulo: `Perguntas frequentes${perguntasPreenchidas ? ` (${perguntasPreenchidas})` : ''}` },
+    { id: 'mensagens', rotulo: `Mensagens prontas${totalMensagensProntas ? ` (${totalMensagensProntas})` : ''}` },
+    { id: 'skills', rotulo: `Estúdio de Skills${totalSkillsEObjecoes ? ` (${totalSkillsEObjecoes})` : ''}` },
+    { id: 'cerebro', rotulo: 'Cérebro e Pacote' },
     { id: 'arquivos', rotulo: `Arquivos${base.arquivos.length ? ` (${base.arquivos.length})` : ''}` },
   ];
 
@@ -510,6 +530,15 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
             desativado={!podeEditar}
             aoMudar={(instrucoesExtras) => mudar({ instrucoesExtras })}
           />
+          <CampoDeTexto
+            rotulo="Regras e gatilhos de repasse (quando chamar você ou pausar)"
+            valor={rascunho.gatilhosDeRepasse}
+            limite={LIMITES_DO_TREINAMENTO.gatilhosDeRepasse}
+            exemplo="Ex.: Sempre chamar humano ao pedir orçamento fechado, mandar comprovante ou pedir para falar direto comigo."
+            linhas={3}
+            desativado={!podeEditar}
+            aoMudar={(gatilhosDeRepasse) => mudar({ gatilhosDeRepasse })}
+          />
           <div className="lista-de-interruptores">
             <Interruptor
               titulo="Blindagem contra tentativas de manipular a IA"
@@ -601,6 +630,26 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
             {rascunho.perguntas.length} de {LIMITES_DO_TREINAMENTO.perguntasPorBase} perguntas.
           </p>
         </section>
+
+        <AbasDoEstudio
+          aba={aba}
+          rascunho={rascunho}
+          podeEditar={podeEditar}
+          ocupado={parado}
+          arquivosCount={base.arquivos.length}
+          mudar={mudar}
+          aoAvisar={(aviso) => setRecado(aviso)}
+          aoExtrairDosArquivos={async () => {
+            setOcupado('extrair');
+            const resposta = await extrairEstudioDosArquivos(base.id);
+            setOcupado(null);
+            if (!resposta.ok) {
+              setRecado({ tipo: 'erro', texto: resposta.erro });
+              return null;
+            }
+            return resposta.resultado;
+          }}
+        />
 
         {podeEditar && aba !== 'arquivos' && (
           <div className="barra-de-salvar">
@@ -696,16 +745,6 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
         <p className="campo-dica">
           {base.arquivos.length} de {LIMITES_DO_TREINAMENTO.arquivosPorBase} arquivos · {milhar(letrasDosArquivos)} de {milhar(LIMITES_DO_TREINAMENTO.letrasPorBase)}{' '}
           caracteres nesta base.
-        </p>
-      </section>
-
-      <section className="panel treino-falta" aria-labelledby="treino-falta">
-        <h2 id="treino-falta" className="panel-title">
-          Ainda em reconstrução nesta aba
-        </h2>
-        <p className="panel-desc">
-          Mensagens prontas (as antigas M01–M13), Estúdio de Skills, “Cérebro completo” e “Pacote Turbo” existem no sistema antigo e ainda não foram
-          refeitos aqui. Eles não aparecem nesta tela para não parecer que funcionam.
         </p>
       </section>
 

@@ -40,6 +40,10 @@ const DO_BANCO = {
   split_long_messages: true,
   pause_on_human_reply: true,
   human_pause_minutes: 60,
+  admin_alert_enabled: false,
+  admin_alert_whatsapp: '',
+  admin_alert_events: ['handoff', 'silent_handoff', 'uncertain_send', 'error', 'safety'],
+  admin_alert_include_messages: true,
   updated_at: null,
   keys: {},
   can_edit: true,
@@ -357,5 +361,22 @@ describe('textos para a tela', () => {
     expect(duracaoLegivel(9940)).toBe('9,9 s');
     expect(duracaoLegivel(12400)).toBe('12 s');
     expect(duracaoLegivel(-5)).toBe('0,0 s');
+  });
+
+  test('dossiê administrativo: valida WhatsApp (só dígitos) e lista de motivos', () => {
+    expect(conferirConfiguracao(com({ alertaAdminAtivo: true, alertaAdminWhatsapp: '' }))).toEqual({
+      ok: false,
+      erro: 'Digite o WhatsApp administrativo antes de ativar o envio automático de dossiês.',
+    });
+    expect(conferirConfiguracao(com({ alertaAdminAtivo: true, alertaAdminWhatsapp: '123' }))).toEqual({
+      ok: false,
+      erro: 'Informe o WhatsApp administrativo completo (DDI + DDD + número, com 10 a 15 dígitos). Exemplo: 5586999999999.',
+    });
+    expect(conferirConfiguracao(com({ alertaAdminAtivo: true, alertaAdminWhatsapp: '5586981303979', alertaAdminEventos: [] }))).toEqual({
+      ok: false,
+      erro: 'Escolha ao menos um motivo para disparar o dossiê administrativo.',
+    });
+    const ok = conferirConfiguracao(com({ alertaAdminAtivo: true, alertaAdminWhatsapp: '+55 (86) 98130-3979' }));
+    expect(ok).toMatchObject({ ok: true, configuracao: { alertaAdminAtivo: true, alertaAdminWhatsapp: '5586981303979' } });
   });
 });

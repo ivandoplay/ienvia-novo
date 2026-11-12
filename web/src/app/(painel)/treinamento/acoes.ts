@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { extrairEstudioDeDocumentos, type ResultadoDaImportacao } from '@/lib/ia/estudio';
 import { montarInstrucoes } from '@/lib/ia/instrucoes';
 import {
   BASE_EM_BRANCO,
@@ -12,6 +13,7 @@ import {
   explicarErroDoTreinamento,
   lerBase,
   lerListaDeBases,
+  type AbaDeErroDoTreinamento,
   type BaseDeTreinamento,
   type ListaDeBases,
 } from '@/lib/ia/treinamento';
@@ -28,7 +30,7 @@ export type Resultado<T = object> =
   | {
       ok: false;
       erro: string;
-      aba?: 'identidade' | 'regras' | 'perguntas';
+      aba?: AbaDeErroDoTreinamento;
       /** A base mudou em outro lugar depois que a tela abriu: é preciso recarregar antes de salvar. */
       desatualizada?: true;
     };
@@ -209,4 +211,49 @@ export async function verInstrucoes(baseId: unknown): Promise<Resultado<{ instru
   if (!base) return { ok: false, erro: ALGO_DEU_ERRADO };
   const instrucoes = montarInstrucoes(base, { agora: new Date(), nomeDoContato: 'Cliente de exemplo' });
   return { ok: true, instrucoes, letras: instrucoes.length };
+}
+
+/** Lê os arquivos já anexados na base e extrai códigos M01–M13, S01–S35, H01–H32 e O001+ para prévia no Estúdio. */
+export async function extrairEstudioDosArquivos(baseId: unknown): Promise<Resultado<{ resultado: ResultadoDaImportacao }>> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehId(baseId)) return { ok: false, erro: ALGO_DEU_ERRADO };
+
+  const { data, error } = await contexto.supabase.rpc('read_my_ai_agent', {
+    p_workspace_id: contexto.workspaceId,
+    p_agent_id: baseId,
+    p_include_content: true,
+  });
+  if (error) return { ok: false, erro: mensagemDoBanco('ler arquivos da base', error) };
+  const base = lerBase(data);
+  if (!base) return { ok: false, erro: ALGO_DEU_ERRADO };
+  if (base.arquivos.length === 0) return { ok: false, erro: 'Esta base ainda não tem arquivos anexados.' };
+
+  const estudio = extrairEstudioDeDocumentos(base.arquivos.map((a) => ({ titulo: a.titulo, conteudo: a.conteudo ?? '' })));
+  const total =
+    estudio.mensagensAprovadas.length +
+    estudio.habilidadesOperacionais.length +
+    estudio.habilidadesDeHumanizacao.length +
+    estudio.objecoes.length;
+  if (total === 0) {
+    return { ok: false, erro: 'Não encontrei blocos M01–M13, S01–S35, H01–H32 ou O001+ nos arquivos desta base.' };
+  }
+
+  return {
+    ok: true,
+    resultado: {
+      sugestaoIdentidade: {},
+      estudio,
+      resumo: {
+        origem: `${base.arquivos.length} arquivos anexados`,
+        mensagens: estudio.mensagensAprovadas.length,
+        skillsOperacionais: estudio.habilidadesOperacionais.length,
+        skillsHumanizacao: estudio.habilidadesDeHumanizacao.length,
+        objecoes: estudio.objecoes.length,
+        personas: 0,
+        respostasReferencia: 0,
+        perguntas: 0,
+      },
+    },
+  };
 }

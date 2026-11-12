@@ -10,6 +10,7 @@ import type { ModeloDisponivel } from '@/lib/ia/provedores';
 import {
   ATENDENTE_DE_IA_NO_AR,
   CAMPO_DO_MODELO,
+  EVENTOS_DO_ALERTA_DO_ADMIN,
   NOME_DO_PROVEDOR,
   PADRAO_DO_MOTOR,
   PROVEDORES,
@@ -17,18 +18,27 @@ import {
   conferirChave,
   doProvedor,
   situacaoDoMotor,
+  whatsappSomenteDigitos,
   type ConfiguracaoDoMotor,
+  type EventoDeAlertaDoAdmin,
   type MotorDeIa,
   type Provedor,
   type Reserva,
 } from '@/lib/ia/regras';
-import { buscarModelos, guardarChave, removerChave, salvarMotor, testarProvedor } from './acoes';
+import { buscarModelos, enviarDossieDeTeste, guardarChave, removerChave, salvarMotor, testarProvedor } from './acoes';
+
+interface ChipParaTeste {
+  id: string;
+  apelido: string;
+  telefone: string | null;
+}
 
 interface Props {
   motor: MotorDeIa | null;
   falhouAoCarregar: boolean;
   /** O servidor tem o segredo que protege as chaves? Sem ele não dá para guardar chave nenhuma. */
   cofreConfigurado: boolean;
+  chipsConectados?: ChipParaTeste[];
 }
 
 interface Recado {
@@ -102,10 +112,12 @@ function rotuloDaCriatividade(valor: number): string {
 
 const iguais = (a: ConfiguracaoDoMotor, b: ConfiguracaoDoMotor) => JSON.stringify(a) === JSON.stringify(b);
 
-export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConfigurado }: Props) {
+export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConfigurado, chipsConectados = [] }: Props) {
   const [motor, setMotor] = useState<MotorDeIa | null>(motorInicial);
   const [rascunho, setRascunho] = useState<ConfiguracaoDoMotor>(motorInicial?.configuracao ?? PADRAO_DO_MOTOR);
   const [recado, setRecado] = useState<Recado | null>(null);
+  const [recadoDossie, setRecadoDossie] = useState<Recado | null>(null);
+  const [chipTesteId, setChipTesteId] = useState<string>(chipsConectados[0]?.id ?? '');
   const [recadosDoProvedor, setRecadosDoProvedor] = useState<Partial<Record<Provedor, Recado>>>({});
   const [modelos, setModelos] = useState<Partial<Record<Provedor, ModeloDisponivel[]>>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -195,6 +207,22 @@ export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConf
     receberMotor(resposta.motor, true);
     setModelos((atuais) => ({ ...atuais, [provedor]: undefined }));
     avisarProvedor(provedor, { tipo: 'ok', texto: 'Chave removida.' });
+  }
+
+  function alternarEventoDossie(evento: EventoDeAlertaDoAdmin) {
+    const atuais = rascunho.alertaAdminEventos;
+    const proximos = atuais.includes(evento) ? atuais.filter((e) => e !== evento) : [...atuais, evento];
+    mudar({ alertaAdminEventos: proximos });
+  }
+
+  async function dispararTesteDossie() {
+    if (ocupado) return;
+    setOcupado('dossie-teste');
+    setRecadoDossie(null);
+    const resposta = await enviarDossieDeTeste(rascunho.alertaAdminWhatsapp, chipTesteId || undefined);
+    setOcupado(null);
+    if (!resposta.ok) return setRecadoDossie({ tipo: 'erro', texto: resposta.erro });
+    setRecadoDossie({ tipo: 'ok', texto: resposta.mensagem });
   }
 
   return (
@@ -449,6 +477,128 @@ export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConf
               <p className="campo-dica">Para atendimento e vendas, o melhor é ficar perto do começo da régua.</p>
             </div>
           </div>
+        </section>
+
+        <section className="panel" aria-labelledby="motor-alertas">
+          <h2 id="motor-alertas" className="panel-title">
+            Dossiê no WhatsApp do administrador
+          </h2>
+          <p className="panel-desc">
+            Sempre que a conversa entrar em modo manual, o sistema envia pelo próprio chip do atendimento um resumo completo com o
+            motivo, dados do cliente, cenário e próxima jogada sugerida.
+          </p>
+
+          <div className="motor-interruptores">
+            <Interruptor
+              titulo="Enviar dossiê completo quando a IA repassar ou parar"
+              descricao="Avisa o administrador no WhatsApp cadastrado usando o mesmo chip da conversa."
+              ligado={rascunho.alertaAdminAtivo}
+              desativado={!podeEditar}
+              aoMudar={(alertaAdminAtivo) => mudar({ alertaAdminAtivo })}
+            />
+            <Interruptor
+              titulo="Incluir as últimas mensagens do cliente no dossiê"
+              descricao="Mostra até 4 mensagens recentes do contato para você entender o contexto sem abrir o painel."
+              ligado={rascunho.alertaAdminIncluirMensagens}
+              desativado={!podeEditar || !rascunho.alertaAdminAtivo}
+              aoMudar={(alertaAdminIncluirMensagens) => mudar({ alertaAdminIncluirMensagens })}
+            />
+          </div>
+
+          <div className="motor-grade">
+            <div className="form-group">
+              <label className="form-label" htmlFor="motor-admin-whatsapp">
+                WhatsApp administrativo (DDI + DDD + número)
+              </label>
+              <input
+                id="motor-admin-whatsapp"
+                className="campo"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={20}
+                disabled={!podeEditar}
+                placeholder="5586999999999"
+                value={rascunho.alertaAdminWhatsapp}
+                onChange={(evento) => mudar({ alertaAdminWhatsapp: whatsappSomenteDigitos(evento.target.value) })}
+              />
+              <p className="campo-dica">Somente números com DDI e DDD (exemplo no Brasil: 5586981303979). O aviso não polui a Inbox.</p>
+            </div>
+
+            {podeEditar && chipsConectados.length > 0 && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="motor-admin-chip-teste">
+                  Chip para enviar dossiê de teste
+                </label>
+                <div className="linha-de-campo">
+                  <select
+                    id="motor-admin-chip-teste"
+                    className="campo"
+                    disabled={ocupado !== null}
+                    value={chipTesteId}
+                    onChange={(evento) => setChipTesteId(evento.target.value)}
+                  >
+                    {chipsConectados.map((chip) => (
+                      <option key={chip.id} value={chip.id}>
+                        {chip.apelido}
+                        {chip.telefone ? ` (${chip.telefone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={ocupado !== null || !rascunho.alertaAdminWhatsapp}
+                    onClick={() => void dispararTesteDossie()}
+                  >
+                    {ocupado === 'dossie-teste' ? 'Enviando teste…' : 'Enviar dossiê de teste'}
+                  </button>
+                </div>
+                <p className="campo-dica">Dispara uma simulação completa para você conferir o formato na hora no celular.</p>
+              </div>
+            )}
+          </div>
+
+          {podeEditar && chipsConectados.length === 0 && (
+            <div className="motor-dossie-teste-sem-chip">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={ocupado !== null || !rascunho.alertaAdminWhatsapp}
+                onClick={() => void dispararTesteDossie()}
+              >
+                {ocupado === 'dossie-teste' ? 'Enviando teste…' : 'Enviar dossiê de teste'}
+              </button>
+            </div>
+          )}
+
+          {recadoDossie && (
+            <p className={`aviso aviso--${recadoDossie.tipo}`} role="status">
+              {recadoDossie.texto}
+            </p>
+          )}
+
+          <fieldset className="motor-eventos-dossie" disabled={!podeEditar || !rascunho.alertaAdminAtivo}>
+            <legend className="form-label">Quando disparar o dossiê</legend>
+            <div className="motor-eventos-grade">
+              {EVENTOS_DO_ALERTA_DO_ADMIN.map((item) => {
+                const marcado = rascunho.alertaAdminEventos.includes(item.valor);
+                return (
+                  <label key={item.valor} className="motor-evento-item">
+                    <input
+                      type="checkbox"
+                      checked={marcado}
+                      onChange={() => alternarEventoDossie(item.valor)}
+                    />
+                    <span>
+                      <strong>{item.rotulo}</strong>
+                      <small>{item.descricao}</small>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
         </section>
 
         {podeEditar && (

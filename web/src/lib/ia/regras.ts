@@ -81,6 +81,23 @@ export function tipoDoAnexo(tipoDoConteudo: string): TipoDeAnexo {
   return 'documento';
 }
 
+export type EventoDeAlertaDoAdmin = 'handoff' | 'silent_handoff' | 'uncertain_send' | 'error' | 'safety';
+
+export const EVENTOS_DO_ALERTA_DO_ADMIN: ReadonlyArray<{ valor: EventoDeAlertaDoAdmin; rotulo: string; descricao: string }> = [
+  { valor: 'handoff', rotulo: 'Repasses para humano', descricao: 'Sempre que a IA usar [[CHAMAR_HUMANO]] ou disparar um gatilho configurado.' },
+  { valor: 'silent_handoff', rotulo: 'Pausas silenciosas', descricao: 'Quando a IA entrar em silêncio por mensagem solta ou mídia sem leitura.' },
+  { valor: 'uncertain_send', rotulo: 'Envio sem confirmação', descricao: 'Quando a Evolution responder sem confirmar se a mensagem saiu.' },
+  { valor: 'error', rotulo: 'Falhas da IA', descricao: 'Quando nenhum provedor responder ou ocorrer erro inesperado no turno.' },
+  { valor: 'safety', rotulo: 'Parada de segurança', descricao: 'Quando houver muitas mensagens seguidas (proteção contra loop ou robô).' },
+];
+
+export const TODOS_EVENTOS_DO_ALERTA: readonly EventoDeAlertaDoAdmin[] = ['handoff', 'silent_handoff', 'uncertain_send', 'error', 'safety'];
+
+export const ehEventoDeAlerta = (valor: unknown): valor is EventoDeAlertaDoAdmin =>
+  typeof valor === 'string' && (TODOS_EVENTOS_DO_ALERTA as readonly string[]).includes(valor);
+
+export const whatsappSomenteDigitos = (valor: unknown): string => (typeof valor === 'string' ? valor.replace(/\D/g, '') : '');
+
 export interface ConfiguracaoDoMotor {
   /** O provedor que responde. */
   provedor: Provedor;
@@ -103,6 +120,14 @@ export interface ConfiguracaoDoMotor {
   pausarQuandoHumanoResponde: boolean;
   /** Por quanto tempo a IA fica parada depois que uma pessoa respondeu. */
   minutosDePausa: number;
+  /** Enviar dossiê completo no WhatsApp administrativo sempre que a conversa entrar em modo manual. */
+  alertaAdminAtivo: boolean;
+  /** Número administrativo só com dígitos (ex.: 5586999999999). */
+  alertaAdminWhatsapp: string;
+  /** Quais situações disparam o dossiê administrativo. */
+  alertaAdminEventos: EventoDeAlertaDoAdmin[];
+  /** Incluir as últimas mensagens do cliente dentro do dossiê. */
+  alertaAdminIncluirMensagens: boolean;
 }
 
 export interface ChaveCadastrada {
@@ -136,6 +161,10 @@ export const PADRAO_DO_MOTOR: ConfiguracaoDoMotor = {
   dividirMensagensLongas: true,
   pausarQuandoHumanoResponde: true,
   minutosDePausa: 60,
+  alertaAdminAtivo: false,
+  alertaAdminWhatsapp: '',
+  alertaAdminEventos: [...TODOS_EVENTOS_DO_ALERTA],
+  alertaAdminIncluirMensagens: true,
 };
 
 /** Os mesmos limites que o banco confere. */
@@ -184,6 +213,10 @@ export function lerMotor(resposta: unknown): MotorDeIa {
   const chaves = objeto(dados.keys);
   const numero = (valor: unknown, padrao: number) => (typeof valor === 'number' && Number.isFinite(valor) ? valor : padrao);
   const logico = (valor: unknown, padrao: boolean) => (typeof valor === 'boolean' ? valor : padrao);
+  const eventosBrutos = Array.isArray(dados.admin_alert_events)
+    ? dados.admin_alert_events.filter((item): item is EventoDeAlertaDoAdmin => ehEventoDeAlerta(item))
+    : null;
+  const alertaWhatsapp = whatsappSomenteDigitos(dados.admin_alert_whatsapp);
   return {
     configuracao: {
       ...arrumarOrdem({
@@ -201,6 +234,13 @@ export function lerMotor(resposta: unknown): MotorDeIa {
       dividirMensagensLongas: logico(dados.split_long_messages, PADRAO_DO_MOTOR.dividirMensagensLongas),
       pausarQuandoHumanoResponde: logico(dados.pause_on_human_reply, PADRAO_DO_MOTOR.pausarQuandoHumanoResponde),
       minutosDePausa: numero(dados.human_pause_minutes, PADRAO_DO_MOTOR.minutosDePausa),
+      alertaAdminAtivo: logico(dados.admin_alert_enabled, PADRAO_DO_MOTOR.alertaAdminAtivo),
+      alertaAdminWhatsapp: /^[0-9]{10,15}$/.test(alertaWhatsapp) ? alertaWhatsapp : '',
+      alertaAdminEventos:
+        eventosBrutos !== null
+          ? Array.from(new Set(eventosBrutos))
+          : [...PADRAO_DO_MOTOR.alertaAdminEventos],
+      alertaAdminIncluirMensagens: logico(dados.admin_alert_include_messages, PADRAO_DO_MOTOR.alertaAdminIncluirMensagens),
     },
     chaves: { gemini: lerChave(chaves.gemini), openrouter: lerChave(chaves.openrouter), nvidia: lerChave(chaves.nvidia) },
     podeEditar: dados.can_edit === true,
@@ -224,6 +264,10 @@ export function configuracaoParaOBanco(configuracao: ConfiguracaoDoMotor): Json 
     split_long_messages: configuracao.dividirMensagensLongas,
     pause_on_human_reply: configuracao.pausarQuandoHumanoResponde,
     human_pause_minutes: configuracao.minutosDePausa,
+    admin_alert_enabled: configuracao.alertaAdminAtivo,
+    admin_alert_whatsapp: configuracao.alertaAdminWhatsapp,
+    admin_alert_events: configuracao.alertaAdminEventos,
+    admin_alert_include_messages: configuracao.alertaAdminIncluirMensagens,
   };
 }
 
@@ -269,6 +313,23 @@ export function conferirConfiguracao(entrada: unknown): Conferencia {
     if (typeof dados[campo] !== 'boolean') return { ok: false, erro: 'Não foi possível ler as opções de comportamento. Atualize a página.' };
   }
 
+  const alertaAdminAtivo = dados.alertaAdminAtivo === true;
+  const alertaAdminIncluirMensagens = dados.alertaAdminIncluirMensagens !== false;
+  const alertaAdminWhatsapp = whatsappSomenteDigitos(dados.alertaAdminWhatsapp);
+  if (alertaAdminWhatsapp !== '' && !/^[0-9]{10,15}$/.test(alertaAdminWhatsapp)) {
+    return { ok: false, erro: 'Informe o WhatsApp administrativo completo (DDI + DDD + número, com 10 a 15 dígitos). Exemplo: 5586999999999.' };
+  }
+  if (alertaAdminAtivo && !alertaAdminWhatsapp) {
+    return { ok: false, erro: 'Digite o WhatsApp administrativo antes de ativar o envio automático de dossiês.' };
+  }
+  const eventosEntrada = Array.isArray(dados.alertaAdminEventos)
+    ? dados.alertaAdminEventos.filter((item): item is EventoDeAlertaDoAdmin => ehEventoDeAlerta(item))
+    : [...TODOS_EVENTOS_DO_ALERTA];
+  const alertaAdminEventos = Array.from(new Set(eventosEntrada));
+  if (alertaAdminAtivo && alertaAdminEventos.length === 0) {
+    return { ok: false, erro: 'Escolha ao menos um motivo para disparar o dossiê administrativo.' };
+  }
+
   return {
     ok: true,
     configuracao: {
@@ -283,6 +344,10 @@ export function conferirConfiguracao(entrada: unknown): Conferencia {
       dividirMensagensLongas: dados.dividirMensagensLongas === true,
       pausarQuandoHumanoResponde: dados.pausarQuandoHumanoResponde === true,
       minutosDePausa,
+      alertaAdminAtivo,
+      alertaAdminWhatsapp,
+      alertaAdminEventos,
+      alertaAdminIncluirMensagens,
     },
   };
 }

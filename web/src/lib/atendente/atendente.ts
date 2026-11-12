@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { montarDossieParaAdmin } from '@/lib/atendente/dossie';
 import {
   cortarRecado,
   dividirResposta,
@@ -14,6 +15,7 @@ import {
   tempoDeDigitacao,
   LIMITE_DO_ARQUIVO_PARA_A_IA,
   type ArquivoDoHistorico,
+  type MensagemDoHistorico,
 } from '@/lib/atendente/regras';
 import { enviarTexto, type ResultadoDoEnvio } from '@/lib/evolution/cliente';
 import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
@@ -28,6 +30,8 @@ import {
   modeloDoProvedor,
   ordemDeUso,
   provedorRecebe,
+  type ConfiguracaoDoMotor,
+  type EventoDeAlertaDoAdmin,
   type MotivoDoErroDeIa,
   type Provedor,
 } from '@/lib/ia/regras';
@@ -163,7 +167,7 @@ async function fechar(vez: Vez, desfecho: DesfechoNoBanco, extras: { detalhe?: s
   }
 }
 
-type Pega = { pega: true; pacote: Json } | { pega: false; motivo: string };
+type Pega = { pega: true; pacote: Json } | { pega: false; motivo: string; alertaSeguranca?: boolean };
 
 /** Espera o cliente terminar de escrever e pega a vez. */
 async function pegarVez(ambiente: Ambiente, pedido: PedidoDeVez): Promise<Pega> {
@@ -190,9 +194,123 @@ async function pegarVez(ambiente: Ambiente, pedido: PedidoDeVez): Promise<Pega> 
       await dormir(pausa);
       continue;
     }
-    return { pega: false, motivo: texto(resposta.reason) ? `${resultado}:${texto(resposta.reason)}` : resultado || 'desconhecido' };
+    return {
+      pega: false,
+      motivo: texto(resposta.reason) ? `${resultado}:${texto(resposta.reason)}` : resultado || 'desconhecido',
+      alertaSeguranca: resultado === 'handed_off' && texto(resposta.reason) === 'rate_limit',
+    };
   }
   return { pega: false, motivo: 'ocupada' };
+}
+
+/**
+ * Envia o dossiê completo para o WhatsApp administrativo usando o próprio chip da conversa.
+ * Só dispara quando os alertas estão ativos nas configurações da conta e o motivo está habilitado.
+ * Falhas aqui são só registradas no servidor para nunca derrubar o fluxo principal do atendimento.
+ */
+async function despacharDossieParaAdmin(params: {
+  ambiente: Ambiente;
+  workspaceId: string;
+  vezId: string;
+  motor: ConfiguracaoDoMotor;
+  dadosDaConversa: Json;
+  mensagens: readonly MensagemDoHistorico[];
+  tipo: EventoDeAlertaDoAdmin;
+  detalhe?: string;
+  recado?: string;
+}): Promise<void> {
+  const { ambiente, workspaceId, vezId, motor, dadosDaConversa, mensagens, tipo, detalhe, recado } = params;
+  if (!motor.alertaAdminAtivo) return;
+  if (!/^[0-9]{10,15}$/.test(motor.alertaAdminWhatsapp)) return;
+  if (!motor.alertaAdminEventos.includes(tipo)) return;
+
+  const instanceId = texto(dadosDaConversa.instance_id);
+  const chip = texto(dadosDaConversa.provider_instance_name);
+  if (!instanceId || !chip) return;
+
+  const agora = ambiente.agora ?? Date.now;
+  const sobra = ambiente.prazo - agora();
+  if (sobra < 2_500) return;
+
+  const dossie = montarDossieParaAdmin({
+    tipo,
+    agora: new Date(agora()),
+    nomeDoContato: texto(dadosDaConversa.contact_name) || null,
+    telefoneDoContato: texto(dadosDaConversa.contact_phone) || null,
+    emailDoContato: texto(dadosDaConversa.contact_email) || null,
+    recipientJid: texto(dadosDaConversa.recipient) || null,
+    nomeDoChip: texto(dadosDaConversa.instance_label) || null,
+    telefoneDoChip: texto(dadosDaConversa.instance_phone) || null,
+    recado: recado ?? null,
+    detalhe: detalhe ?? null,
+    mensagens,
+    incluirMensagens: motor.alertaAdminIncluirMensagens,
+  });
+
+  try {
+    const { data: deliveryId, error: erroInicio } = await ambiente.supabase.rpc('start_admin_alert_delivery', {
+      p_workspace_id: workspaceId,
+      p_turn_id: vezId,
+      p_conversation_id: texto(dadosDaConversa.id) || null,
+      p_instance_id: instanceId,
+      p_kind: tipo,
+      p_recipient_whatsapp: motor.alertaAdminWhatsapp,
+      p_body_prefix: dossie.slice(0, 120),
+    });
+    if (erroInicio || typeof deliveryId !== 'string' || !deliveryId) {
+      if (erroInicio) {
+        console.error('[atendente] não foi possível registrar envio do dossiê ao admin:', { vezId, erro: erroInicio.message });
+      }
+      return;
+    }
+
+    const envio = await enviarTexto(chip, motor.alertaAdminWhatsapp, dossie, {
+      digitandoMs: 0,
+      tempoLimite: Math.max(Math.min(12_000, sobra - 500), 3_000),
+    });
+
+    await ambiente.supabase.rpc('finish_admin_alert_delivery', {
+      p_workspace_id: workspaceId,
+      p_delivery_id: deliveryId,
+      p_status: envio.situacao === 'enviada' ? 'sent' : envio.situacao === 'nao_enviada' ? 'failed' : 'uncertain',
+      p_provider_message_id: envio.situacao === 'enviada' ? envio.idNoWhatsApp : null,
+      p_error_detail:
+        envio.situacao === 'nao_enviada'
+          ? envio.motivo
+          : envio.situacao === 'incerta'
+            ? envio.detalhe
+            : null,
+    });
+  } catch (erro) {
+    console.error('[atendente] erro ao enviar dossiê administrativo:', { vezId, tipo, erro: erro instanceof Error ? erro.message : String(erro) });
+  }
+}
+
+async function notificarSegurancaDoAdmin(ambiente: Ambiente, workspaceId: string, vezId: string): Promise<void> {
+  try {
+    const { data, error } = await ambiente.supabase.rpc('read_admin_alert_context', {
+      p_workspace_id: workspaceId,
+      p_turn_id: vezId,
+    });
+    if (error || !data) return;
+    const ctx = objeto(data);
+    const motor = lerMotor(ctx.settings).configuracao;
+    const dadosDaConversa = objeto(ctx.conversation);
+    const historico = lerHistorico(ctx.messages);
+    await despacharDossieParaAdmin({
+      ambiente,
+      workspaceId,
+      vezId,
+      motor,
+      dadosDaConversa,
+      mensagens: historico,
+      tipo: 'safety',
+      detalhe: 'rate_limit',
+      recado: 'A IA respondeu muitas vezes em pouco tempo nesta conversa e parou por segurança. Pode haver um robô do outro lado.',
+    });
+  } catch (erro) {
+    console.error('[atendente] erro ao buscar contexto de segurança para dossiê:', { vezId, erro: String(erro) });
+  }
 }
 
 /** Lê do depósito o arquivo que vai junto com o pedido à IA. `null` quando não deu para ler. */
@@ -228,8 +346,26 @@ type Fim =
 
 const fim = (desfecho: Desfecho): Fim => ({ tipo: 'fim', desfecho });
 
-async function falhar(vez: Vez, detalhe: string, recado: string): Promise<Fim> {
+async function falhar(
+  vez: Vez,
+  detalhe: string,
+  recado: string,
+  alerta?: { motor: ConfiguracaoDoMotor; dadosDaConversa: Json; mensagens: readonly MensagemDoHistorico[] },
+): Promise<Fim> {
   await fechar(vez, 'failed', { detalhe, recado });
+  if (alerta) {
+    await despacharDossieParaAdmin({
+      ambiente: vez.ambiente,
+      workspaceId: vez.workspaceId,
+      vezId: vez.vezId,
+      motor: alerta.motor,
+      dadosDaConversa: alerta.dadosDaConversa,
+      mensagens: alerta.mensagens,
+      tipo: 'error',
+      detalhe,
+      recado,
+    });
+  }
   return fim({ desfecho: 'falhou', motivo: detalhe });
 }
 
@@ -257,15 +393,18 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
   const dadosDaConversa = objeto(pacote.conversation);
 
   const cofre = lerChaveDoCofre();
+  const historicoInicial = lerHistorico(pacote.messages);
+  const contextoAlerta = { motor, dadosDaConversa, mensagens: historicoInicial };
+
   if (!cofre) {
-    return falhar(vez, 'no_vault', 'O painel está sem o segredo que protege as chaves de IA neste ambiente. Avise o suporte.');
+    return falhar(vez, 'no_vault', 'O painel está sem o segredo que protege as chaves de IA neste ambiente. Avise o suporte.', contextoAlerta);
   }
   const base = lerBase(pacote.agent);
   if (!base) {
-    return falhar(vez, 'no_training', 'Ainda não existe uma base de treinamento. Preencha a aba Treinamento.');
+    return falhar(vez, 'no_training', 'Ainda não existe uma base de treinamento. Preencha a aba Treinamento.', contextoAlerta);
   }
 
-  const historico = lerHistorico(pacote.messages);
+  const historico = historicoInicial;
   const pendentes = mensagensPendentes(historico);
   if (pendentes.length === 0) {
     // Alguém já respondeu depois da mensagem que marcou a vez: não há o que responder.
@@ -289,8 +428,8 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
   if (comChave.length === 0) {
     const principal = ordem[0]!;
     return naoAbrem.includes(principal)
-      ? falhar(vez, 'key_unreadable', `A chave ${doProvedor(principal)} guardada não abre mais. Cadastre a chave de novo no Motor de IA.`)
-      : falhar(vez, 'no_key', `Falta a chave ${doProvedor(principal)} no Motor de IA.`);
+      ? falhar(vez, 'key_unreadable', `A chave ${doProvedor(principal)} guardada não abre mais. Cadastre a chave de novo no Motor de IA.`, contextoAlerta)
+      : falhar(vez, 'no_key', `Falta a chave ${doProvedor(principal)} no Motor de IA.`, contextoAlerta);
   }
 
   // Arquivo (foto, áudio ou PDF) que acompanha as mensagens pendentes.
@@ -321,11 +460,20 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
   const semLeitura = porQueNaoDaParaLer(pendentes, entregue, motivoDeNaoEntregar);
   if (semLeitura) {
     await fechar(vez, 'silent_handoff', { detalhe: 'unreadable_media', recado: semLeitura });
+    await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'silent_handoff', detalhe: 'unreadable_media', recado: semLeitura });
     return fim({ desfecho: 'passou', motivo: 'arquivo_sem_leitura' });
   }
 
   const conversa = montarConversa(historico, entregue);
-  let instrucoes = montarInstrucoes(base, { agora: new Date(agora()), nomeDoContato: texto(dadosDaConversa.contact_name) || null });
+  const falasCliente = historico.filter((m) => m.recebida).map((m) => m.texto).filter(Boolean);
+  let instrucoes = montarInstrucoes(base, {
+    agora: new Date(agora()),
+    nomeDoContato: texto(dadosDaConversa.contact_name) || null,
+    mensagemAtual: pendentes.map((m) => m.texto).filter(Boolean).join(' ').trim() || falasCliente.at(-1) || '',
+    historicoRecente: falasCliente.slice(-5),
+    temAudio: Boolean(anexo && anexo.tipo.startsWith('audio/')),
+    temFoto: Boolean(anexo && anexo.tipo.startsWith('image/')),
+  });
   if (conversa.abertura) instrucoes = `${instrucoes}\n\n${instrucaoDaAbertura(conversa.abertura)}`;
 
   // Pede a resposta: o principal primeiro; se falhar, a reserva; depois a segunda reserva.
@@ -374,26 +522,29 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
   if (!resposta || !usado) {
     const tentativas = vez.meta.attempts;
     if (tentativas.length === 0) {
-      return falhar(vez, 'no_time', 'Não deu tempo de pedir a resposta ao provedor.');
+      return falhar(vez, 'no_time', 'Não deu tempo de pedir a resposta ao provedor.', contextoAlerta);
     }
     // Foto que nenhum modelo da ordem de uso enxerga: não é defeito, é só um arquivo que a IA não lê.
     if (anexo && tentativas.every((tentativa) => tentativa.error === 'nao_suportado')) {
+      const recadoFoto = 'O contato mandou uma foto, e o modelo escolhido no Motor de IA não enxerga fotos.';
       await fechar(vez, 'silent_handoff', {
         detalhe: 'unreadable_media',
-        recado: 'O contato mandou uma foto, e o modelo escolhido no Motor de IA não enxerga fotos.',
+        recado: recadoFoto,
       });
+      await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'silent_handoff', detalhe: 'unreadable_media', recado: recadoFoto });
       return fim({ desfecho: 'passou', motivo: 'arquivo_sem_leitura' });
     }
     const primeira = tentativas[0]!;
     const explicacao = explicarErroDeIa(primeira.error, primeira.provider, primeira.model);
     const outras = tentativas.length > 1 ? ` ${tentativas.length === 2 ? 'A reserva também falhou' : 'As reservas também falharam'}.` : '';
-    return falhar(vez, primeira.error, `${explicacao}${outras}${faltouTempo ? ' Não deu tempo de tentar a próxima reserva.' : ''}`);
+    return falhar(vez, primeira.error, `${explicacao}${outras}${faltouTempo ? ' Não deu tempo de tentar a próxima reserva.' : ''}`, contextoAlerta);
   }
 
   const lida = lerResposta(resposta.texto);
 
   if (lida.pausaSilenciosa !== null) {
     await fechar(vez, 'silent_handoff', { detalhe: 'silent_pause', recado: lida.pausaSilenciosa });
+    await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'silent_handoff', detalhe: 'silent_pause', recado: lida.pausaSilenciosa });
     return fim({ desfecho: 'passou', motivo: 'pausa_silenciosa' });
   }
   if (lida.silencioDeCortesia) {
@@ -410,7 +561,7 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
 
   const baloes = dividirResposta(lida.texto, motor.dividirMensagensLongas);
   if (baloes === null) {
-    return falhar(vez, 'reply_too_long', 'A IA escreveu uma resposta grande demais para o WhatsApp. Nada foi enviado.');
+    return falhar(vez, 'reply_too_long', 'A IA escreveu uma resposta grande demais para o WhatsApp. Nada foi enviado.', contextoAlerta);
   }
 
   let enviados = 0;
@@ -438,6 +589,7 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     if (resultado !== 'started') {
       // Este balão já tinha sido começado por outro pedido. Não dá para saber se saiu: nunca envia de novo.
       await fechar(vez, 'uncertain_send', { detalhe: 'part_already_started', recado: RECADO_DO_ENVIO_INCERTO });
+      await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'uncertain_send', detalhe: 'part_already_started', recado: RECADO_DO_ENVIO_INCERTO });
       return fim({ desfecho: 'passou', motivo: 'envio_incerto' });
     }
 
@@ -474,10 +626,21 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     if (envio.situacao === 'incerta') {
       console.error('[atendente] envio sem confirmação:', { vez: vez.vezId, mensagem: mensagemId, detalhe: envio.detalhe });
       await fechar(vez, 'uncertain_send', { detalhe: `uncertain_part_${indice + 1}`, recado: RECADO_DO_ENVIO_INCERTO });
+      await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'uncertain_send', detalhe: `uncertain_part_${indice + 1}`, recado: RECADO_DO_ENVIO_INCERTO });
       return fim({ desfecho: 'passou', motivo: 'envio_incerto' });
     }
     if (envio.situacao === 'nao_enviada') {
-      await fechar(vez, 'failed', { detalhe: `not_sent:${envio.motivo}`, recado: recadoDoEnvioQueNaoSaiu(envio.motivo) });
+      const recadoNaoSaiu = recadoDoEnvioQueNaoSaiu(envio.motivo);
+      await fechar(vez, 'failed', { detalhe: `not_sent:${envio.motivo}`, recado: recadoNaoSaiu });
+      await despacharDossieParaAdmin({
+        ...contextoAlerta,
+        ambiente,
+        workspaceId,
+        vezId: vez.vezId,
+        tipo: 'error',
+        detalhe: `not_sent:${envio.motivo}`,
+        recado: recadoNaoSaiu,
+      });
       return fim({ desfecho: 'falhou', motivo: `nao_enviada:${envio.motivo}` });
     }
     enviados += 1;
@@ -493,15 +656,17 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     return fim({ desfecho: 'encerrou', motivo: 'recusa' });
   }
   if (recadoDoRepasse !== null) {
+    const detalheRepasse = lida.foraDoAlcance.length > 0 ? `unsupported:${lida.foraDoAlcance.join(',')}` : 'asked';
     await fechar(vez, 'handoff', {
-      detalhe: lida.foraDoAlcance.length > 0 ? `unsupported:${lida.foraDoAlcance.join(',')}` : 'asked',
+      detalhe: detalheRepasse,
       recado: recadoDoRepasse,
       trava: base.travaAteRetomar,
     });
+    await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'handoff', detalhe: detalheRepasse, recado: recadoDoRepasse });
     return fim({ desfecho: 'passou', motivo: lida.foraDoAlcance.length > 0 ? 'comando_fora_do_alcance' : 'a_ia_pediu' });
   }
   if (enviados === 0) {
-    return falhar(vez, 'empty_reply', `${provedorComArtigo(usado)} devolveu uma resposta sem texto.`);
+    return falhar(vez, 'empty_reply', `${provedorComArtigo(usado)} devolveu uma resposta sem texto.`, contextoAlerta);
   }
   await fechar(vez, 'answered');
   return fim({ desfecho: 'respondeu', baloes: enviados, provedor: usado });
@@ -525,16 +690,33 @@ export async function atenderVez(ambiente: Ambiente, pedido: PedidoDeVez): Promi
       console.error('[atendente] não foi possível pegar a vez:', { vez: alvo.vezId, erro: String(erro) });
       return { desfecho: 'nada', motivo: 'banco_indisponivel' };
     }
-    if (!pega.pega) return { desfecho: 'nada', motivo: pega.motivo };
+    if (!pega.pega) {
+      if (pega.alertaSeguranca) {
+        await notificarSegurancaDoAdmin(ambiente, alvo.workspaceId, alvo.vezId);
+      }
+      return { desfecho: 'nada', motivo: pega.motivo };
+    }
 
     let resultado: Fim;
     try {
       resultado = await responder(ambiente, alvo.workspaceId, pega.pacote);
     } catch (erro) {
       console.error('[atendente] erro inesperado ao responder:', { vez: alvo.vezId, erro: erro instanceof Error ? erro.message : String(erro) });
+      const recadoErro = 'Houve um problema do nosso lado. Confira a conversa antes de responder.';
       await fechar({ ambiente, workspaceId: alvo.workspaceId, vezId: alvo.vezId, meta: { attempts: [] } }, 'failed', {
         detalhe: 'unexpected_error',
-        recado: 'Houve um problema do nosso lado. Confira a conversa antes de responder.',
+        recado: recadoErro,
+      });
+      await despacharDossieParaAdmin({
+        ambiente,
+        workspaceId: alvo.workspaceId,
+        vezId: alvo.vezId,
+        motor: lerMotor(pega.pacote.settings).configuracao,
+        dadosDaConversa: objeto(pega.pacote.conversation),
+        mensagens: lerHistorico(pega.pacote.messages),
+        tipo: 'error',
+        detalhe: 'unexpected_error',
+        recado: recadoErro,
       });
       return { desfecho: 'falhou', motivo: 'erro_inesperado' };
     }

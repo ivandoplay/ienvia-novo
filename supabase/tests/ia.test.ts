@@ -64,6 +64,10 @@ const PADROES = {
   split_long_messages: true,
   pause_on_human_reply: true,
   human_pause_minutes: 60,
+  admin_alert_enabled: false,
+  admin_alert_whatsapp: '',
+  admin_alert_events: ['handoff', 'silent_handoff', 'uncertain_send', 'error', 'safety'],
+  admin_alert_include_messages: true,
 };
 
 describe('Motor de IA: configurações', () => {
@@ -704,6 +708,67 @@ describe('Treinamento: arquivos de conhecimento', () => {
         ),
       );
       expect(sobras.rows[0]).toEqual({ perguntas: 0, arquivos: 0 });
+    });
+  });
+});
+
+describe('Fase 2: dossiê administrativo e Estúdio de Skills', () => {
+  test('dossiê administrativo: grava número e eventos válidos e recusa entradas fora do padrão', async () => {
+    await banco.comoUsuario(DONA_A, async () => {
+      // Ativar sem número é recusado pelo banco.
+      expect(await recusa('save_my_ai_settings', [LOJA_A, { admin_alert_enabled: true }])).toMatch(/admin_alert_whatsapp_required/);
+      expect(await recusa('save_my_ai_settings', [LOJA_A, { admin_alert_whatsapp: '123' }])).toMatch(/Invalid admin_alert_whatsapp/);
+      expect(await recusa('save_my_ai_settings', [LOJA_A, { admin_alert_events: ['evento_inventado'] }])).toMatch(/Invalid admin_alert_events/);
+
+      const salvo = await chamar('save_my_ai_settings', [
+        LOJA_A,
+        {
+          admin_alert_enabled: true,
+          admin_alert_whatsapp: '+55 (86) 98130-3979',
+          admin_alert_events: ['handoff', 'safety', 'handoff'],
+          admin_alert_include_messages: false,
+        },
+      ]);
+      expect(salvo).toMatchObject({
+        admin_alert_enabled: true,
+        admin_alert_whatsapp: '5586981303979',
+        admin_alert_events: ['handoff', 'safety'],
+        admin_alert_include_messages: false,
+      });
+    });
+  });
+
+  test('Estúdio (M01, S01, H01, O001, cérebro e gatilhos de repasse): grava, valida limites e devolve na leitura sem precisar p_include_content', async () => {
+    await banco.comoUsuario(DONA_A, async () => {
+      const criada = await criarBase({
+        escalation_rules: 'Pedir orçamento exato ou comprovante.',
+        approved_messages: [{ id: 'M01', title: 'Abertura', category: 'Abertura', text: 'Olá!', enabled: true }],
+        operational_skills: [{ id: 'S01', name: 'Saudação', when: 'Início', example_response: 'Oi!', body_md: '# S01', enabled: true }],
+        humanization_skills: [{ id: 'H01', name: 'Tom curto', trigger: 'Sempre', goal: 'Natural', avoid: 'Textão', bad_response: 'Caro senhor', better_response: 'Oi!', enabled: true }],
+        objections: [{ id: 'O001', input_pattern: 'Caro', nature: 'Preço', skill_id: 'S01', response_strategy: 'Qualificar', avoid: 'Desconto', enabled: true }],
+        brain_pack: { id: 'p1', name: 'Lizandro', version: '1', context_mode: 'smart', playbook_central: 'Playbook' },
+      });
+      expect(criada).toMatchObject({
+        escalation_rules: 'Pedir orçamento exato ou comprovante.',
+        approved_messages: [{ id: 'M01', title: 'Abertura' }],
+        operational_skills: [{ id: 'S01', name: 'Saudação' }],
+        humanization_skills: [{ id: 'H01', name: 'Tom curto' }],
+        objections: [{ id: 'O001', input_pattern: 'Caro' }],
+        brain_pack: { id: 'p1', name: 'Lizandro' },
+      });
+
+      // read_my_ai_agent com p_include_content = false continua trazendo os dados do Estúdio.
+      const lida = await chamar<Base>('read_my_ai_agent', [LOJA_A, criada.id, false]);
+      expect(lida).toMatchObject({
+        escalation_rules: 'Pedir orçamento exato ou comprovante.',
+        approved_messages: [{ id: 'M01' }],
+        brain_pack: { id: 'p1' },
+      });
+
+      // Recusa tipos inválidos nas colunas do Estúdio.
+      expect(await recusa('save_my_ai_agent', [LOJA_A, criada.id, { approved_messages: 'texto' }])).toMatch(/Invalid approved_messages/);
+      expect(await recusa('save_my_ai_agent', [LOJA_A, criada.id, { brain_pack: [] }])).toMatch(/Invalid brain_pack/);
+      expect(await recusa('save_my_ai_agent', [LOJA_A, criada.id, { escalation_rules: 'x'.repeat(4001) }])).toMatch(/Invalid escalation_rules/);
     });
   });
 });
