@@ -97,6 +97,7 @@ function cenarioInicial() {
     created_at: criadaEm,
     updated_at: criadaEm,
     updated_by: dona,
+    revision: 1,
   });
   const pergunta = (numero, agentId, posicao, question, answer, source = 'manual') => ({
     workspace_id: WORKSPACE_INBOX,
@@ -185,6 +186,7 @@ export const FUNCOES_DA_IA = [
   'add_my_ai_agent_document',
   'delete_my_ai_agent_document',
   'set_my_instance_ai_agent',
+  'teach_my_ai_from_message',
 ];
 
 /**
@@ -212,6 +214,7 @@ export function criarIaDoBanco({ tabelas, responder }) {
     is_default: base.is_default,
     ...Object.fromEntries(Object.keys(BASE_VAZIA).map((campo) => [campo, base[campo]])),
     updated_at: base.updated_at,
+    revision: base.revision ?? 1,
     faqs: estado.perguntas
       .filter((item) => item.agent_id === base.id)
       .sort((a, b) => a.position - b.position)
@@ -342,8 +345,13 @@ export function criarIaDoBanco({ tabelas, responder }) {
       if (!dados || typeof dados !== 'object' || Array.isArray(dados)) return invalido('agent data');
       const limpos = {};
       let perguntas = null;
+      let revisaoEsperada = null;
       for (const [campo, valor] of Object.entries(dados)) {
-        if (campo in LIMITES_DE_TEXTO) {
+        if (campo === 'expected_revision') {
+          // A revisão que a tela tinha quando abriu a base (não é um campo da base).
+          if (!Number.isInteger(valor) || valor < 1) return invalido('expected_revision');
+          revisaoEsperada = valor;
+        } else if (campo in LIMITES_DE_TEXTO) {
           if (typeof valor !== 'string' || tamanho(valor.trim()) > LIMITES_DE_TEXTO[campo]) return invalido(campo);
           limpos[campo] = valor.trim();
         } else if (LIGA_DESLIGA.includes(campo)) {
@@ -385,11 +393,14 @@ export function criarIaDoBanco({ tabelas, responder }) {
           limpos.label = 'Principal';
         }
         // A primeira base da empresa já nasce como a padrão.
-        base = { workspace_id: workspaceId, id: crypto.randomUUID(), label: limpos.label, is_default: daEmpresa.length === 0, ...BASE_VAZIA, created_at: agora() };
+        base = { workspace_id: workspaceId, id: crypto.randomUUID(), label: limpos.label, is_default: daEmpresa.length === 0, ...BASE_VAZIA, created_at: agora(), revision: 1 };
         estado.bases.push(base);
       } else {
         base = baseDaEmpresa(agentId);
         if (!base) return erro(400, 'P0002', 'Agent not found');
+        // A base mudou depois que a tela abriu (outra aba, ou uma resposta ensinada pela Inbox): recusa.
+        if (revisaoEsperada !== null && (base.revision ?? 1) !== revisaoEsperada) return erro(400, 'P0001', 'agent_changed');
+        base.revision = (base.revision ?? 1) + 1;
       }
       Object.assign(base, limpos, { updated_at: agora(), updated_by: usuario.id });
 
@@ -456,6 +467,51 @@ export function criarIaDoBanco({ tabelas, responder }) {
       if (agentId === null) estado.baseDoChip.delete(chip.id);
       else estado.baseDoChip.set(chip.id, agentId);
       return responder(res, 200, listaDeBases(workspaceId, true));
+    }
+
+    if (nome === 'teach_my_ai_from_message') {
+      const destino = corpo.p_target;
+      if (destino !== 'faq' && destino !== 'rule') return invalido('target');
+      const pergunta = String(corpo.p_question ?? '').trim();
+      const resposta = String(corpo.p_answer ?? '').trim();
+      if (destino === 'faq' && (tamanho(pergunta) < 1 || tamanho(pergunta) > 500)) return invalido('question');
+      if (tamanho(resposta) < 1 || tamanho(resposta) > (destino === 'faq' ? 2000 : 1000)) return invalido('answer');
+
+      const mensagem = tabelas.messages.find((item) => item.workspace_id === workspaceId && item.id === corpo.p_message_id);
+      if (!mensagem) return erro(400, 'P0002', 'Message not found');
+      // A base que o chip da mensagem usa; sem base própria, a padrão da empresa.
+      const escolhida = estado.baseDoChip.get(mensagem.instance_id) ?? null;
+      const base = estado.bases.find((item) => item.workspace_id === workspaceId && (escolhida ? item.id === escolhida : item.is_default));
+      if (!base) return erro(400, 'P0001', 'ai_training_missing');
+      const daBase = () => estado.perguntas.filter((item) => item.agent_id === base.id).sort((a, b) => a.position - b.position);
+
+      let resultado = 'added';
+      if (destino === 'faq') {
+        let ensinada = daBase().find((item) => item.question.toLowerCase() === pergunta.toLowerCase());
+        if (ensinada) {
+          resultado = 'replaced';
+          Object.assign(ensinada, { question: pergunta, answer: resposta, source: 'correction' });
+        } else {
+          if (daBase().length >= 100) return erro(400, 'P0001', 'faq_limit_reached');
+          ensinada = { workspace_id: workspaceId, agent_id: base.id, id: crypto.randomUUID(), position: 0, question: pergunta, answer: resposta, source: 'correction' };
+          estado.perguntas.push(ensinada);
+        }
+        // A pergunta ensinada passa a ser a primeira; as outras continuam na ordem em que estavam.
+        [ensinada, ...daBase().filter((item) => item !== ensinada)].forEach((item, posicao) => {
+          item.position = posicao;
+        });
+      } else {
+        const linha = `- ${resposta.replace(/\s+/g, ' ')}`;
+        if (base.golden_rules.toLowerCase().includes(linha.toLowerCase())) {
+          return responder(res, 200, { agent_id: base.id, agent_label: base.label, target: destino, result: 'unchanged', revision: base.revision ?? 1 });
+        }
+        const regras = base.golden_rules === '' ? linha : `${base.golden_rules}\n${linha}`;
+        if (tamanho(regras) > 8000) return erro(400, 'P0001', 'rules_limit_reached');
+        base.golden_rules = regras;
+      }
+      base.revision = (base.revision ?? 1) + 1;
+      Object.assign(base, { updated_at: agora(), updated_by: usuario.id });
+      return responder(res, 200, { agent_id: base.id, agent_label: base.label, target: destino, result: resultado, revision: base.revision });
     }
 
     return erro(404, 'PGRST202', `Função não imitada: ${nome}`);

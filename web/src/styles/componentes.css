@@ -480,6 +480,9 @@
   font-size: 12px;
   line-height: 1.5;
 }
+.campo-dica--erro {
+  color: var(--danger-text);
+}
 .linha-de-campo {
   display: flex;
   gap: 8px;

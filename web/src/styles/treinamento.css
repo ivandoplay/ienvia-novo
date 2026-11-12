@@ -148,8 +148,20 @@ a.treino-base:hover {
   border-radius: var(--radius-md);
   background: var(--bg-card-subtle);
 }
-.treino-pergunta-campos .form-group:last-child {
+.treino-pergunta-campos .form-group:last-of-type {
   margin-bottom: 0;
+}
+/* "Veio de uma resposta ensinada pela Inbox." */
+.treino-pergunta-origem {
+  margin-top: 6px;
+}
+/* A dica de que dá para ensinar pela conversa, acima da lista de perguntas. */
+.treino-dica-da-inbox {
+  margin: 0 0 12px;
+}
+.treino-dica-da-inbox a {
+  color: var(--text-main);
+  text-decoration: underline;
 }
 .treino-perguntas li > .btn {
   margin-top: 22px;
@@ -195,10 +207,6 @@ a.treino-base:hover {
   margin-right: auto;
   color: var(--text-secondary);
   font-size: 12px;
-}
-
-.campo-dica--erro {
-  color: var(--danger-text);
 }
 
 /* Modelos prontos, dentro da janela. */

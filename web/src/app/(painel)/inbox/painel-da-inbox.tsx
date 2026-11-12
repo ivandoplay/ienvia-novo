@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import type { FaixaDaIa } from '@/lib/atendente/painel';
 import type { ArquivoDaMensagem, ChipDaInbox, ConversaAberta, FiltrosDaInbox, ListaDaInbox, MensagemDaConversa } from '@/lib/dados/inbox';
 import { plural } from '@/lib/formato';
+import { mensagensQueEnsinam, sugerirEnsino, type SugestaoDeEnsino } from '@/lib/ia/ensino';
 import {
   LEGENDA_MAXIMA,
   LIMITE_DE_DOCUMENTO,
@@ -42,6 +43,7 @@ import {
   prepararEnvioDeArquivo,
   type ResultadoDoEnvio,
 } from './acoes';
+import { JanelaDeEnsino } from './janela-de-ensino';
 
 interface Props {
   workspaceId: string;
@@ -83,7 +85,7 @@ interface Pendente {
 }
 
 interface Aviso {
-  tipo: 'erro' | 'atencao';
+  tipo: 'erro' | 'atencao' | 'ok';
   texto: string;
 }
 
@@ -860,6 +862,8 @@ function Conversa({
   const [buscando, setBuscando] = useState<string | null>(null);
   /** Texto colocado no campo por um "tentar de novo". Cada pedido tem um número, para o campo recomeçar. */
   const [preenchimento, setPreenchimento] = useState<{ texto: string; vez: number } | null>(null);
+  /** A resposta que o dono está guardando no Treinamento ("corrigir resposta em 1 clique"). */
+  const [ensinando, setEnsinando] = useState<{ mensagemId: string; sugestao: SugestaoDeEnsino } | null>(null);
 
   const titulo = useRef<HTMLHeadingElement>(null);
   const rolagem = useRef<HTMLDivElement>(null);
@@ -987,6 +991,16 @@ function Conversa({
     [aoAvisar, conversa.id, router],
   );
 
+  // Só o dono da conta altera o treinamento: para o resto da equipe o botão nem aparece.
+  const ensinaveis = useMemo(() => (ehDono ? mensagensQueEnsinam(conversa.mensagens) : null), [ehDono, conversa.mensagens]);
+  const abrirEnsino = useCallback(
+    (mensagemId: string) => {
+      const sugestao = sugerirEnsino(conversa.mensagens, mensagemId);
+      if (sugestao) setEnsinando({ mensagemId, sugestao });
+    },
+    [conversa.mensagens],
+  );
+
   const anteriores = conversa.temMensagensAnteriores ? proximoLimiteDeMensagens(limiteDeMensagens) : null;
   const podeResponder = impedimento === null;
 
@@ -1075,6 +1089,8 @@ function Conversa({
             aoEscreverDeNovo={escreverDeNovo}
             aoAbrirFoto={setFotoAberta}
             aoBuscarArquivo={buscarDeNovo}
+            ensinaveis={ensinaveis}
+            aoEnsinar={abrirEnsino}
           />
 
           {meusPendentes.length > 0 ? (
@@ -1091,7 +1107,7 @@ function Conversa({
         </div>
 
         {aviso ? (
-          <p className={`aviso ${aviso.tipo === 'erro' ? 'aviso--erro' : 'aviso--atencao'} inbox-aviso`} role="alert">
+          <p className={`aviso aviso--${aviso.tipo} inbox-aviso`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>
             <span>{aviso.texto}</span>
             <button type="button" className="inbox-aviso-fechar" onClick={() => aoAvisar(conversa.id, null)}>
               <Icone nome="fechar" className="icon-15" />
@@ -1131,6 +1147,19 @@ function Conversa({
         <Dialogo titulo="Dados do contato" aoFechar={() => setContatoAberto(false)}>
           <CartaoDoContato conversa={conversa} etapa={etapa.texto} estadoDoChip={chipRemovido ? 'Removido' : estadoDoChip.texto} />
         </Dialogo>
+      ) : null}
+
+      {ensinando ? (
+        <JanelaDeEnsino
+          mensagemId={ensinando.mensagemId}
+          sugestao={ensinando.sugestao}
+          chip={conversa.chip.apelido}
+          aoFechar={() => setEnsinando(null)}
+          aoGuardar={(texto) => {
+            setEnsinando(null);
+            aoAvisar(conversa.id, { tipo: 'ok', texto });
+          }}
+        />
       ) : null}
 
       {fotoAberta ? (
@@ -1199,6 +1228,9 @@ interface PropsDasMensagens {
   aoEscreverDeNovo: (texto: string) => void;
   aoAbrirFoto: (foto: FotoAberta) => void;
   aoBuscarArquivo: (mensagemId: string) => void;
+  /** As mensagens que têm o botão de ensinar a IA. `null` = quem está olhando não altera o treinamento. */
+  ensinaveis: ReadonlySet<string> | null;
+  aoEnsinar: (mensagemId: string) => void;
 }
 
 /** As mensagens que vêm do banco. Fica separado (e memorizado) para digitar no campo não redesenhar tudo. */
@@ -1212,6 +1244,8 @@ const Mensagens = memo(function Mensagens({
   aoEscreverDeNovo,
   aoAbrirFoto,
   aoBuscarArquivo,
+  ensinaveis,
+  aoEnsinar,
 }: PropsDasMensagens) {
   if (mensagens.length === 0) return null;
   return (
@@ -1277,6 +1311,14 @@ const Mensagens = memo(function Mensagens({
                 <div className="balao-botoes">
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => aoEscreverDeNovo(mensagem.texto)}>
                     Escrever de novo
+                  </button>
+                </div>
+              ) : null}
+
+              {ensinaveis?.has(mensagem.id) ? (
+                <div className="balao-ensinar">
+                  <button type="button" className="balao-ensinar-botao" onClick={() => aoEnsinar(mensagem.id)}>
+                    {mensagem.autor === 'IA' ? 'Corrigir resposta' : 'Ensinar à IA'}
                   </button>
                 </div>
               ) : null}

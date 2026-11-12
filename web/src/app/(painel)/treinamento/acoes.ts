@@ -23,7 +23,15 @@ import { criarClienteServidor } from '@/lib/supabase/servidor';
  * o banco confere de novo se a pessoa é a dona da conta antes de aceitar qualquer mudança.
  */
 
-export type Resultado<T = object> = ({ ok: true } & T) | { ok: false; erro: string; aba?: 'identidade' | 'regras' | 'perguntas' };
+export type Resultado<T = object> =
+  | ({ ok: true } & T)
+  | {
+      ok: false;
+      erro: string;
+      aba?: 'identidade' | 'regras' | 'perguntas';
+      /** A base mudou em outro lugar depois que a tela abriu: é preciso recarregar antes de salvar. */
+      desatualizada?: true;
+    };
 
 type Supabase = Awaited<ReturnType<typeof criarClienteServidor>>;
 
@@ -71,16 +79,26 @@ async function devolverBase(contexto: Contexto, dados: unknown): Promise<ComBase
   return { ok: true, base, lista: await lerLista(contexto) };
 }
 
-/** Grava os campos de uma base (identidade, regras e perguntas frequentes). */
-export async function salvarBase(baseId: unknown, campos: unknown): Promise<ComBase> {
+/**
+ * Grava os campos de uma base (identidade, regras e perguntas frequentes).
+ *
+ * `revisao` é a revisão da base que a tela tinha quando abriu. A lista de perguntas enviada substitui
+ * a lista inteira; por isso, se a base mudou nesse meio-tempo (outra aba, ou uma resposta ensinada pela
+ * Inbox), o banco recusa a gravação em vez de apagar a mudança mais nova.
+ */
+export async function salvarBase(baseId: unknown, campos: unknown, revisao?: unknown): Promise<ComBase> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
   if (!ehId(baseId)) return { ok: false, erro: ALGO_DEU_ERRADO };
   const conferida = conferirBase(campos);
   if (!conferida.ok) return { ok: false, erro: conferida.erro, aba: conferida.aba };
 
-  const { data, error } = await contexto.supabase.rpc('save_my_ai_agent', { p_workspace_id: contexto.workspaceId, p_agent_id: baseId, p_data: conferida.paraOBanco });
-  if (error) return { ok: false, erro: mensagemDoBanco('gravar a base', error) };
+  const dados = typeof revisao === 'number' && Number.isInteger(revisao) && revisao >= 1 ? { ...conferida.paraOBanco, expected_revision: revisao } : conferida.paraOBanco;
+  const { data, error } = await contexto.supabase.rpc('save_my_ai_agent', { p_workspace_id: contexto.workspaceId, p_agent_id: baseId, p_data: dados });
+  if (error) {
+    const erro = mensagemDoBanco('gravar a base', error);
+    return error.message === 'agent_changed' ? { ok: false, erro, desatualizada: true } : { ok: false, erro };
+  }
   return devolverBase(contexto, data);
 }
 

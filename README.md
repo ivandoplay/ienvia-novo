@@ -9,13 +9,15 @@ as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do 
 
 **Situação:** Fase 0 (fundação) pronta. Fase 1 pronta no código e no banco: a aba **Instâncias**
 (conectar chips), o recebimento das mensagens e a **Inbox** com texto e com arquivos (fotos, áudios,
-vídeos, documentos e figurinhas). Fase 2 em andamento: as abas **Motor de IA** e **Treinamento** e o
+vídeos, documentos e figurinhas). Fase 2 em andamento: as abas **Motor de IA** e **Treinamento**, o
 **atendente de IA** (a IA responde no WhatsApp nos chips em que for ligada, passa a conversa para uma
-pessoa quando precisa e para quando alguém responde) estão prontos no código e no banco. Faltam: corrigir
-resposta em 1 clique, as Mensagens prontas e as Skills.
+pessoa quando precisa e para quando alguém responde) e o **corrigir resposta em 1 clique** (na Inbox,
+guardar no Treinamento o jeito certo de responder) estão prontos no código e no banco. Faltam: as
+Mensagens prontas e as Skills.
 O banco voltou a funcionar em 12/11/2026, num projeto Supabase novo e só dele (`ienvia-001`). Falta a
-conferência final no ar, que continua travada pelo bloqueio da conta da Vercel (publicação) desde
-11/11/2026. Os detalhes e o que fazer estão no começo da seção 6 de [docs/PLANO.md](docs/PLANO.md).
+conferência final no ar, que continua travada: a Vercel pausou a conta inteira em 11/11/2026 (limite
+do plano gratuito) e só libera sozinha em 11/12/2026. Os detalhes e as saídas estão no começo da
+seção 6 de [docs/PLANO.md](docs/PLANO.md).
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
@@ -53,9 +55,9 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 865 testes em 34 arquivos: login, menu, datas, chips, a Inbox, os arquivos (fotos, áudios, vídeos, documentos), a conversa com a Evolution, os avisos de mensagem, o motor de IA (provedores, chaves guardadas com cadeado), o treinamento, o atendente de IA (quando responde, quando cala, quando passa para uma pessoa) e as regras do banco (acesso, envio, eco, leitura, depósito de arquivos, a vez da IA). |
+| Regras e banco | `npm test` | 901 testes em 36 arquivos: login, menu, datas, chips, a Inbox, os arquivos (fotos, áudios, vídeos, documentos), a conversa com a Evolution, os avisos de mensagem, o motor de IA (provedores, chaves guardadas com cadeado), o treinamento, o atendente de IA (quando responde, quando cala, quando passa para uma pessoa), ensinar a IA pela conversa e as regras do banco (acesso, envio, eco, leitura, depósito de arquivos, a vez da IA, a revisão das bases de treinamento). |
 | Montagem | `npm run build` | O painel monta para produção. |
-| Navegador | `npm run test:e2e` | 259 testes num navegador de verdade, em tela de computador e de celular (mais 13 que só valem para uma das duas telas). |
+| Navegador | `npm run test:e2e` | 279 testes num navegador de verdade, em tela de computador e de celular (mais 15 que só valem para uma das duas telas). |
 
 Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`.
 

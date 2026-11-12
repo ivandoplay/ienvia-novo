@@ -11,6 +11,7 @@ const base = (mudancas: Partial<BaseDeTreinamento> = {}): BaseDeTreinamento => (
   padrao: true,
   arquivos: [],
   atualizadaEm: null,
+  revisao: 1,
   podeEditar: true,
   nomeDoNegocio: 'Flor de Sal Moda',
   nicho: 'Moda feminina',

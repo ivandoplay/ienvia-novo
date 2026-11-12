@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { CampoDeTexto } from '@/components/ui/campo-de-texto';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import { Interruptor } from '@/components/ui/interruptor';
@@ -18,7 +19,6 @@ import {
   conferirArquivo,
   conferirBase,
   conferirRotulo,
-  letras,
   type BaseDeTreinamento,
   type CamposDaBase,
   type ListaDeBases,
@@ -65,6 +65,8 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
   const [recadoDosArquivos, setRecadoDosArquivos] = useState<Recado | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [janela, setJanela] = useState<Janela>(null);
+  /** A base mudou em outro lugar depois que esta tela abriu: salvar daqui apagaria a mudança mais nova. */
+  const [desatualizada, setDesatualizada] = useState(false);
   const campoDoArquivo = useRef<HTMLInputElement>(null);
 
   if (!lista) {
@@ -177,10 +179,11 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
     }
     setOcupado('salvar');
     setRecado(null);
-    const resposta = await salvarBase(base.id, rascunho);
+    const resposta = await salvarBase(base.id, rascunho, base.revisao);
     setOcupado(null);
     if (!resposta.ok) {
       if (resposta.aba) setAba(resposta.aba);
+      if (resposta.desatualizada) setDesatualizada(true);
       return setRecado({ tipo: 'erro', texto: resposta.erro });
     }
     setBase(resposta.base);
@@ -233,6 +236,15 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
     setRecadoDasBases({ tipo: 'ok', texto: 'Base do chip alterada.' });
   }
 
+  /**
+   * Depois de anexar ou apagar um arquivo, a tela aproveita SÓ a lista de arquivos que o servidor devolveu.
+   * Os campos, as perguntas e a revisão continuam sendo os que esta tela abriu: se a base mudou em outro
+   * lugar nesse meio-tempo, quem tem de perceber é o "Salvar" (que confere a revisão), e não esta troca.
+   */
+  function aproveitarArquivos(nova: BaseDeTreinamento) {
+    setBase((atual) => (atual && atual.id === nova.id ? { ...atual, arquivos: nova.arquivos, atualizadaEm: nova.atualizadaEm } : nova));
+  }
+
   async function anexar() {
     const entrada = campoDoArquivo.current;
     const arquivo = entrada?.files?.[0];
@@ -250,7 +262,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
     const resposta = await anexarArquivo(base.id, formulario);
     setOcupado(null);
     if (!resposta.ok) return setRecadoDosArquivos({ tipo: 'erro', texto: resposta.erro });
-    setBase(resposta.base);
+    aproveitarArquivos(resposta.base);
     if (resposta.lista) setLista(resposta.lista);
     if (entrada) entrada.value = '';
     setRecadoDosArquivos({ tipo: 'ok', texto: `Arquivo "${arquivo.name}" anexado.` });
@@ -263,7 +275,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
     const resposta = await apagarArquivo(id);
     setOcupado(null);
     if (!resposta.ok) return setRecadoDosArquivos({ tipo: 'erro', texto: resposta.erro });
-    setBase(resposta.base);
+    aproveitarArquivos(resposta.base);
     if (resposta.lista) setLista(resposta.lista);
     setRecadoDosArquivos({ tipo: 'ok', texto: `Arquivo "${titulo}" apagado.` });
   }
@@ -537,6 +549,12 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
         <section className="panel" role="tabpanel" id="treino-painel-perguntas" aria-labelledby="treino-aba-perguntas" hidden={aba !== 'perguntas'}>
           <h2 className="panel-title">Perguntas frequentes</h2>
           <p className="panel-desc">Cadastre as respostas exatas das dúvidas que os seus clientes fazem todo dia. A IA usa estas respostas antes de qualquer outra coisa.</p>
+          {podeEditar && (
+            <p className="campo-dica treino-dica-da-inbox">
+              Dá para guardar uma resposta sem sair da conversa: na <Link href="/inbox">Inbox</Link>, use “Corrigir resposta” numa resposta da IA ou “Ensinar à IA” numa
+              resposta sua. O que for guardado aparece aqui, no topo da lista.
+            </p>
+          )}
           {rascunho.perguntas.length === 0 && <p className="treino-vazio">Nenhuma pergunta cadastrada ainda.</p>}
           <ol className="treino-perguntas">
             {rascunho.perguntas.map((item, indice) => (
@@ -559,6 +577,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
                     desativado={!podeEditar}
                     aoMudar={(resposta) => mudar({ perguntas: rascunho.perguntas.map((outra, posicao) => (posicao === indice ? { ...outra, resposta } : outra)) })}
                   />
+                  {item.origem === 'correction' && <p className="campo-dica treino-pergunta-origem">Veio de uma resposta ensinada pela Inbox.</p>}
                 </div>
                 {podeEditar && (
                   <button type="button" className="btn btn-danger btn-sm" onClick={() => mudar({ perguntas: rascunho.perguntas.filter((_, posicao) => posicao !== indice) })}>
@@ -586,23 +605,38 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
         {podeEditar && aba !== 'arquivos' && (
           <div className="barra-de-salvar">
             <div className="barra-de-salvar-recado" role="status">
-              {recado ? <span className={`recado--${recado.tipo}`}>{recado.texto}</span> : mudou ? <span className="recado--atencao">Há alterações que ainda não foram salvas.</span> : null}
+              {recado ? (
+                <span className={`recado--${recado.tipo}`}>{recado.texto}</span>
+              ) : desatualizada ? (
+                <span className="recado--erro">Esta base foi alterada em outro lugar. Recarregue a página antes de salvar.</span>
+              ) : mudou ? (
+                <span className="recado--atencao">Há alterações que ainda não foram salvas.</span>
+              ) : null}
             </div>
             <div className="barra-de-salvar-acoes">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!mudou || parado}
-                onClick={() => {
-                  setRascunho(gravado);
-                  setRecado(null);
-                }}
-              >
-                Desfazer
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={!mudou || parado}>
-                {ocupado === 'salvar' ? 'Salvando…' : 'Salvar treinamento'}
-              </button>
+              {desatualizada ? (
+                // Salvar daqui apagaria o que mudou em outro lugar: o caminho é recarregar e refazer.
+                <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
+                  Recarregar a página
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={!mudou || parado}
+                    onClick={() => {
+                      setRascunho(gravado);
+                      setRecado(null);
+                    }}
+                  >
+                    Desfazer
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={!mudou || parado}>
+                    {ocupado === 'salvar' ? 'Salvando…' : 'Salvar treinamento'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -670,8 +704,8 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
           Ainda em reconstrução nesta aba
         </h2>
         <p className="panel-desc">
-          Mensagens prontas (as antigas M01–M13), Estúdio de Skills, “Cérebro completo”, “Pacote Turbo” e “corrigir resposta em 1 clique” existem no
-          sistema antigo e ainda não foram refeitos aqui. Eles não aparecem nesta tela para não parecer que funcionam.
+          Mensagens prontas (as antigas M01–M13), Estúdio de Skills, “Cérebro completo” e “Pacote Turbo” existem no sistema antigo e ainda não foram
+          refeitos aqui. Eles não aparecem nesta tela para não parecer que funcionam.
         </p>
       </section>
 
@@ -793,58 +827,6 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
         </p>
       )}
       {!podeEditar && <p className="aviso">Só o dono da conta altera o treinamento. Você pode ver como ele está.</p>}
-    </div>
-  );
-}
-
-function CampoDeTexto({
-  rotulo,
-  valor,
-  limite,
-  exemplo,
-  dica,
-  linhas,
-  desativado,
-  aoMudar,
-}: {
-  rotulo: string;
-  valor: string;
-  limite: number;
-  exemplo?: string;
-  dica?: string;
-  /** Com `linhas`, vira uma caixa de texto de várias linhas. */
-  linhas?: number;
-  desativado: boolean;
-  aoMudar: (valor: string) => void;
-}) {
-  const id = useId();
-  const tamanho = letras(valor.trim());
-  const passou = tamanho > limite;
-  // O contador só aparece quando o texto está chegando perto do limite (ou passou).
-  const mostrarContador = passou || tamanho >= limite * 0.8;
-  const idDaDica = dica || mostrarContador ? `${id}-dica` : undefined;
-  const comuns = {
-    id,
-    className: 'campo',
-    disabled: desativado,
-    placeholder: exemplo,
-    value: valor,
-    'aria-invalid': passou ? true : undefined,
-    'aria-describedby': idDaDica,
-  } as const;
-  return (
-    <div className="form-group">
-      <label className="form-label" htmlFor={id}>
-        {rotulo}
-      </label>
-      {linhas ? <textarea {...comuns} rows={linhas} onChange={(evento) => aoMudar(evento.target.value)} /> : <input {...comuns} type="text" onChange={(evento) => aoMudar(evento.target.value)} />}
-      {idDaDica && (
-        <p id={idDaDica} className={passou ? 'campo-dica campo-dica--erro' : 'campo-dica'}>
-          {dica}
-          {dica && mostrarContador ? ' ' : ''}
-          {mostrarContador && `${milhar(tamanho)} de ${milhar(limite)} caracteres.`}
-        </p>
-      )}
     </div>
   );
 }

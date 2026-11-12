@@ -110,7 +110,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
 | 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Pronta no código e no banco; falta conferir no ar.** Feitos e testados: Instâncias, recebimento das mensagens e a Inbox com texto e com **arquivos** (fotos, áudios, vídeos, documentos e figurinhas). A conferência final com os serviços de verdade está **travada por dois bloqueios de conta** (Vercel e Supabase): ver o começo da seção 6. |
-| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Prontos: as telas **Motor de IA** (Gemini, OpenRouter e NVIDIA) e **Treinamento**, e o **atendente** (a IA responde no WhatsApp, passa a conversa para você, para quando uma pessoa responde; liga/desliga por chip, "Pausar tudo", assumir e devolver). Falta: corrigir resposta em 1 clique, as Mensagens prontas e as Skills; e conferir com um celular de verdade (depende de publicar). Detalhes abaixo. |
+| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Prontos: as telas **Motor de IA** (Gemini, OpenRouter e NVIDIA) e **Treinamento**, o **atendente** (a IA responde no WhatsApp, passa a conversa para você, para quando uma pessoa responde; liga/desliga por chip, "Pausar tudo", assumir e devolver) e o **corrigir resposta em 1 clique** (ensinar a IA sem sair da conversa). Falta: as Mensagens prontas e as Skills; e conferir com um celular de verdade (depende de publicar). Detalhes abaixo. |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
 | 5 | Campanhas e segurança | **Campanhas** com prévia, cadência segura, rodízio de chips, pausar/retomar. **Segurança**: anti-ban, fila segura, horário de atendimento, contatos ignorados, alerta no seu WhatsApp. | |
@@ -194,11 +194,12 @@ trocam de lugar sem prejuízo.
 
 ### O que a Fase 2 entregou até aqui (12/11/2026)
 
-São três partes: a tela **Motor de IA** (guarda e testa as chaves e os ajustes), a tela
-**Treinamento** (guarda o que a IA sabe e mostra as instruções que ela recebe) e o **atendente**
-(a IA respondendo no WhatsApp, nos chips em que você ligar). O atendente está pronto no código e no
-banco, mas **ainda não está no ar**: a publicação continua bloqueada (seção 6). Por isso nenhuma
-resposta da IA chegou ainda a um celular de verdade.
+São quatro partes: a tela **Motor de IA** (guarda e testa as chaves e os ajustes), a tela
+**Treinamento** (guarda o que a IA sabe e mostra as instruções que ela recebe), o **atendente**
+(a IA respondendo no WhatsApp, nos chips em que você ligar) e o **corrigir resposta em 1 clique**
+(ensinar a IA sem sair da conversa). Tudo isso está pronto no código e no banco, mas **ainda não
+está no ar**: a publicação continua bloqueada (seção 6). Por isso nenhuma resposta da IA chegou
+ainda a um celular de verdade.
 
 #### Motor de IA
 
@@ -232,7 +233,8 @@ resposta da IA chegou ainda a um celular de verdade.
   que o atendente vai usar.
 - **Só o dono da conta altera.** A equipe vê, sem botões.
 - Ainda **não refeitos** (a tela avisa): Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro
-  completo", "Pacote Turbo" e "corrigir resposta em 1 clique".
+  completo" e "Pacote Turbo". O "corrigir resposta em 1 clique" foi refeito e mora na Inbox (mais
+  abaixo, em "Corrigir resposta em 1 clique").
 - **O que a IA faz quando perguntam "estou falando com um robô?"** se escolhe na aba Regras: passar
   a conversa para uma pessoa (padrão) ou dizer que é a assistente virtual.
 
@@ -390,12 +392,52 @@ O que foi conferido de verdade, e o que não foi:
 - **Não conferido: numa hospedagem de verdade.** A resposta é preparada depois do "ok" à Evolution,
   dentro do mesmo pedido. Isso foi visto funcionando aqui; na hospedagem escolhida, confiro de novo.
 
+#### Corrigir resposta em 1 clique (ensinar a IA sem sair da conversa)
+
+No sistema antigo isso ficava no Simulador. Agora fica onde o problema aparece: na **Inbox**.
+
+- **Na resposta da IA** aparece o botão **"Corrigir resposta"**; **na resposta de uma pessoa** (pelo
+  painel ou pelo celular do chip), o botão **"Ensinar à IA"**. Este segundo é o caso mais comum: a
+  IA não sabia, passou a conversa, você respondeu, e com um clique ela passa a saber.
+- A janela já vem preenchida: a última pergunta que o cliente fez antes daquela resposta e a
+  resposta em si. A IA costuma responder em vários balões; a janela traz a resposta inteira, e o
+  botão aparece só no último balão. Você ajusta os dois textos e guarda.
+- **Onde guarda:** como **pergunta frequente** ("quando perguntarem isto, responda assim") ou como
+  **regra de ouro** (uma linha nova nas regras). Vai para a base de treinamento **que o chip daquela
+  conversa usa**, e a janela diz qual é.
+- **Vale na resposta seguinte da IA.** Nada é enviado ao cliente: muda só o que a IA sabe.
+- **Não duplica.** Se a mesma pergunta já existe na base (mesmo escrita com outras maiúsculas), a
+  resposta dela é trocada. Se a mesma regra já está escrita, nada muda. A pergunta ensinada vai para
+  o topo da lista, e no Treinamento ela aparece com a marca "Veio de uma resposta ensinada pela
+  Inbox".
+- **Só o dono da conta vê os botões** (é a mesma regra do Treinamento: só o dono altera).
+- **Limites:** os mesmos do Treinamento (pergunta até 500 caracteres, resposta até 2.000, 100
+  perguntas por base, regras até 8.000); uma regra ensinada pela conversa cabe em 1.000.
+- **Proteção nova na tela do Treinamento.** Agora dois lugares mexem nas perguntas (a tela e a
+  Inbox), e a tela grava a lista inteira de uma vez. Sem cuidado, uma tela do Treinamento aberta
+  antes de uma correção apagaria essa correção ao salvar. Por isso cada base tem um número de
+  **revisão**: se a base mudou depois que a tela foi aberta, o banco **recusa** a gravação, a tela
+  explica e oferece "Recarregar a página". Vale também para duas abas do Treinamento abertas ao
+  mesmo tempo.
+- **O que foi conferido.**
+  - Testes: 18 no banco de teste, 17 de regras e 20 no navegador (computador e celular, tema claro
+    e escuro, teclado e leitor de tela).
+  - Banco de verdade: a migração `20261112181500_ai_teaching` foi ensaiada, aplicada, e o retrato
+    bate com o do Git. Um roteiro de 37 passos rodou lá e desfez tudo: 37 de 37 (inclusive a
+    comparação de perguntas com acento e maiúsculas, que depende do banco).
+  - Ambiente de verdade (painel rodando aqui + banco novo, com a conta de teste): 31 conferências,
+    todas certas. Corrigir, ensinar, trocar resposta, regra, a tela do Treinamento mostrando o que
+    foi ensinado, as **instruções que a IA recebe já trazendo o texto novo**, e a recusa da tela
+    desatualizada. A limpeza não deixou sobra.
+- **O que não foi conferido.** A IA de verdade respondendo com a resposta ensinada num celular: o
+  texto ensinado entra nas instruções pelo mesmo caminho das outras perguntas frequentes (e esse
+  caminho foi visto com a NVIDIA de verdade no atendente), mas a conversa completa, do celular à
+  correção e de volta ao celular, só depois de publicar.
+
 O que falta na Fase 2:
 
-1. **Corrigir resposta em 1 clique**: na Inbox, transformar uma resposta ruim da IA numa pergunta
-   frequente certa.
-2. No Treinamento: Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro completo" e "Pacote Turbo".
-3. Publicar e conferir com um chip seu: uma mensagem real chegando, a IA respondendo e a resposta
+1. No Treinamento: Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro completo" e "Pacote Turbo".
+2. Publicar e conferir com um chip seu: uma mensagem real chegando, a IA respondendo e a resposta
    aparecendo no celular.
 
 ### Diferenças pequenas em relação ao visual do branch
@@ -518,27 +560,49 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 - **Conta de teste no banco novo.** Existe um usuário `teste-automatico` com uma empresa
   "Teste automático (pode apagar)". Serve para conferir as telas no ambiente de verdade sem usar a
   sua conta. Será apagado antes da virada.
-- **Publicação (parada em 11/11/2026).** O painel foi publicado em `https://ienvia-novo.vercel.app`
-  (Instâncias e recebimento) e funcionou. Na tarde do mesmo dia a Vercel **bloqueou a conta inteira**
-  por passar do limite de uso do plano gratuito (Hobby): o endereço passou a responder
-  "Payment required", e os outros projetos da mesma conta também. O que este projeto usou naquele
-  dia foi pouco (algumas montagens e algumas dezenas de acessos de teste); qual limite estourou e
-  de onde veio o consumo só aparece no painel da Vercel, em *Usage*.
-  **Suspeita (não confirmada):** o mesmo painel antigo aberto. O sistema antigo roda na Vercel
-  (`zap-ia-studio.vercel.app`) e cada chamada do painel a cada 3,5 segundos aciona o servidor de
-  lá: são cerca de 25 mil acionamentos por dia para cada aba aberta, e o plano gratuito inclui
-  1 milhão por mês.
-  A Inbox, o Motor de IA e o Treinamento estão no GitHub, mas **não estão no ar**. Para voltar:
-  (1) passar a conta para o plano Pro (US$ 20 por mês), (2) hospedar o painel em outro lugar, ou
-  (3) esperar o limite renovar (em geral, 30 dias).
-  **Abrir outra conta gratuita não é saída** (corrigido em 12/11/2026: uma versão anterior deste
-  plano listava "publicar em outra conta"). A política de uso aceitável da Vercel proíbe criar
-  contas para contornar limites e prevê suspensão do acesso; e o plano Hobby é só para uso pessoal,
-  não comercial. Com clientes pagantes, é o Pro ou outra hospedagem de qualquer forma.
-  Enviar para o GitHub **não** publica sozinho: cada publicação é feita de propósito, depois dos
-  testes.
-  Na noite de 11/11 o bloqueio continuava: `ienvia-novo.vercel.app` e `zap-ia-studio.vercel.app`
-  respondiam "Payment required" (conferido às 19h38 e de novo às 22h18, horário de Brasília).
+- **Publicação: a Vercel pausou a conta inteira (de 11/11/2026 até 11/12/2026).** O painel foi
+  publicado em `https://ienvia-novo.vercel.app` em 11/11 (Instâncias e recebimento) e funcionou.
+  Às 16h42 do mesmo dia (horário de Fortaleza) a Vercel pausou **todos os projetos da conta**. No
+  navegador aparece *"This deployment is temporarily paused"*; para programas, a resposta é
+  `402 DEPLOYMENT_DISABLED`. Nada do que foi feito depois (Inbox, Motor de IA, Treinamento,
+  atendente) está no ar: está no GitHub e no banco.
+  - **O motivo, lido na própria Vercel em 12/11/2026** (ficha da conta `ivandoplay's projects`,
+    plano gratuito Hobby): `FAIR_USE_LIMITS_EXCEEDED`, no item **Fast Origin Transfer**. É o volume
+    de dados que passa entre a rede da Vercel e o servidor dos sites. O plano gratuito inclui
+    10 GB a cada 30 dias, e a conta passou disso.
+  - **Quando volta sozinha:** em **11/12/2026 às 16h42** (horário de Fortaleza), 30 dias depois do
+    bloqueio. É a data que a Vercel registrou (`unpauseAt`). Publicar de novo **não** tira a pausa.
+  - **De onde veio o consumo (dedução, não medição).** A divisão por projeto só aparece no site da
+    Vercel, em *Usage*. Mas o projeto do sistema novo foi criado no próprio dia 11/11, menos de
+    duas horas antes do bloqueio, e só recebeu acessos de teste: não tem como ter gasto 10 GB. O
+    sistema antigo roda na mesma conta (`zap-ia-studio.vercel.app`), e o painel dele chama o
+    servidor a cada 3,5 segundos, relendo a conta inteira a cada chamada. É o mesmo comportamento
+    que gastou a cota do Supabase (item mais abaixo).
+  - **Se nada mudar, bloqueia de novo.** Quando a conta voltar, o painel antigo usado do mesmo
+    jeito gasta os 10 GB outra vez em cerca de duas semanas, e a pausa seguinte dura mais 30 dias
+    para **todos** os projetos da conta, inclusive o novo, se estiver lá.
+  - **O plano gratuito da Vercel não serve para o Ienvia de qualquer forma.** As regras dela dizem
+    que o Hobby é só para uso pessoal, não comercial; todo uso comercial pede o plano Pro. Um
+    sistema de atendimento vendido a clientes é uso comercial.
+  - **Abrir outra conta gratuita não é saída** (corrigido em 12/11/2026: uma versão anterior deste
+    plano listava "publicar em outra conta"). As regras da Vercel dizem que contornar os limites é
+    violação e preveem suspensão.
+  - **Saídas** (preços conferidos em 12/11/2026; todas pedem cartão):
+    1. **Vercel Pro, US$ 20 por mês.** Libera na hora, e o projeto já está montado lá.
+    2. **Um servidor pequeno sempre ligado, cerca de US$ 5 a 7 por mês** (Fly.io com máquina em
+       São Paulo: por volta de US$ 4 a 6; Railway: a partir de US$ 5; Render: US$ 7). Precisa de
+       um ou dois dias para montar e conferir. É também o formato que melhor atende as próximas
+       fases: campanhas com cadência e envios agendados pedem algo que fique ligado o tempo todo.
+    3. **Esperar 11/12 sem pagar.** Fica tudo parado até lá, e continua fora das regras (uso
+       comercial no plano gratuito).
+  - **Hospedagem gratuita que aguente um atendimento de verdade: não encontrei.** O gratuito do
+    Render dorme depois de 15 minutos sem acesso e leva cerca de um minuto para acordar (a própria
+    Render diz para não usar em produção). O do Netlify aceita uso comercial, mas dá 300 créditos
+    por mês e pausa todos os sites quando acabam (cada publicação custa 15). O do Railway dá
+    US$ 1 por mês, que não mantém um serviço ligado.
+  - Enviar para o GitHub **não** publica sozinho: cada publicação é feita de propósito, depois dos
+    testes. Conferências do bloqueio: 11/11 às 19h38 e 22h18; 12/11 às 7h38, 14h38 e 14h54 (horário
+    de Fortaleza), sempre `402`.
 - **Conectar os chips pelo endereço publicado.** A Evolution avisa o painel pela internet, e o
   endereço da prévia só abre para quem está na conversa. Chip conectado pela prévia não entrega
   mensagens. Se um chip foi conectado por outro endereço, basta abrir a aba Instâncias no endereço

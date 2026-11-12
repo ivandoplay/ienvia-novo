@@ -38,6 +38,7 @@ const DO_BANCO = {
   prompt_shield_enabled: false,
   robot_question_policy: 'disclose',
   updated_at: '2026-11-11T12:00:00Z',
+  revision: 4,
   faqs: [
     { id: 'f1', question: 'Entregam?', answer: 'Sim.', source: 'manual' },
     { id: 'f2', question: 'Tem provador?', answer: 'Temos dois.', source: 'correction' },
@@ -62,6 +63,7 @@ describe('ler o que o banco devolve', () => {
       perguntaSobreRobo: 'disclose',
       podeEditar: true,
       atualizadaEm: '2026-11-11T12:00:00Z',
+      revisao: 4,
     });
     expect(base?.perguntas).toEqual([
       { pergunta: 'Entregam?', resposta: 'Sim.', origem: 'manual' },
@@ -79,6 +81,14 @@ describe('ler o que o banco devolve', () => {
     // A blindagem só fica desligada quando o banco diz que está desligada.
     expect(minima?.blindagem).toBe(true);
     expect(lerBase({ id: 'x', tone: 'agressivo', robot_question_policy: 'negar' })).toMatchObject({ tom: 'consultivo', perguntaSobreRobo: 'handoff' });
+  });
+
+  test('a revisão da base só vale quando é um número inteiro a partir de 1; senão fica 0 (gravar sem conferência)', () => {
+    expect(lerBase({ id: 'x', revision: 1 })?.revisao).toBe(1);
+    expect(lerBase({ id: 'x', revision: 37 })?.revisao).toBe(37);
+    for (const estranho of [undefined, null, 0, -2, 1.5, '3', Number.NaN, Number.POSITIVE_INFINITY, {}]) {
+      expect(lerBase({ id: 'x', revision: estranho })?.revisao, String(estranho)).toBe(0);
+    }
   });
 
   test('a lista das bases, com os chips de cada uma', () => {
@@ -300,7 +310,7 @@ describe('modelos prontos', () => {
 
 describe('erros do banco em palavras', () => {
   test('cada erro com nome tem a sua frase; o resto não é adivinhado', () => {
-    const nomes = ['agent_label_taken', 'agent_limit_reached', 'default_agent_required', 'document_empty', 'document_too_large', 'document_limit_reached', 'document_space_exceeded', 'Agent not found', 'Document not found', 'Instance not found'];
+    const nomes = ['agent_label_taken', 'agent_limit_reached', 'default_agent_required', 'document_empty', 'document_too_large', 'document_limit_reached', 'document_space_exceeded', 'Agent not found', 'Document not found', 'Instance not found', 'agent_changed', 'faq_limit_reached', 'rules_limit_reached', 'ai_training_missing', 'Message not found'];
     const frases = nomes.map((nome) => explicarErroDoTreinamento(nome));
     for (const frase of frases) expect(frase).toBeTruthy();
     expect(new Set(frases).size).toBe(nomes.length);

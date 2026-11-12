@@ -84,6 +84,12 @@ export interface BaseDeTreinamento extends CamposDaBase {
   padrao: boolean;
   arquivos: ArquivoDeConhecimento[];
   atualizadaEm: string | null;
+  /**
+   * Sobe a cada gravação dos campos ou das perguntas (pela tela ou por uma correção feita na Inbox).
+   * A tela devolve este número ao salvar; se a base já estiver em outra revisão, o banco recusa em vez
+   * de apagar a mudança mais nova. `0` = o banco não informou (aí a gravação vai sem a conferência).
+   */
+  revisao: number;
   podeEditar: boolean;
 }
 
@@ -117,6 +123,8 @@ export const LIMITES_DO_TREINAMENTO = {
   instrucoesExtras: 4000,
   pergunta: 500,
   resposta: 2000,
+  /** Uma regra ensinada pela conversa (uma linha das regras de ouro). */
+  regraEnsinada: 1000,
   perguntasPorBase: 100,
   bases: 10,
   arquivosPorBase: 10,
@@ -153,7 +161,7 @@ const numero = (valor: unknown): number => (typeof valor === 'number' && Number.
 export const letras = (valor: string): number => Array.from(valor).length;
 
 /** Tira espaços, tabulações e quebras de linha das pontas (o banco faz o mesmo antes de medir). */
-const aparar = (valor: string): string => valor.replace(/^[ \t\n\r]+|[ \t\n\r]+$/g, '');
+export const aparar = (valor: string): string => valor.replace(/^[ \t\n\r]+|[ \t\n\r]+$/g, '');
 
 const ORIGENS: readonly OrigemDaPergunta[] = ['manual', 'correction', 'template'];
 
@@ -221,6 +229,7 @@ export function lerBase(resposta: unknown): BaseDeTreinamento | null {
         ...(typeof item.content === 'string' ? { conteudo: item.content } : {}),
       })),
     atualizadaEm: textoOuNulo(dados.updated_at),
+    revisao: Number.isInteger(dados.revision) && numero(dados.revision) >= 1 ? numero(dados.revision) : 0,
     podeEditar: dados.can_edit === true,
   };
 }
@@ -402,6 +411,16 @@ export function explicarErroDoTreinamento(mensagem: string | undefined): string 
       return 'Este arquivo não existe mais. Atualize a página.';
     case 'Instance not found':
       return 'Este chip não existe mais. Atualize a página.';
+    case 'agent_changed':
+      return 'Esta base foi alterada em outro lugar depois que você abriu esta tela (por exemplo, por uma correção feita na Inbox). Para não apagar essa alteração, nada foi salvo. Recarregue a página e refaça o que você mudou aqui.';
+    case 'faq_limit_reached':
+      return `Esta base já tem ${LIMITES_DO_TREINAMENTO.perguntasPorBase} perguntas frequentes. Remova alguma no Treinamento para guardar outra.`;
+    case 'rules_limit_reached':
+      return `As regras de ouro desta base estão cheias (cabem ${milhar(LIMITES_DO_TREINAMENTO.regras)} caracteres). Resuma alguma regra no Treinamento para guardar outra.`;
+    case 'ai_training_missing':
+      return 'Esta conta ainda não tem uma base de treinamento. Crie a primeira na aba Treinamento.';
+    case 'Message not found':
+      return 'Esta mensagem não existe mais. Atualize a página.';
     default:
       return null;
   }

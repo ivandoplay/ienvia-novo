@@ -14,6 +14,7 @@ import {
   type TipoDeEnvio,
 } from '@/lib/inbox/arquivos';
 import { trazerArquivoDaMensagem } from '@/lib/inbox/buscar-arquivo';
+import { conferirEnsino, descreverEnsino, explicarRecusaDoEnsino, lerResultadoDoEnsino } from '@/lib/ia/ensino';
 import { ehChaveDeEnvio, numeroParaEnvio, validarTexto, type SituacaoDoEnvio } from '@/lib/inbox/regras';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { obterSessao } from '@/lib/sessao';
@@ -469,4 +470,39 @@ export async function mudarConversa(dados: { conversaId: string; acao: AcaoDaCon
   }
   atualizarTelas();
   return { ok: true };
+}
+
+export type ResultadoDeEnsinar = { ok: true; texto: string } | { ok: false; erro: string };
+
+/**
+ * "Corrigir resposta em 1 clique": guarda no Treinamento o jeito certo de responder, a partir de uma
+ * mensagem da conversa. Vira uma pergunta frequente ou uma regra de ouro da base que o chip usa.
+ *
+ * Só o dono da conta altera o treinamento (o banco confere de novo). Nada é enviado ao contato: isto
+ * muda só o que a IA sabe, e vale a partir da próxima resposta dela.
+ */
+export async function ensinarIa(dados: { mensagemId: string; destino: string; pergunta: string; resposta: string }): Promise<ResultadoDeEnsinar> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados?.mensagemId)) return { ok: false, erro: 'Esta mensagem não existe mais. Atualize a página.' };
+  const conferido = conferirEnsino(dados);
+  if (!conferido.ok) return { ok: false, erro: conferido.erro };
+
+  const { data, error } = await contexto.supabase.rpc('teach_my_ai_from_message', {
+    p_workspace_id: contexto.workspaceId,
+    p_message_id: dados.mensagemId,
+    p_target: conferido.ensino.destino,
+    p_question: conferido.ensino.pergunta,
+    p_answer: conferido.ensino.resposta,
+  });
+  if (error) {
+    const conhecido = explicarRecusaDoEnsino(error);
+    if (!conhecido) console.error('[inbox] não foi possível ensinar a IA:', { codigo: error.code, mensagem: error.message });
+    return { ok: false, erro: conhecido ?? ALGO_DEU_ERRADO };
+  }
+
+  revalidatePath('/treinamento');
+  const resultado = lerResultadoDoEnsino(data);
+  // O banco aceitou. Se a resposta dele vier num formato inesperado, o ensino está guardado do mesmo jeito.
+  return { ok: true, texto: resultado ? descreverEnsino(resultado) : 'Guardado no Treinamento. A IA já usa na próxima resposta.' };
 }
