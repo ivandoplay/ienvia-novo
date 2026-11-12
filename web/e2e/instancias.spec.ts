@@ -68,7 +68,8 @@ test.describe('Instâncias', () => {
     await expect(chip.getByText('Aguardando a conexão…')).toBeVisible();
     await expect(chip.getByText('Atendimento e campanhas')).toBeVisible();
     await expect(chip.getByText('Número ainda não conectado')).toBeVisible();
-    await expect(chip.getByText('Atendente de IA: desligado neste chip.')).toBeVisible();
+    // Todo chip nasce com a IA desligada; quem liga é o dono, neste mesmo cartão.
+    await expect(chip.getByRole('switch', { name: 'Atendente de IA neste chip' })).not.toBeChecked();
 
     // A Evolution ficou sabendo para onde avisar quando chegar mensagem.
     const [naEvolution] = await chipsNaEvolution(request);

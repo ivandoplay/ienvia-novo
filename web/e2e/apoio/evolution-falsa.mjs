@@ -244,11 +244,14 @@ export function criarEvolutionFalsa({ chave = CHAVE_DE_TESTE, instancias: fixas 
     if (req.method === 'POST' && grupo === 'message' && acao === 'sendText') {
       if (!instancia) return naoExiste(res, nome ?? '');
       const corpo = await lerCorpo(req);
-      tentativas.push({ instancia: instancia.nome, numero: corpo.number, texto: corpo.text });
+      // "delay" é o tempo de "digitando…" antes de a mensagem sair (a Evolution de verdade espera esse tempo; aqui só fica anotado).
+      const digitando = corpo.delay === undefined ? {} : { digitando: corpo.delay };
+      tentativas.push({ instancia: instancia.nome, numero: corpo.number, texto: corpo.text, ...digitando });
       if (typeof corpo.number !== 'string' || !corpo.number) return pedidoInvalido(['instance requires property "number"']);
       if (typeof corpo.text !== 'string') return pedidoInvalido(['instance requires property "text"']);
+      if (corpo.delay !== undefined && !Number.isInteger(corpo.delay)) return pedidoInvalido(['instance.delay is not of a type(s) integer']);
       if (!corpo.text.trim()) return pedidoInvalido('Text is required');
-      return concluirEnvio(corpo.number, { texto: corpo.text }, { conversation: corpo.text }, 'conversation');
+      return concluirEnvio(corpo.number, { texto: corpo.text, ...digitando }, { conversation: corpo.text }, 'conversation');
     }
 
     // Foto, vídeo e documento. O arquivo vem inteiro no pedido, em base64.

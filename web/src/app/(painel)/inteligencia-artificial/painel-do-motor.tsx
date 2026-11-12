@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useId, useState, type FormEvent } from 'react';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
@@ -77,7 +78,8 @@ const SOBRE_O_PROVEDOR: Record<Provedor, SobreOProvedor> = {
 /** "a NVIDIA", "o OpenRouter", "o Google Gemini". */
 const oProvedor = (provedor: Provedor) => `${provedor === 'nvidia' ? 'a' : 'o'} ${NOME_DO_PROVEDOR[provedor]}`;
 
-const ESPERAS = [3, 6, 10, 15, 30];
+/** Até 20 segundos: a espera, a resposta do provedor e o envio precisam caber num único pedido ao servidor. */
+const ESPERAS = [3, 6, 10, 15, 20];
 const MEMORIAS = [10, 20, 30, 40, 60];
 const PAUSAS = [
   { minutos: 30, rotulo: '30 minutos' },
@@ -209,6 +211,12 @@ export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConf
             <strong>A IA ainda não responde no WhatsApp.</strong> Esta tela já guarda e testa as suas chaves e ajustes, mas a parte que
             lê as mensagens dos clientes e responde sozinha ainda está sendo reconstruída. Nada do que está aqui envia mensagens por
             enquanto.
+          </p>
+        )}
+        {ATENDENTE_DE_IA_NO_AR && (
+          <p className="aviso">
+            O que está aqui vale para as conversas dos chips que estão com a IA ligada. Para ligar ou desligar a IA em um chip, use a aba{' '}
+            <Link href="/instancias">Instâncias</Link>.
           </p>
         )}
         {!podeEditar && <p className="aviso">Só o dono da conta altera o Motor de IA. Você pode ver como ele está configurado.</p>}

@@ -37,11 +37,11 @@ test.describe('Treinamento', () => {
     await comecarDoZero(request);
   });
 
-  test('abre a base padrão, com as partes do treinamento e o aviso de que a IA ainda não responde', async ({ page }) => {
+  test('abre a base padrão, com as partes do treinamento e o aviso de onde ele vale', async ({ page }) => {
     await abrirTreinamento(page);
     await expect(page).toHaveTitle('Treinamento · Ienvia');
     await expect(page.getByText('2 bases de treinamento')).toBeVisible();
-    await expect(page.locator('.pilha-de-avisos .aviso').first()).toContainText('A IA ainda não responde no WhatsApp.');
+    await expect(page.locator('.pilha-de-avisos .aviso').first()).toContainText('A IA usa este treinamento nas conversas dos chips que estão com ela ligada');
 
     // As duas bases; a aberta é a padrão.
     await expect(bases(page).locator('.treino-base')).toHaveText([/^Principal\s*padrão\s*3 perguntas · 1 arquivo$/i, /^Suporte\s*0 perguntas · 0 arquivos$/]);

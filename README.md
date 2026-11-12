@@ -9,8 +9,10 @@ as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do 
 
 **Situação:** Fase 0 (fundação) pronta. Fase 1 pronta no código e no banco: a aba **Instâncias**
 (conectar chips), o recebimento das mensagens e a **Inbox** com texto e com arquivos (fotos, áudios,
-vídeos, documentos e figurinhas). Fase 2 em andamento: as abas **Motor de IA** e **Treinamento** estão
-prontas; falta o atendente em si (a IA respondendo no WhatsApp).
+vídeos, documentos e figurinhas). Fase 2 em andamento: as abas **Motor de IA** e **Treinamento** e o
+**atendente de IA** (a IA responde no WhatsApp nos chips em que for ligada, passa a conversa para uma
+pessoa quando precisa e para quando alguém responde) estão prontos no código e no banco. Faltam: corrigir
+resposta em 1 clique, as Mensagens prontas e as Skills.
 O banco voltou a funcionar em 12/11/2026, num projeto Supabase novo e só dele (`ienvia-001`). Falta a
 conferência final no ar, que continua travada pelo bloqueio da conta da Vercel (publicação) desde
 11/11/2026. Os detalhes e o que fazer estão no começo da seção 6 de [docs/PLANO.md](docs/PLANO.md).
@@ -51,9 +53,9 @@ Esse comando roda tudo, em ordem, e para no primeiro problema:
 | --- | --- | --- |
 | Tipos | `npm run check` | Erros de programação que dá para pegar sem rodar nada. |
 | Estilo | `npm run lint` | Padrões do código do painel. |
-| Regras e banco | `npm test` | 593 testes: login, menu, datas, chips, a Inbox, os arquivos (fotos, áudios, vídeos, documentos), a conversa com a Evolution, os avisos de mensagem e as regras do banco (acesso, envio, eco, leitura, depósito de arquivos). |
+| Regras e banco | `npm test` | 865 testes em 34 arquivos: login, menu, datas, chips, a Inbox, os arquivos (fotos, áudios, vídeos, documentos), a conversa com a Evolution, os avisos de mensagem, o motor de IA (provedores, chaves guardadas com cadeado), o treinamento, o atendente de IA (quando responde, quando cala, quando passa para uma pessoa) e as regras do banco (acesso, envio, eco, leitura, depósito de arquivos, a vez da IA). |
 | Montagem | `npm run build` | O painel monta para produção. |
-| Navegador | `npm run test:e2e` | 161 testes num navegador de verdade, em tela de computador e de celular (mais 11 que só valem para uma das duas telas). |
+| Navegador | `npm run test:e2e` | 259 testes num navegador de verdade, em tela de computador e de celular (mais 13 que só valem para uma das duas telas). |
 
 Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`.
 
@@ -92,9 +94,10 @@ Explicadas uma a uma em [web/.env.example](web/.env.example).
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Chave pública do projeto. |
 | `AUTH_DOMINIO_USUARIO` | (Opcional) Domínio interno dos logins por nome de usuário. Padrão: `zapia.local`. |
 | `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` | (Servidor) Endereço e chave da Evolution, para conectar chips e enviar mensagens. |
-| `SUPABASE_SERVICE_ROLE_KEY` | (Servidor, segredo) Gravar os avisos da Evolution e guardar os arquivos recebidos. |
+| `SUPABASE_SERVICE_ROLE_KEY` | (Servidor, segredo) Gravar os avisos da Evolution, guardar os arquivos recebidos e fazer o atendente de IA responder. |
 | `IENVIA_URL_PUBLICA` | (Servidor) Endereço público do painel, para a Evolution avisar. Na Vercel não precisa. |
 | `IENVIA_CHAVE_DOS_SEGREDOS` | (Servidor, segredo) Cifra as chaves de IA de cada cliente antes de gravar no banco. Sem ela, o painel não guarda nem usa chave de IA. |
+| `IENVIA_ATENDENTE_ORCAMENTO_MS` | (Servidor, opcional) Tempo total que o atendente de IA tem para responder uma mensagem. Padrão: 55000 (cabe numa hospedagem que corta o pedido em 60 s). |
 
 As chaves de IA (Google Gemini, OpenRouter e NVIDIA) **não** são variáveis de ambiente: cada dono de
 conta cadastra as suas na tela Motor de IA.

@@ -59,7 +59,7 @@ test.describe('Motor de IA', () => {
     await comecarDoZero(request);
   });
 
-  test('mostra os três provedores, a situação de cada chave e o aviso de que a IA ainda não responde', async ({ page }) => {
+  test('mostra os três provedores, a situação de cada chave e onde a IA é ligada', async ({ page }) => {
     await abrirMotor(page);
     await expect(page).toHaveTitle('Motor de IA · Ienvia');
     await expect(page.getByRole('article')).toHaveCount(3);
@@ -76,9 +76,10 @@ test.describe('Motor de IA', () => {
     await expect(page.getByLabel('Modelo do OpenRouter')).toHaveValue('deepseek/deepseek-chat');
     await expect(page.getByLabel('Modelo da NVIDIA')).toHaveValue('nvidia/nemotron-3.5-super-vl-120b-a12b');
 
-    // O principal (Gemini) tem chave: está pronto. E a tela não finge: a IA ainda não responde no WhatsApp.
+    // O principal (Gemini) tem chave: está pronto. E a tela diz onde isso passa a valer: nos chips com a IA ligada.
     await expect(page.getByText('Pronto para responder')).toBeVisible();
-    await expect(avisos(page).first()).toContainText('A IA ainda não responde no WhatsApp.');
+    await expect(avisos(page).first()).toContainText('O que está aqui vale para as conversas dos chips que estão com a IA ligada.');
+    await expect(avisos(page).first().getByRole('link', { name: 'Instâncias' })).toHaveAttribute('href', '/instancias');
     await expect(principal(page)).toHaveValue('gemini');
     await expect(reserva(page)).toHaveValue('none');
     await expect(segundaReserva(page)).toBeDisabled();

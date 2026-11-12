@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { apelidoDoLogin, iniciais } from '@ienvia/shared';
 import { Casca } from '@/components/casca/casca';
 import { ConfiguracaoPendente } from '@/components/configuracao-pendente';
+import { carregarResumoDaIa } from '@/lib/dados/atendente';
 import { resumirInstancias } from '@/lib/dados/visao-geral';
 import { lerConfigSupabase } from '@/lib/env';
 import { resumoDeConexao } from '@/lib/formato';
@@ -18,7 +19,7 @@ export default async function LayoutDoPainel({ children }: { children: ReactNode
   if (!sessao) redirect('/login');
 
   const workspace = sessao.workspaceAtivo;
-  const instancias = workspace ? await resumirInstancias(workspace.id) : null;
+  const [instancias, ia] = workspace ? await Promise.all([resumirInstancias(workspace.id), carregarResumoDaIa(workspace.id)]) : [null, null];
   const conexao = instancias
     ? resumoDeConexao(instancias.conectadas, instancias.total)
     : { texto: 'Sem informação', conectado: false };
@@ -36,6 +37,7 @@ export default async function LayoutDoPainel({ children }: { children: ReactNode
       }}
       workspace={workspace?.nome ?? 'Nenhum workspace'}
       conexao={conexao}
+      ia={ia}
     >
       {sessao.falhouAoCarregar ? <FalhaAoCarregar /> : workspace ? children : <SemWorkspace />}
     </Casca>

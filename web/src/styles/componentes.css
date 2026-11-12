@@ -691,6 +691,11 @@
   background: var(--warning-soft);
   color: var(--warning-text);
 }
+/* A conversa está com a IA. */
+.estado--ia {
+  border-color: var(--accent-border);
+  color: var(--accent-bright);
+}
 .estado--erro {
   border-color: rgba(239, 68, 68, 0.35);
   background: var(--danger-soft);

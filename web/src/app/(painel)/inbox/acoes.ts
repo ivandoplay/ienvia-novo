@@ -429,7 +429,8 @@ export async function decidirEnvio(dados: { mensagemId: string; foiEnviada: bool
   return { ok: true };
 }
 
-const ACOES_DA_CONVERSA = { resolver: 'resolve', reabrir: 'reopen', marcar_lida: 'mark_read' } as const;
+/** assumir = a IA para de responder nesta conversa até alguém devolver; devolver = a IA volta a responder nela. */
+const ACOES_DA_CONVERSA = { resolver: 'resolve', reabrir: 'reopen', marcar_lida: 'mark_read', assumir: 'claim', devolver: 'release' } as const;
 
 export type AcaoDaConversa = keyof typeof ACOES_DA_CONVERSA;
 
@@ -438,13 +439,15 @@ function motivoDaAcao(mensagem: string): string {
     return 'Este contato já tem uma conversa mais nova em aberto. Responda por ela (procure o contato na lista de ativas).';
   }
   if (/Conversation is not resolved/.test(mensagem)) return 'Esta conversa já está aberta. Atualize a página.';
+  if (/assigned to another teammate/.test(mensagem)) return 'Esta conversa já foi assumida por outra pessoa da equipe.';
+  if (/Conversation is not active/.test(mensagem)) return 'Esta conversa está resolvida. Reabra a conversa primeiro.';
   if (/Archived conversation/.test(mensagem)) return 'Esta conversa está arquivada.';
   if (/Conversation not found/.test(mensagem)) return 'Esta conversa não existe mais. Atualize a página.';
   if (/Workspace membership required/.test(mensagem)) return 'Você não participa mais desta empresa.';
   return ALGO_DEU_ERRADO;
 }
 
-/** Resolver, reabrir ou marcar como lida. */
+/** Resolver, reabrir, marcar como lida, assumir a conversa ou devolver para a IA. */
 export async function mudarConversa(dados: { conversaId: string; acao: AcaoDaConversa }): Promise<Resultado> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
@@ -457,7 +460,10 @@ export async function mudarConversa(dados: { conversaId: string; acao: AcaoDaCon
     p_action: acao,
   });
   if (error) {
-    const esperada = /another_open_conversation|Conversation is not resolved|Archived conversation|Conversation not found|Workspace membership/.test(error.message);
+    const esperada =
+      /another_open_conversation|Conversation is not resolved|Archived conversation|Conversation not found|Workspace membership|another teammate|Conversation is not active/.test(
+        error.message,
+      );
     if (!esperada) console.error('[inbox] não foi possível mudar a conversa:', { acao, erro: error });
     return { ok: false, erro: motivoDaAcao(error.message) };
   }

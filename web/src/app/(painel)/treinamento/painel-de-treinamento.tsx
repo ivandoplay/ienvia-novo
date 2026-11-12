@@ -786,6 +786,12 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
           geradas”, mas a parte que lê as mensagens dos clientes e responde sozinha ainda está sendo reconstruída.
         </p>
       )}
+      {ATENDENTE_DE_IA_NO_AR && (
+        <p className="aviso">
+          A IA usa este treinamento nas conversas dos chips que estão com ela ligada (aba <Link href="/instancias">Instâncias</Link>). O que você salvar
+          aqui já vale na próxima resposta.
+        </p>
+      )}
       {!podeEditar && <p className="aviso">Só o dono da conta altera o treinamento. Você pode ver como ele está.</p>}
     </div>
   );

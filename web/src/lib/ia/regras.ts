@@ -6,11 +6,12 @@
 
 /**
  * A IA já responde sozinha no WhatsApp?
- * Enquanto for `false`, as telas de Treinamento e do Motor de IA avisam, com todas as letras, que o que
- * se configura ali fica guardado mas ainda não é usado em conversa nenhuma. Vira `true` junto com o
- * código que responde as mensagens (o atendente em si), nunca antes.
+ * Enquanto era `false`, as telas de Treinamento e do Motor de IA avisavam que o que se configurava ali
+ * ficava guardado mas ainda não era usado em conversa nenhuma. Virou `true` junto com o atendente
+ * (lib/atendente/atendente.ts): a partir daí, o que está nessas telas vale nas conversas dos chips
+ * que estiverem com a IA ligada.
  */
-export const ATENDENTE_DE_IA_NO_AR: boolean = false;
+export const ATENDENTE_DE_IA_NO_AR: boolean = true;
 
 export type Provedor = 'gemini' | 'openrouter' | 'nvidia';
 /** Na ordem em que aparecem na tela. */
@@ -141,7 +142,8 @@ export const PADRAO_DO_MOTOR: ConfiguracaoDoMotor = {
 export const LIMITES_DO_MOTOR = {
   criatividade: { minimo: 0, maximo: 1 },
   memoria: { minimo: 4, maximo: 60 },
-  esperaEmSegundos: { minimo: 1, maximo: 60 },
+  // Até 20 segundos: a espera, a resposta do provedor e o envio precisam caber num único pedido ao servidor.
+  esperaEmSegundos: { minimo: 1, maximo: 20 },
   minutosDePausa: { minimo: 5, maximo: 1440 },
 } as const;
 
@@ -259,7 +261,7 @@ export function conferirConfiguracao(entrada: unknown): Conferencia {
   const memoria = inteiroEntre(dados.memoria, LIMITES_DO_MOTOR.memoria);
   if (memoria === null) return { ok: false, erro: 'A memória vai de 4 a 60 mensagens.' };
   const esperaEmSegundos = inteiroEntre(dados.esperaEmSegundos, LIMITES_DO_MOTOR.esperaEmSegundos);
-  if (esperaEmSegundos === null) return { ok: false, erro: 'O tempo de espera vai de 1 a 60 segundos.' };
+  if (esperaEmSegundos === null) return { ok: false, erro: 'O tempo de espera vai de 1 a 20 segundos.' };
   const minutosDePausa = inteiroEntre(dados.minutosDePausa, LIMITES_DO_MOTOR.minutosDePausa);
   if (minutosDePausa === null) return { ok: false, erro: 'A pausa vai de 5 minutos a 24 horas (1440 minutos).' };
 

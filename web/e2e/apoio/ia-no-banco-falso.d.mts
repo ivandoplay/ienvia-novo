@@ -15,5 +15,6 @@ export declare function criarIaDoBanco(apoio: {
   responder: (res: ServerResponse, status: number, corpo: unknown) => void;
 }): {
   acoesDaIa: (res: ServerResponse, usuario: { id: string }, nome: string, corpo: Record<string, unknown>) => void;
+  faltaParaAIa: (workspaceId: string, chipId?: string | null) => 'ai_key_missing' | 'ai_training_missing' | null;
   reiniciarIa: () => void;
 };

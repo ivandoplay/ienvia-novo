@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
+import { Interruptor } from '@/components/ui/interruptor';
+import type { ResumoDaIa } from '@/lib/atendente/painel';
 import type { Chip } from '@/lib/dados/instancias';
 import {
   FUNCOES_DO_CHIP,
@@ -17,6 +20,7 @@ import {
   conferirChip,
   desconectarChip,
   gerarQrCode,
+  mudarIaDoChip,
   removerChip,
   salvarChip,
   type EstadoDoFormulario,
@@ -31,6 +35,8 @@ interface Props {
   evolutionConfigurada: boolean;
   temEnderecoPublico: boolean;
   falhouAoCarregar: boolean;
+  /** Como está a IA da empresa: pausada ou não, e o que falta para ligar. `null` quando não deu para ler. */
+  ia: ResumoDaIa | null;
 }
 
 /** O que está sendo mostrado para conectar um chip: a imagem do QR Code ou o código de 8 dígitos. */
@@ -56,7 +62,7 @@ const INTERVALO_DE_CONFERENCIA = 3_000;
 const VALIDADE_DO_QR = 35_000;
 const RENOVACOES_MAXIMAS = 5;
 
-export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada, temEnderecoPublico, falhouAoCarregar }: Props) {
+export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada, temEnderecoPublico, falhouAoCarregar, ia }: Props) {
   const router = useRouter();
   const [janela, setJanela] = useState<Janela>(null);
   const [conexao, setConexao] = useState<Conexao | null>(null);
@@ -261,6 +267,10 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
             }
             aoEditar={() => setJanela({ tipo: 'editar', chip })}
             aoRemover={() => setJanela({ tipo: 'remover', chip })}
+            ia={ia}
+            aoMudarIa={(ligar) =>
+              executar(`ia:${chip.id}`, chip, () => mudarIaDoChip(chip.id, ligar), ligar ? 'IA ligada neste chip.' : 'IA desligada neste chip.')
+            }
           />
         ))
       )}
@@ -323,6 +333,20 @@ interface PropsDoCartao {
   aoDesconectar: () => void;
   aoEditar: () => void;
   aoRemover: () => void;
+  ia: ResumoDaIa | null;
+  aoMudarIa: (ligar: boolean) => void;
+}
+
+/** O que dizer embaixo do liga/desliga da IA de um chip. */
+function situacaoDaIaNoChip(chip: Chip, ia: ResumoDaIa | null): string {
+  if (chip.iaLigada) {
+    if (ia?.pausada) return 'Ligado, mas a IA está pausada em todos os chips. Ela volta quando a pausa for retirada, no topo do painel.';
+    if (chip.estado !== 'connected') return 'Ligado. A IA começa a responder quando o chip estiver conectado.';
+    return 'A IA responde as mensagens que chegam neste chip e passa a conversa para você quando precisa.';
+  }
+  if (ia?.falta === 'chave') return 'Desligado. Para ligar, cadastre antes a chave do provedor principal no Motor de IA.';
+  if (ia?.falta === 'treinamento') return 'Desligado. Para ligar, preencha antes o Treinamento: é de lá que a IA tira o que responder.';
+  return 'Desligado: as mensagens deste chip chegam na Inbox, e só a equipe responde.';
 }
 
 function CartaoDoChip({
@@ -337,10 +361,14 @@ function CartaoDoChip({
   aoDesconectar,
   aoEditar,
   aoRemover,
+  ia,
+  aoMudarIa,
 }: PropsDoCartao) {
   const idTitulo = useId();
   const idNumero = useId();
   const [numero, setNumero] = useState('');
+  /** O que a pessoa acabou de pedir no liga/desliga da IA; vale só enquanto o pedido está a caminho. */
+  const [iaPedida, setIaPedida] = useState<boolean | null>(null);
   const estado = descreverEstado(chip.estado);
   const conectado = chip.estado === 'connected';
   const naNuvem = chip.motor === 'evolution';
@@ -389,10 +417,33 @@ function CartaoDoChip({
         )}
       </div>
 
-      <p className="chip-ia">
-        Atendente de IA: {chip.iaLigada ? 'ligado' : 'desligado'} neste chip.{' '}
-        {!chip.iaLigada && 'Todo chip nasce assim; o botão de ligar chega junto com o atendente de IA, na próxima etapa.'}
-      </p>
+      <div className="chip-ia">
+        {podeEditar && naNuvem ? (
+          <>
+            <Interruptor
+              titulo="Atendente de IA neste chip"
+              descricao={situacaoDaIaNoChip(chip, ia)}
+              // O botão muda na hora do clique; quando o pedido termina, vale o que o servidor respondeu.
+              ligado={ocupado === `ia:${chip.id}` && iaPedida !== null ? iaPedida : chip.iaLigada}
+              desativado={trabalhando}
+              aoMudar={(ligar) => {
+                setIaPedida(ligar);
+                aoMudarIa(ligar);
+              }}
+            />
+            {!chip.iaLigada && ia?.falta && (
+              <Link href={ia.falta === 'chave' ? '/inteligencia-artificial' : '/treinamento'} className="btn btn-secondary btn-sm chip-ia-atalho">
+                {ia.falta === 'chave' ? 'Abrir o Motor de IA' : 'Abrir o Treinamento'}
+              </Link>
+            )}
+          </>
+        ) : (
+          <p>
+            Atendente de IA: {chip.iaLigada ? 'ligado' : 'desligado'} neste chip.{' '}
+            {naNuvem ? 'Só o dono da conta liga e desliga.' : chip.iaLigada ? '' : 'A IA ainda não responde por chips do motor local.'}
+          </p>
+        )}
+      </div>
 
       {recado && (
         <p className={`aviso ${recado.tipo === 'ok' ? 'aviso--ok' : 'aviso--erro'}`} role={recado.tipo === 'ok' ? 'status' : 'alert'}>

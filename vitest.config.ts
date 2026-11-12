@@ -8,7 +8,8 @@ const raiz = path.dirname(fileURLToPath(import.meta.url));
  * Um único comando (`npm test`) roda os três grupos de teste rápidos do repositório:
  *   shared — regras usadas pelo painel e pelo motor
  *   web    — funções puras do painel (sem navegador)
- *   banco  — migrações e regras de acesso, num Postgres em memória
+ *   banco  — migrações e regras de acesso, num Postgres em memória; e o atendente de IA de ponta a ponta
+ *            (código do painel + banco de verdade em memória + Evolution e provedores de IA de mentira)
  * Os testes de navegador (ponta a ponta) rodam à parte: `npm run test:e2e`.
  */
 export default defineConfig({
@@ -38,9 +39,18 @@ export default defineConfig({
         },
       },
       {
+        // Os testes de web/test-com-banco rodam código do painel (a porta dos avisos e o atendente de IA)
+        // contra o banco de verdade em memória; por isso este grupo conhece os mesmos atalhos do grupo web.
+        resolve: {
+          alias: {
+            '@': path.join(raiz, 'web', 'src'),
+            '@ienvia/shared': path.join(raiz, 'shared', 'src', 'index.ts'),
+            'server-only': path.join(raiz, 'web', 'test', 'apoio', 'vazio.ts'),
+          },
+        },
         test: {
           name: 'banco',
-          include: ['supabase/tests/**/*.test.ts'],
+          include: ['supabase/tests/**/*.test.ts', 'web/test-com-banco/**/*.test.ts'],
           environment: 'node',
           // O Postgres em memória é pesado (uns 400 MB, com pico de ~1 GB ao subir). Para caber em
           // máquinas pequenas: um processo só, sem isolar os arquivos (assim todos usam o mesmo

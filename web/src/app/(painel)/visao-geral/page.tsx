@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icone, type NomeIcone } from '@/components/ui/icone';
+import { situacaoDaIa } from '@/lib/atendente/painel';
+import { carregarResumoDaIa } from '@/lib/dados/atendente';
 import { carregarVisaoGeral, ETAPAS_DO_FUNIL } from '@/lib/dados/visao-geral';
 import { plural } from '@/lib/formato';
 import { obterSessao } from '@/lib/sessao';
@@ -33,8 +35,9 @@ export default async function PaginaVisaoGeral() {
   // O layout do painel já garante sessão e workspace; isto é só para o TypeScript.
   if (!sessao?.workspaceAtivo) return null;
 
-  const dados = await carregarVisaoGeral(sessao.workspaceAtivo.id);
+  const [dados, resumoDaIa] = await Promise.all([carregarVisaoGeral(sessao.workspaceAtivo.id), carregarResumoDaIa(sessao.workspaceAtivo.id)]);
   const instancias = dados.instancias;
+  const ia = resumoDaIa ? situacaoDaIa(resumoDaIa) : null;
 
   const indicadores: Indicador[] = [
     {
@@ -48,18 +51,13 @@ export default async function PaginaVisaoGeral() {
     },
     {
       rota: '/instancias',
-      dica: 'Chips conectados com a resposta automática ligada',
+      dica: 'Se a IA está respondendo sozinha, e em quantos chips',
       icone: 'kpiIa',
       cor: 'ia',
-      valor: instancias === null ? '—' : instancias.comIaLigada > 0 ? 'Ligada' : 'Desligada',
+      valor: ia === null ? '—' : ia.rotulo,
       valorEhTexto: true,
       rotulo: 'IA respondendo',
-      rodape:
-        instancias === null
-          ? 'sem informação'
-          : instancias.comIaLigada > 0
-            ? `em ${plural(instancias.comIaLigada, 'chip', 'chips')}`
-            : 'atendimento automático',
+      rodape: ia === null ? 'sem informação' : ia.detalhe,
     },
     {
       rota: '/campanhas',
@@ -200,12 +198,12 @@ export default async function PaginaVisaoGeral() {
             <Passo numero={1} feito={(instancias?.conectadas ?? 0) > 0}>
               <strong>Conecte um chip</strong> em Instâncias, por QR Code ou código.
             </Passo>
-            {/* O passo 2 passa a ser marcado de verdade na Fase 2, quando o Treinamento existir. */}
-            <Passo numero={2} feito={false}>
-              <strong>Treine o atendente</strong> com as informações do seu negócio.
+            {/* Feito = já dá para ligar a IA: há uma base de treinamento e a chave do provedor principal. */}
+            <Passo numero={2} feito={resumoDaIa !== null && resumoDaIa.falta === null}>
+              <strong>Prepare o atendente</strong>: preencha o Treinamento e cadastre a chave no Motor de IA.
             </Passo>
-            <Passo numero={3} feito={(instancias?.comIaLigada ?? 0) > 0}>
-              <strong>Ligue a IA</strong> no chip quando estiver satisfeito com as respostas.
+            <Passo numero={3} feito={(resumoDaIa?.chipsComIa ?? 0) > 0}>
+              <strong>Ligue a IA</strong> no chip, em Instâncias, quando estiver satisfeito com o treinamento.
             </Passo>
           </ol>
         </section>

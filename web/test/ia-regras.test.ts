@@ -221,6 +221,7 @@ describe('conferir o formulário', () => {
       [com({ memoria: 61 }), /memória/],
       [com({ memoria: 10.5 }), /memória/],
       [com({ esperaEmSegundos: 0 }), /espera/],
+      [com({ esperaEmSegundos: 21 }), /espera vai de 1 a 20 segundos/],
       [com({ esperaEmSegundos: 61 }), /espera/],
       [com({ minutosDePausa: 4 }), /pausa/],
       [com({ minutosDePausa: 1441 }), /pausa/],
@@ -234,7 +235,7 @@ describe('conferir o formulário', () => {
     }
     // Os limites exatos passam.
     expect(conferirConfiguracao(com({ criatividade: 0, memoria: 4, esperaEmSegundos: 1, minutosDePausa: 5 })).ok).toBe(true);
-    expect(conferirConfiguracao(com({ criatividade: 1, memoria: 60, esperaEmSegundos: 60, minutosDePausa: 1440 })).ok).toBe(true);
+    expect(conferirConfiguracao(com({ criatividade: 1, memoria: 60, esperaEmSegundos: 20, minutosDePausa: 1440 })).ok).toBe(true);
   });
 });
 

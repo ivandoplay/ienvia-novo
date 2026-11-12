@@ -146,3 +146,12 @@
     flex: 1 1 auto;
   }
 }
+
+/* O liga/desliga da IA em cada chip. */
+.chip-ia .interruptor {
+  align-items: flex-start;
+}
+
+.chip-ia-atalho {
+  margin: 0 0 4px 56px;
+}

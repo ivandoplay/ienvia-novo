@@ -2,6 +2,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
+import { explicarRecusaDoChip } from '@/lib/atendente/painel';
 import { enderecoPublico, lerConfigEvolution } from '@/lib/env';
 import {
   ErroEvolution,
@@ -400,5 +401,29 @@ export async function removerChip(chipId: string): Promise<Resultado> {
     return { ok: false, erro: 'Não foi possível remover o chip agora. Tente de novo em instantes.' };
   }
   atualizarTelas();
+  return { ok: true };
+}
+
+/**
+ * Liga ou desliga a IA num chip (só o dono). Para ligar, o banco exige a chave do provedor principal
+ * e uma base de treinamento; sem isso a IA não teria como responder, e a tela explica o que falta.
+ */
+export async function mudarIaDoChip(chipId: string, ligar: boolean): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(chipId) || typeof ligar !== 'boolean') return { ok: false, erro: CHIP_NAO_ENCONTRADO };
+
+  const { error } = await contexto.supabase.rpc('set_my_instance_ai', {
+    p_workspace_id: contexto.workspaceId,
+    p_instance_id: chipId,
+    p_enabled: ligar,
+  });
+  if (error) {
+    const explicacao = explicarRecusaDoChip(error.message);
+    if (!explicacao) console.error('[instâncias] não foi possível mudar a IA do chip:', { codigo: error.code, mensagem: error.message });
+    return { ok: false, erro: explicacao ?? 'Algo deu errado do nosso lado. Tente de novo em instantes.' };
+  }
+  // A IA ligada ou desligada aparece nas Instâncias, no topo do painel, na Visão geral e na Inbox.
+  revalidatePath('/', 'layout');
   return { ok: true };
 }

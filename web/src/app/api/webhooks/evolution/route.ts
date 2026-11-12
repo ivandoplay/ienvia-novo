@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { after } from 'next/server';
+import { atenderSobras, atenderVez, orcamentoDoAtendente } from '@/lib/atendente/atendente';
 import { interpretarAviso } from '@/lib/evolution/aviso';
 import { trazerArquivoDaMensagem } from '@/lib/inbox/buscar-arquivo';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
@@ -13,9 +14,16 @@ import { criarClienteDeServico } from '@/lib/supabase/servico';
  *
  * Mensagem com arquivo (foto, áudio, vídeo, documento, figurinha): a mensagem é gravada na hora e a
  * Evolution recebe o "ok" em seguida; o arquivo em si é trazido logo depois, sem segurar a resposta.
+ *
+ * Mensagem de um cliente num chip com a IA ligada: o banco marca a vez da IA ao gravar a mensagem, e a
+ * resposta é preparada e enviada também depois do "ok" (ver lib/atendente/atendente.ts).
  */
 
-/** Buscar um arquivo grande na Evolution e guardá-lo pode levar dezenas de segundos. */
+/**
+ * Buscar um arquivo grande na Evolution e guardá-lo pode levar dezenas de segundos; a resposta da IA
+ * (esperar o cliente terminar de escrever, pedir ao provedor e enviar) também. O atendente trabalha
+ * com um tempo total menor que este (orcamentoDoAtendente), para nunca ser cortado no meio de um envio.
+ */
 export const maxDuration = 60;
 
 /**
@@ -27,6 +35,7 @@ const CORPO_MAXIMO = 4_000_000;
 const responder = (status: number, corpo: Record<string, unknown>) => Response.json(corpo, { status });
 
 export async function POST(pedido: Request): Promise<Response> {
+  const chegouEm = Date.now();
   const segredo = /^Bearer\s+(\S+)$/i.exec(pedido.headers.get('authorization') ?? '')?.[1];
   if (!segredo || segredo.length > 200) return responder(401, { ok: false, erro: 'não autorizado' });
 
@@ -90,7 +99,16 @@ export async function POST(pedido: Request): Promise<Response> {
     return responder(500, { ok: false, erro: 'não foi possível gravar' });
   }
 
-  const gravado = data as { result?: string; workspace_id?: string; message_id?: string; media?: { status?: string } | null } | null;
+  const gravado = data as {
+    result?: string;
+    workspace_id?: string;
+    message_id?: string;
+    media?: { status?: string } | null;
+    /** A vez da IA, quando a mensagem é de um cliente e a IA pode responder. */
+    ai?: { scheduled?: boolean; turn_id?: string; wait_ms?: number } | null;
+    /** Ficou alguma vez da IA para trás nesta empresa. */
+    ai_stale?: boolean;
+  } | null;
   const resultado = gravado?.result ?? 'desconhecido';
   if (resultado === 'unauthorized') return responder(401, { ok: false, erro: 'não autorizado' });
 
@@ -102,6 +120,22 @@ export async function POST(pedido: Request): Promise<Response> {
     after(async () => {
       await trazerArquivoDaMensagem(supabase, alvo, mensagemDoAviso);
     });
+  }
+
+  // A IA responde depois do "ok" à Evolution. Se algo der errado, a conversa vai para "Esperando você".
+  if (aviso.tipo === 'mensagem' && resultado === 'accepted' && gravado?.workspace_id) {
+    const workspaceId = gravado.workspace_id;
+    const ambiente = { supabase, prazo: chegouEm + orcamentoDoAtendente() };
+    const vez = gravado.ai?.scheduled === true && gravado.ai.turn_id && gravado.message_id ? { vezId: gravado.ai.turn_id, gatilhoId: gravado.message_id } : null;
+    const espera = typeof gravado.ai?.wait_ms === 'number' && gravado.ai.wait_ms > 0 ? gravado.ai.wait_ms : 0;
+    const haSobras = gravado.ai_stale === true;
+    if (vez || haSobras) {
+      after(async () => {
+        if (vez) await atenderVez(ambiente, { workspaceId, ...vez, esperaMs: espera });
+        // Vez que ficou sem dono (o servidor reiniciou no meio, por exemplo): este pedido aproveita e cuida.
+        if (haSobras) await atenderSobras(ambiente, workspaceId);
+      });
+    }
   }
 
   return responder(200, { ok: true, resultado });

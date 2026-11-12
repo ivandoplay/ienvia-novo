@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Icone } from '@/components/ui/icone';
 import { ATALHOS_CELULAR, buscarItemPorRota, rotaEstaAtiva, type GrupoMenu, type ItemMenu } from '@/lib/navegacao';
+import type { ResumoDaIa } from '@/lib/atendente/painel';
+import { ControleDaIa } from './controle-da-ia';
 import { MenuDaConta } from './menu-da-conta';
 
 export interface PropsDaCasca {
@@ -22,6 +24,8 @@ export interface PropsDaCasca {
   };
   workspace: string;
   conexao: { texto: string; conectado: boolean };
+  /** Como está a IA da empresa (para o botão "Pausar tudo"). `null` quando não deu para ler. */
+  ia: ResumoDaIa | null;
   children: ReactNode;
 }
 
@@ -44,7 +48,7 @@ function useTelaDeCelular(): boolean {
  * A moldura do painel: menu lateral, barra do topo, conteúdo e navegação do celular.
  * Tudo que é comum a todas as abas mora aqui; cada aba só entrega o seu miolo (`children`).
  */
-export function Casca({ menu, usuario, workspace, conexao, children }: PropsDaCasca) {
+export function Casca({ menu, usuario, workspace, conexao, ia, children }: PropsDaCasca) {
   const caminho = usePathname();
   const ehCelular = useTelaDeCelular();
   const [gavetaAberta, setGavetaAberta] = useState(false);
@@ -158,6 +162,7 @@ export function Casca({ menu, usuario, workspace, conexao, children }: PropsDaCa
           </div>
 
           <div className="topbar-right">
+            <ControleDaIa ia={ia} />
             <button
               type="button"
               className="account-trigger-btn"

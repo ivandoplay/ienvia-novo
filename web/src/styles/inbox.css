@@ -1084,3 +1084,105 @@ a.balao-arquivo:hover {
   font-size: 12px;
   line-height: 1.45;
 }
+
+/* A faixa da IA no alto da conversa: o que ela está fazendo ali, o recado que deixou e os botões de assumir e devolver. */
+.inbox-ia {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.inbox-ia--ia {
+  background: var(--accent-soft);
+}
+
+.inbox-ia--atencao {
+  background: var(--warning-soft);
+}
+
+.inbox-ia-icone {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  color: var(--text-secondary);
+}
+
+.inbox-ia--ia .inbox-ia-icone {
+  color: var(--accent-bright);
+}
+
+.inbox-ia--atencao .inbox-ia-icone {
+  color: var(--warning-text);
+}
+
+.inbox-ia-texto {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.inbox-ia-titulo {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.inbox-ia-recado {
+  margin-top: 4px;
+  color: var(--text-primary);
+}
+
+dl.inbox-ia-recado {
+  display: grid;
+  gap: 2px;
+}
+
+.inbox-ia-recado > div {
+  display: flex;
+  gap: 6px;
+}
+
+.inbox-ia-recado dt {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.inbox-ia-recado dt::after {
+  content: ':';
+}
+
+.inbox-ia-recado dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.inbox-ia-detalhe {
+  margin-top: 4px;
+}
+
+.inbox-ia-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .inbox-ia {
+    flex-wrap: wrap;
+  }
+
+  .inbox-ia-acoes {
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 27px;
+  }
+}

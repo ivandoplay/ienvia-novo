@@ -137,6 +137,7 @@ describe('Motor de IA: configurações', () => {
       [{ max_history_messages: 61 }, /Invalid max_history_messages/],
       [{ max_history_messages: 10.5 }, /Invalid max_history_messages/],
       [{ debounce_seconds: 0 }, /Invalid debounce_seconds/],
+      [{ debounce_seconds: 21 }, /Invalid debounce_seconds/],
       [{ debounce_seconds: 61 }, /Invalid debounce_seconds/],
       [{ human_pause_minutes: 4 }, /Invalid human_pause_minutes/],
       [{ human_pause_minutes: 1441 }, /Invalid human_pause_minutes/],
@@ -154,10 +155,10 @@ describe('Motor de IA: configurações', () => {
       // E os limites exatos são aceitos.
       const nosLimites = { temperature: 1, max_history_messages: 60, debounce_seconds: 1, human_pause_minutes: 1440, gemini_model: 'google/gemma-4:free' };
       expect(await chamar('save_my_ai_settings', [LOJA_A, nosLimites])).toMatchObject(nosLimites);
-      expect(await chamar('save_my_ai_settings', [LOJA_A, { temperature: 0, max_history_messages: 4, debounce_seconds: 60, human_pause_minutes: 5 }])).toMatchObject({
+      expect(await chamar('save_my_ai_settings', [LOJA_A, { temperature: 0, max_history_messages: 4, debounce_seconds: 20, human_pause_minutes: 5 }])).toMatchObject({
         temperature: 0,
         max_history_messages: 4,
-        debounce_seconds: 60,
+        debounce_seconds: 20,
         human_pause_minutes: 5,
       });
     });

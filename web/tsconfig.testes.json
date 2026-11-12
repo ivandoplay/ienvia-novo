@@ -4,6 +4,6 @@
     "incremental": false,
     "plugins": []
   },
-  "include": ["next-env.d.ts", "test/**/*.ts", "e2e/**/*.ts", "playwright.config.ts"],
+  "include": ["next-env.d.ts", "test/**/*.ts", "test-com-banco/**/*.ts", "e2e/**/*.ts", "playwright.config.ts"],
   "exclude": ["node_modules"]
 }

@@ -76,13 +76,21 @@ describe('o que o navegador NÃO pode fazer direto no banco', () => {
     });
   });
 
-  test('alterar a conversa de outra empresa não tem efeito', async () => {
+  test('ninguém altera uma conversa direto, nem a da própria empresa: só pelas funções do banco', async () => {
     await banco.comoUsuario(DONA_A, async () => {
-      const resultado = await banco.db.query(`update public.conversations set stage = 'resolved' where id = '${CONVERSA_B}'`);
-      expect(resultado.affectedRows).toBe(0);
+      for (const conversa of [CONVERSA_A, CONVERSA_B]) {
+        expect(await banco.esperarErro(executar(`update public.conversations set stage = 'resolved' where id = '${conversa}'`))).toMatch(
+          /permission denied/,
+        );
+        expect(
+          await banco.esperarErro(executar(`update public.conversations set automation_paused = false where id = '${conversa}'`)),
+        ).toMatch(/permission denied/);
+      }
     });
-    const depois = await banco.db.query<{ stage: string }>(`select stage from public.conversations where id = '${CONVERSA_B}'`);
-    expect(depois.rows[0]?.stage).toBe('new');
+    const depois = await banco.db.query<{ stage: string }>(
+      `select stage from public.conversations where id in ('${CONVERSA_A}', '${CONVERSA_B}') order by stage`,
+    );
+    expect(depois.rows.map((linha) => linha.stage)).toEqual(['new', 'waiting_human']);
   });
 
   test('não cadastra contato dentro de outra empresa', async () => {

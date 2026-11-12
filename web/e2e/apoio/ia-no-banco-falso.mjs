@@ -300,7 +300,7 @@ export function criarIaDoBanco({ tabelas, responder }) {
       }
       if (typeof novo.temperature !== 'number' || !(novo.temperature >= 0 && novo.temperature <= 1)) return invalido('temperature');
       if (!inteiroEntre(novo.max_history_messages, 4, 60)) return invalido('max_history_messages');
-      if (!inteiroEntre(novo.debounce_seconds, 1, 60)) return invalido('debounce_seconds');
+      if (!inteiroEntre(novo.debounce_seconds, 1, 20)) return invalido('debounce_seconds');
       if (!inteiroEntre(novo.human_pause_minutes, 5, 1440)) return invalido('human_pause_minutes');
       for (const campo of ['simulate_typing', 'split_long_messages', 'pause_on_human_reply']) {
         if (typeof novo[campo] !== 'boolean') return invalido(campo);
@@ -463,6 +463,17 @@ export function criarIaDoBanco({ tabelas, responder }) {
 
   return {
     acoesDaIa,
+    /**
+     * O que falta para a IA poder ser ligada num chip, como o banco de verdade responde:
+     * 'ai_key_missing' (sem a chave do provedor principal), 'ai_training_missing' (sem base de treinamento) ou null.
+     */
+    faltaParaAIa(workspaceId, chipId = null) {
+      const principal = estado.configuracoes.get(workspaceId)?.provider ?? PADROES.provider;
+      if (!estado.chaves.has(`${workspaceId}:${principal}`)) return 'ai_key_missing';
+      const baseDoChip = chipId ? estado.baseDoChip.get(chipId) : null;
+      const temBase = estado.bases.some((base) => base.workspace_id === workspaceId && (base.is_default || base.id === baseDoChip));
+      return temBase ? null : 'ai_training_missing';
+    },
     /** Só para os testes: põe o Motor de IA e o Treinamento de volta no começo. */
     reiniciarIa() {
       estado = cenarioInicial();

@@ -180,7 +180,8 @@ describe('receber um arquivo', () => {
         storage_status: 'pending',
         attempts: 0,
       });
-      expect(await lerConversa()).toEqual({ stage: 'waiting_human', unread_count: 3, last_message_preview: '📷 Foto: meu comprovante' });
+      // No cenário, o chip da Loja A está com a IA ligada: a mensagem do cliente fica na vez dela.
+      expect(await lerConversa()).toEqual({ stage: 'ai', unread_count: 3, last_message_preview: '📷 Foto: meu comprovante' });
     });
   });
 

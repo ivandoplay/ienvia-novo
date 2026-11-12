@@ -268,6 +268,27 @@ function acoesDosChips(res, usuario, nome, corpo) {
 const mudancas = new Map();
 const anotarMudanca = (workspaceId) => mudancas.set(workspaceId, (mudancas.get(workspaceId) ?? 0) + 1);
 
+/** Empresas com a IA pausada ("Pausar tudo"): empresa → quando foi pausada. */
+const pausasDaIa = new Map();
+const UMA_HORA_EM_MS = 60 * 60_000;
+
+/** Como a IA está numa conversa, no formato que read_my_conversation devolve em conversation.ai. */
+function iaDaConversa(conversa, chip) {
+  const agora = Date.now();
+  const ate = conversa.ai_paused_until && new Date(conversa.ai_paused_until).getTime() > agora ? conversa.ai_paused_until : null;
+  const travada = conversa.automation_paused === true;
+  return {
+    chip_enabled: chip.is_enabled === true,
+    workspace_paused: pausasDaIa.has(conversa.workspace_id),
+    locked: travada,
+    paused_until: travada ? null : ate,
+    pause_reason: conversa.ai_pause_reason ?? null,
+    handoff_at: conversa.ai_handoff_at ?? null,
+    handoff_note: conversa.ai_handoff_note ?? null,
+    working: conversa.ai_working === true,
+  };
+}
+
 const ETAPAS_ABERTAS = ['new', 'ai', 'waiting_human', 'human', 'waiting_customer'];
 const ETAPAS_QUE_ESPERAM = ['new', 'waiting_human', 'human'];
 const FUNCOES_DA_INBOX = [
@@ -297,7 +318,71 @@ function tocarConversaDepoisDoEnvio(conversa, texto, quando) {
   if (!conversa.last_message_at || quando > conversa.last_message_at) conversa.last_message_at = quando;
   conversa.activity_at = conversa.last_message_at;
   conversa.unread_count = 0;
-  if (ETAPAS_QUE_ESPERAM.includes(conversa.stage)) conversa.stage = 'waiting_customer';
+  if (ETAPAS_QUE_ESPERAM.includes(conversa.stage) || conversa.stage === 'ai') conversa.stage = 'waiting_customer';
+  // Uma pessoa respondeu: a IA para nesta conversa por uma hora (o padrão do Motor de IA), como no banco de verdade.
+  if (!conversa.automation_paused) conversa.ai_paused_until = new Date(Date.now() + UMA_HORA_EM_MS).toISOString();
+  if (conversa.ai_pause_reason !== 'claimed') conversa.ai_pause_reason = 'human_reply';
+  // O recado que a IA tinha deixado já foi atendido.
+  conversa.ai_handoff_at = null;
+  conversa.ai_handoff_note = null;
+  conversa.ai_working = false;
+}
+
+/**
+ * A IA da empresa: o resumo para o topo do painel, "Pausar tudo", retomar e o liga/desliga de cada chip.
+ * As mesmas regras do banco de verdade: qualquer pessoa ativa da empresa lê e pausa; só o dono retoma e mexe nos chips;
+ * para ligar a IA num chip é preciso a chave do provedor principal e uma base de treinamento.
+ */
+const FUNCOES_DO_ATENDENTE = ['read_my_ai_overview', 'pause_my_ai', 'resume_my_ai', 'set_my_instance_ai'];
+
+function acoesDoAtendente(res, usuario, nome, corpo) {
+  const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
+  const workspaceId = corpo.p_workspace_id;
+  const papel = PARTICIPACOES.find((p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.status === 'active')?.role ?? null;
+  const ehDono = papel === 'owner';
+  const chips = tabelas.instances.filter((chip) => chip.workspace_id === workspaceId && chip.status !== 'revoked');
+
+  if (nome === 'read_my_ai_overview') {
+    if (!papel) return erro(403, '42501', 'Workspace membership required');
+    return responder(res, 200, {
+      paused: pausasDaIa.has(workspaceId),
+      paused_at: pausasDaIa.get(workspaceId) ?? null,
+      can_resume: ehDono,
+      can_switch_chips: ehDono,
+      missing: iaDoBanco.faltaParaAIa(workspaceId),
+      chips_enabled: chips.filter((chip) => chip.is_enabled).length,
+      chips_answering: chips.filter((chip) => chip.is_enabled && chip.status === 'connected').length,
+    });
+  }
+  if (nome === 'pause_my_ai') {
+    if (!papel) return erro(403, '42501', 'Workspace membership required');
+    const mudou = !pausasDaIa.has(workspaceId);
+    if (mudou) pausasDaIa.set(workspaceId, new Date().toISOString());
+    anotarMudanca(workspaceId);
+    return responder(res, 200, { paused: true, changed: mudou });
+  }
+  if (nome === 'resume_my_ai') {
+    if (!ehDono) return erro(403, '42501', 'Workspace owner required');
+    const mudou = pausasDaIa.delete(workspaceId);
+    anotarMudanca(workspaceId);
+    return responder(res, 200, { paused: false, changed: mudou });
+  }
+  if (nome === 'set_my_instance_ai') {
+    if (!ehDono) return erro(403, '42501', 'Workspace owner required');
+    if (typeof corpo.p_enabled !== 'boolean') return erro(400, '22023', 'Invalid value');
+    const chip = chips.find((item) => item.id === corpo.p_instance_id);
+    if (!chip) return erro(400, 'P0002', 'Instance not found');
+    if (chip.is_enabled === corpo.p_enabled) return responder(res, 200, { id: chip.id, is_enabled: chip.is_enabled, changed: false });
+    if (corpo.p_enabled) {
+      if (chip.engine !== 'evolution') return erro(400, 'P0001', 'instance_unavailable');
+      const falta = iaDoBanco.faltaParaAIa(workspaceId, chip.id);
+      if (falta) return erro(400, 'P0001', falta);
+    }
+    chip.is_enabled = corpo.p_enabled;
+    anotarMudanca(workspaceId);
+    return responder(res, 200, { id: chip.id, is_enabled: chip.is_enabled, changed: true });
+  }
+  return erro(404, 'PGRST202', `Função não imitada: ${nome}`);
 }
 
 /**
@@ -412,6 +497,7 @@ function acoesDaInbox(res, usuario, nome, corpo) {
           created_at: contato.created_at,
         },
         instance: { id: chip.id, display_name: chip.display_name, status: chip.status, engine: chip.engine },
+        ai: iaDaConversa(conversa, chip),
       },
       messages: mensagens
         .slice(0, limite)
@@ -627,7 +713,27 @@ function acoesDaInbox(res, usuario, nome, corpo) {
       if (conversa.assigned_user_id && conversa.assigned_user_id !== usuario.id) {
         return erro(400, '22023', 'Conversation is assigned to another teammate');
       }
-      Object.assign(conversa, { stage: 'human', automation_paused: true, assigned_user_id: usuario.id, assigned_label: 'Atendente' });
+      Object.assign(conversa, {
+        stage: 'human',
+        automation_paused: true,
+        ai_pause_reason: 'claimed',
+        ai_paused_until: null,
+        ai_working: false,
+        assigned_user_id: usuario.id,
+        assigned_label: 'Atendente',
+      });
+    } else if (corpo.p_action === 'release') {
+      // Devolver para a IA: ela volta a responder a partir da próxima mensagem do contato.
+      if (['resolved', 'archived'].includes(conversa.stage)) return erro(400, '22023', 'Conversation is not active');
+      Object.assign(conversa, {
+        automation_paused: false,
+        ai_paused_until: null,
+        ai_pause_reason: null,
+        ai_handoff_at: null,
+        ai_handoff_note: null,
+        assigned_user_id: null,
+        assigned_label: null,
+      });
     } else if (corpo.p_action === 'resolve') {
       if (conversa.stage === 'archived') return erro(400, '22023', 'Archived conversation cannot be resolved again');
       Object.assign(conversa, { stage: 'resolved', automation_paused: true, unread_count: 0 });
@@ -997,6 +1103,7 @@ function reiniciarInbox() {
   assinaturas.clear();
   avisosRecebidos.clear();
   subidasQueVaoFalhar = 0;
+  pausasDaIa.delete(WORKSPACE_INBOX);
   anotarMudanca(WORKSPACE_INBOX);
 }
 
@@ -1054,6 +1161,10 @@ async function rotasDeDados(req, res, url) {
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DA_IA.includes(recurso.slice(4))) {
     return iaDoBanco.acoesDaIa(res, usuario, recurso.slice(4), await lerCorpo(req));
+  }
+
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DO_ATENDENTE.includes(recurso.slice(4))) {
+    return acoesDoAtendente(res, usuario, recurso.slice(4), await lerCorpo(req));
   }
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && recurso !== 'rpc/is_my_platform_master') {
@@ -1119,6 +1230,84 @@ const servidor = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/controle/reiniciar-ia') {
       iaDoBanco.reiniciarIa();
+      pausasDaIa.clear();
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/ia-na-conversa') {
+      // Só para os testes: deixa a IA de uma conversa num estado (como o atendente deixaria).
+      // ?conversa=...&estado=respondendo | repassada | sem_leitura | falhou | parada_por_pessoa | limpa
+      const conversa = tabelas.conversations.find((item) => item.id === url.searchParams.get('conversa'));
+      if (!conversa) return responder(res, 404, { ok: false });
+      const estado = url.searchParams.get('estado');
+      const daquiAUmaHora = new Date(Date.now() + UMA_HORA_EM_MS).toISOString();
+      const limpa = { automation_paused: false, ai_paused_until: null, ai_pause_reason: null, ai_handoff_at: null, ai_handoff_note: null, ai_working: false, assigned_user_id: null };
+      const estados = {
+        limpa: {},
+        respondendo: { stage: 'ai', unread_count: 0 },
+        escrevendo: { stage: 'ai', ai_working: true },
+        repassada: {
+          stage: 'waiting_human',
+          unread_count: Math.max(conversa.unread_count ?? 0, 1),
+          ai_paused_until: daquiAUmaHora,
+          ai_pause_reason: 'handoff',
+          ai_handoff_at: new Date().toISOString(),
+          ai_handoff_note: url.searchParams.get('recado') ?? 'Cenário: cliente novo | Gatilho: quer fechar o pedido | Próxima jogada: confirmar o endereço',
+        },
+        sem_leitura: {
+          stage: 'waiting_human',
+          unread_count: Math.max(conversa.unread_count ?? 0, 1),
+          automation_paused: true,
+          ai_pause_reason: 'silent_handoff',
+          ai_handoff_at: new Date().toISOString(),
+          ai_handoff_note: 'O contato mandou um áudio. A IA só escuta áudio pelo Google Gemini, que não está na ordem de uso do Motor de IA (ou está sem chave).',
+        },
+        falhou: {
+          stage: 'waiting_human',
+          unread_count: Math.max(conversa.unread_count ?? 0, 1),
+          ai_paused_until: daquiAUmaHora,
+          ai_pause_reason: 'error',
+          ai_handoff_at: new Date().toISOString(),
+          ai_handoff_note: 'O Google Gemini recusou a chave. Confira se ela foi copiada inteira e se continua ativa.',
+        },
+        parada_por_pessoa: { stage: 'waiting_customer', ai_paused_until: daquiAUmaHora, ai_pause_reason: 'human_reply' },
+      };
+      if (!estados[estado]) return responder(res, 400, { ok: false, erro: 'estado desconhecido' });
+      Object.assign(conversa, limpa, estados[estado]);
+      anotarMudanca(conversa.workspace_id);
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/mensagem-da-ia') {
+      // Só para os testes: uma resposta da IA aparece numa conversa (como se o atendente tivesse acabado de enviar).
+      const conversa = tabelas.conversations.find((item) => item.id === url.searchParams.get('conversa'));
+      if (!conversa) return responder(res, 404, { ok: false });
+      const texto = url.searchParams.get('texto') ?? 'Resposta da IA';
+      const agora = new Date().toISOString();
+      tabelas.messages.push({
+        id: crypto.randomUUID(),
+        workspace_id: conversa.workspace_id,
+        conversation_id: conversa.id,
+        instance_id: conversa.instance_id,
+        provider_message_id: `WA-IA-${crypto.randomUUID()}`,
+        idempotency_key: `ia-${crypto.randomUUID().replaceAll('-', '')}-1`,
+        direction: 'outbound',
+        source_engine: 'evolution',
+        actor_type: 'ai',
+        status: url.searchParams.get('situacao') ?? 'sent',
+        body_text: texto,
+        occurred_at: agora,
+        created_at: agora,
+        sent_by: null,
+      });
+      Object.assign(conversa, { last_message_at: agora, activity_at: agora, last_message_preview: texto.slice(0, 300) });
+      anotarMudanca(conversa.workspace_id);
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/ia-do-chip') {
+      // Só para os testes: liga ou desliga a IA de um chip sem passar pela tela.
+      const chip = tabelas.instances.find((item) => item.id === url.searchParams.get('chip'));
+      if (!chip) return responder(res, 404, { ok: false });
+      chip.is_enabled = url.searchParams.get('ligada') === 'sim';
+      anotarMudanca(chip.workspace_id);
       return responder(res, 200, { ok: true });
     }
     if (url.pathname === '/controle/receber-mensagem') {

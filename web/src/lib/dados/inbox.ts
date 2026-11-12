@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { descreverIaNaConversa, lerIaDaConversa, type FaixaDaIa } from '@/lib/atendente/painel';
 import {
   duracaoLegivel,
   ehCaminhoDeArquivo,
@@ -168,6 +169,8 @@ export interface ConversaAberta {
   naoLidas: number;
   contato: { nome: string; iniciais: string; temNome: boolean; telefone: string; apagado: boolean; desde: string };
   chip: { id: string; apelido: string; estado: string; motor: string };
+  /** A faixa da IA nesta conversa (o que ela está fazendo aqui e quais botões cabem). `null` = a IA não participa. */
+  ia: FaixaDaIa | null;
   mensagens: MensagemDaConversa[];
   temMensagensAnteriores: boolean;
   desde: string;
@@ -250,6 +253,7 @@ interface RespostaDaConversa {
     created_at: string;
     contact: { display_name: string | null; phone_e164: string | null; erased: boolean; created_at: string };
     instance: { id: string; display_name: string; status: string; engine: string };
+    ai?: unknown;
   };
   messages?: LinhaDeMensagem[] | null;
   has_more?: boolean;
@@ -301,6 +305,7 @@ export async function carregarConversa(
         estado: conversa.instance.status,
         motor: conversa.instance.engine,
       },
+      ia: descreverIaNaConversa(lerIaDaConversa(conversa.ai), conversa.stage, agora),
       temMensagensAnteriores: resposta.has_more === true,
       mensagens: (resposta.messages ?? []).map((linha) => {
         const recebida = linha.direction === 'inbound';

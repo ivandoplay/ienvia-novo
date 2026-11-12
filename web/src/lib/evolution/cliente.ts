@@ -52,6 +52,8 @@ export interface Aviso {
 const TEMPO_LIMITE_PADRAO = 15_000;
 /** Enviar uma mensagem pode demorar mais que uma consulta; passado isto, o envio fica "sem confirmação". */
 const TEMPO_LIMITE_DO_ENVIO = 25_000;
+/** Teto do "digitando…" antes de uma mensagem (acima de 20 s a Evolution muda o jeito de esperar). */
+const DIGITANDO_NO_MAXIMO = 15_000;
 
 /**
  * O que a Evolution avisa ao painel:
@@ -256,9 +258,21 @@ export async function enviarTexto(
   nome: string,
   numero: string,
   texto: string,
-  opcoes: { tempoLimite?: number } = {},
+  opcoes: {
+    tempoLimite?: number;
+    /**
+     * Mostrar "digitando…" para o contato por este tempo (em milésimos de segundo) antes de a mensagem sair.
+     * A própria Evolution faz a espera (campo `delay`), então a resposta dela demora esse tanto a mais.
+     */
+    digitandoMs?: number;
+  } = {},
 ): Promise<ResultadoDoEnvio> {
-  return enviar(`/message/sendText/${nomeNoCaminho(nome)}`, { number: numero, text: texto }, opcoes.tempoLimite ?? TEMPO_LIMITE_DO_ENVIO);
+  const digitando = Math.round(Math.min(Math.max(opcoes.digitandoMs ?? 0, 0), DIGITANDO_NO_MAXIMO));
+  return enviar(
+    `/message/sendText/${nomeNoCaminho(nome)}`,
+    { number: numero, text: texto, ...(digitando > 0 ? { delay: digitando } : {}) },
+    opcoes.tempoLimite ?? TEMPO_LIMITE_DO_ENVIO + digitando,
+  );
 }
 
 /** Uma chamada de envio (texto ou arquivo) e a leitura do que a Evolution respondeu. Nunca lança erro. */

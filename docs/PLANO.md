@@ -110,7 +110,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
 | 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Pronta no código e no banco; falta conferir no ar.** Feitos e testados: Instâncias, recebimento das mensagens e a Inbox com texto e com **arquivos** (fotos, áudios, vídeos, documentos e figurinhas). A conferência final com os serviços de verdade está **travada por dois bloqueios de conta** (Vercel e Supabase): ver o começo da seção 6. |
-| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Prontas: as telas **Motor de IA** (Gemini, OpenRouter e NVIDIA) e **Treinamento** (identidade, regras, perguntas frequentes, arquivos, modelos prontos e várias bases). Falta: o atendente em si (a IA ainda **não responde** no WhatsApp), as Skills e as Mensagens prontas. Detalhes abaixo. |
+| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Prontos: as telas **Motor de IA** (Gemini, OpenRouter e NVIDIA) e **Treinamento**, e o **atendente** (a IA responde no WhatsApp, passa a conversa para você, para quando uma pessoa responde; liga/desliga por chip, "Pausar tudo", assumir e devolver). Falta: corrigir resposta em 1 clique, as Mensagens prontas e as Skills; e conferir com um celular de verdade (depende de publicar). Detalhes abaixo. |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
 | 5 | Campanhas e segurança | **Campanhas** com prévia, cadência segura, rodízio de chips, pausar/retomar. **Segurança**: anti-ban, fila segura, horário de atendimento, contatos ignorados, alerta no seu WhatsApp. | |
@@ -194,9 +194,11 @@ trocam de lugar sem prejuízo.
 
 ### O que a Fase 2 entregou até aqui (12/11/2026)
 
-**A IA ainda não responde ninguém.** O que existe são as telas **Motor de IA** (guarda e testa as
-chaves e os ajustes) e **Treinamento** (guarda o que a IA sabe e mostra as instruções que ela vai
-receber). As duas dizem isso com todas as letras enquanto o atendente não estiver pronto.
+São três partes: a tela **Motor de IA** (guarda e testa as chaves e os ajustes), a tela
+**Treinamento** (guarda o que a IA sabe e mostra as instruções que ela recebe) e o **atendente**
+(a IA respondendo no WhatsApp, nos chips em que você ligar). O atendente está pronto no código e no
+banco, mas **ainda não está no ar**: a publicação continua bloqueada (seção 6). Por isso nenhuma
+resposta da IA chegou ainda a um celular de verdade.
 
 #### Motor de IA
 
@@ -231,6 +233,8 @@ receber). As duas dizem isso com todas as letras enquanto o atendente não estiv
 - **Só o dono da conta altera.** A equipe vê, sem botões.
 - Ainda **não refeitos** (a tela avisa): Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro
   completo", "Pacote Turbo" e "corrigir resposta em 1 clique".
+- **O que a IA faz quando perguntam "estou falando com um robô?"** se escolhe na aba Regras: passar
+  a conversa para uma pessoa (padrão) ou dizer que é a assistente virtual.
 
 As instruções da IA foram postas à prova com dois modelos de verdade (NVIDIA e OpenRouter), em 14
 situações: pergunta que está na base, pergunta que não está, "é um robô?", tentativa de arrancar as
@@ -275,11 +279,9 @@ Decisões tomadas nesta parte (diga se quiser diferente):
   depois de escolher, e recomendo deixar o Gemini ou o OpenRouter como reserva.
 - **Não trouxe o "pool de chaves extras do Gemini"** (várias chaves grátis para multiplicar a cota).
   No lugar dele há três provedores com reserva. Se fizer falta, diga.
-- **Ainda não decidido:** a "mensagem enviada quando a IA está desligada" do painel antigo. Entra
-  (ou não) junto com o atendente.
-- **Nova opção no Treinamento (ainda sem tela):** o que a IA faz quando perguntam "estou falando com
-  um robô?". Padrão: passa a conversa para uma pessoa. Alternativa: admitir que é uma assistente
-  virtual. O painel antigo mandava negar; o novo não nega.
+- **A "mensagem enviada quando a IA está desligada" do painel antigo não entrou.** Com a IA
+  desligada (no chip, na conversa ou em tudo), a mensagem do cliente fica na Inbox para a equipe, e
+  nada é respondido sozinho. Se quiser essa mensagem automática de volta, diga.
 
 O que foi conferido de verdade, e o que não foi:
 
@@ -295,23 +297,113 @@ O que foi conferido de verdade, e o que não foi:
   NVIDIA, recusar ordem repetida, guardar/ler/apagar chave cifrada, recusar chave em texto puro,
   criar base, pergunta, arquivo, base por chip; conta de fora e visitante recusados; auditoria sem
   a chave) e desfez tudo no fim: 31 de 31, nada ficou gravado.
-- **Não conferido**: a tela falando com o banco de verdade pelo navegador (o Supabase está
-  bloqueado para o painel), e nada disto está publicado (a Vercel está bloqueada).
+- **As duas telas pelo navegador, no banco novo** (12/11/2026): 26 conferências, todas certas
+  (guardar e testar as chaves de verdade, ordem de uso, treinamento por modelo pronto, pergunta,
+  arquivo, instruções geradas, segunda base). Nada disto está publicado (a Vercel está bloqueada).
+
+#### Atendente (a IA respondendo no WhatsApp)
+
+O que ele faz:
+
+- **Liga e desliga por chip.** Em Instâncias, cada chip tem o botão "Atendente de IA neste chip" (só
+  o dono mexe). Todo chip nasce desligado. Para ligar é preciso ter a chave do provedor principal e
+  uma base de treinamento; sem isso, a tela diz o que falta e leva até a aba certa.
+- **Responde do jeito que uma pessoa responderia.** Espera o cliente terminar de escrever (mensagens
+  picadas viram uma resposta só), mostra "digitando…" por um tempo proporcional ao texto e divide
+  resposta comprida em até três balões.
+- **Usa o Treinamento e o Motor de IA exatamente como estão nas telas.** O que você salvar já vale
+  na próxima resposta. Se o provedor principal falha, a reserva responde.
+- **Passa a conversa para você quando precisa.** A conversa vai para "Esperando você" com a
+  explicação escrita no alto dela. Acontece quando:
+  - a própria IA pede (o recado dela aparece em três linhas: quem é, o que pediu, sugestão);
+  - ela não entende a mensagem (aí não envia nada);
+  - perguntam se é um robô (no padrão);
+  - o cliente manda um áudio ou arquivo que ela não consegue ler (não chuta);
+  - algo dá errado: provedor fora do ar, chave recusada, falta de chave ou de treinamento,
+    resposta que não deu para confirmar se chegou.
+- **Para quando uma pessoa responde**, pelo painel ou pelo celular do chip: fica parada naquela
+  conversa pelo tempo configurado no Motor de IA (1 hora no padrão), ou até alguém devolver, quando
+  o treinamento tem a "trava permanente".
+- **Na Inbox:** uma faixa no alto de cada conversa diz o que a IA está fazendo ali; os botões
+  **Assumir** (a IA sai da conversa até alguém devolver) e **Devolver para a IA**; e a etiqueta
+  "Com a IA" na lista.
+- **Pausar tudo**, no topo do painel: para a IA em todos os chips na hora. Qualquer pessoa da equipe
+  pausa; só o dono retoma. O aviso "IA pausada" fica à vista em todas as abas.
+- **Despedida e pedido para parar.** Quando o cliente recusa, a IA se despede uma vez e encerra a
+  conversa. Quando ele pede para parar, ela confirma, encerra, e fica registrado que ele não quer
+  mensagens comerciais (as campanhas da Fase 5 vão respeitar).
+- **Fotos, áudios e PDFs.** Foto vai para a IA quando o modelo escolhido enxerga. Áudio e PDF, só
+  pelo Gemini. Vídeo ela não assiste. Quando não consegue ler o que o cliente mandou, chama uma
+  pessoa em vez de responder no escuro.
+
+Regras que não se quebram:
+
+- **Nunca reenvia.** Se não dá para saber se uma resposta saiu, ela fica "sem confirmação" e a
+  conversa vai para uma pessoa, que confere no WhatsApp e marca.
+- **Nada fica perdido em silêncio.** Todo erro termina com a conversa em "Esperando você" e um
+  recado claro. Se o servidor cair no meio de uma resposta, a conversa volta para a equipe no
+  próximo aviso da Evolution, ou assim que alguém abrir o painel.
+- **Não responde:** mensagem com mais de 5 minutos que só chegou agora (o chip ficou sem sinal);
+  outro chip da mesma empresa (dois robôs conversariam sem parar); e a partir de 6 respostas em um
+  minuto ou 60 em uma hora na mesma conversa (para e chama uma pessoa).
+- **Não atropela ninguém.** Antes de cada balão o banco confere de novo: se uma pessoa respondeu ou
+  assumiu, se alguém pausou, ou se o cliente escreveu mais (aí a resposta velha é abandonada e sai
+  uma só, com tudo), nada é enviado.
+- **A chave de cada cliente** só é aberta no servidor, na hora de usar, e não vai para registro
+  nenhum.
+- **As conversas só mudam pelas funções do banco.** Até aqui, uma pessoa da empresa conseguia
+  alterar direto a etapa de uma conversa; o painel nunca usou esse caminho, e ele foi fechado.
+
+Decisões tomadas nesta parte (diga se quiser diferente):
+
+- **Esperar o cliente terminar de escrever: de 1 a 20 segundos** (era até 60). A espera, a resposta
+  do provedor e o envio precisam caber num único pedido ao servidor, que dura no máximo 60 segundos.
+- **"Devolver para a IA" vale a partir da próxima mensagem do contato.** Ela não responde sozinha a
+  mensagem que tinha ficado para trás.
+- **Confirmar "foi enviada" numa resposta da IA que estava sem confirmação** devolve a conversa
+  para ela.
+- **Quem pediu para parar e volta a escrever por conta própria** é atendido de novo (nasce uma
+  conversa nova). O que fica bloqueado para ele são as mensagens comerciais que partem de nós.
+- **Horário de atendimento, lista de contatos ignorados e alerta no seu WhatsApp pessoal** ficam na
+  Fase 5, como no plano.
+
+O que foi conferido de verdade, e o que não foi:
+
+- **Banco de verdade:** a migração `20261112161500_ai_attendant` foi ensaiada (rodou inteira e foi
+  desfeita), depois aplicada, e o retrato do banco bate com o do Git. Um roteiro de 56 passos rodou
+  lá (ligar a IA, a vez da IA do começo ao fim, o eco da Evolution, repasse, uma pessoa
+  respondendo, assumir e devolver, Pausar tudo, conta de fora e visitante recusados, auditoria) e
+  desfez tudo: 56 de 56.
+- **Ambiente de verdade** (painel rodando aqui, banco novo, Evolution de verdade e **NVIDIA de
+  verdade**, com a sua chave guardada cifrada): 34 conferências, todas certas. O cliente de teste
+  perguntou se entregam; a IA respondeu em menos de 1 segundo, usando o que estava no treinamento
+  ("entregamos em toda a cidade, de segunda a sábado, das 8h às 18h; a taxa é R$ 7,00"). A um "ok,
+  obrigado" ela ficou em silêncio. A "você é um robô?" ela não respondeu e passou a conversa.
+  Assumir, devolver, Pausar tudo e retomar funcionaram. A chave não apareceu em nada gravado, e a
+  limpeza não deixou sobra.
+- **Não conferido: a resposta chegando num celular.** O chip de teste nunca foi ligado a um
+  WhatsApp, então a Evolution não confirmou o envio (e o que se conferiu foi o comportamento certo
+  nessa hora: "sem confirmação", conversa para uma pessoa, nada reenviado). Para ver uma resposta
+  chegar de verdade é preciso um chip seu conectado **no painel publicado**.
+- **Não conferido: o Gemini** (a chave continua bloqueada pelo Google). Áudio e PDF dependem dele e
+  só foram testados com o Gemini de mentira dos testes.
+- **Não conferido: numa hospedagem de verdade.** A resposta é preparada depois do "ok" à Evolution,
+  dentro do mesmo pedido. Isso foi visto funcionando aqui; na hospedagem escolhida, confiro de novo.
 
 O que falta na Fase 2:
 
-1. O **atendente**: ler a mensagem que chega, montar as instruções, pedir a resposta ao provedor,
-   enviar, passar para uma pessoa quando precisa. Com ele: liga/desliga da IA em cada chip,
-   "Pausar tudo", assumir e devolver a conversa na Inbox, corrigir resposta em 1 clique.
+1. **Corrigir resposta em 1 clique**: na Inbox, transformar uma resposta ruim da IA numa pergunta
+   frequente certa.
 2. No Treinamento: Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro completo" e "Pacote Turbo".
-3. Cadastrar na Vercel o segredo que protege as chaves (já criado e guardado; a Vercel está bloqueada).
+3. Publicar e conferir com um chip seu: uma mensagem real chegando, a IA respondendo e a resposta
+   aparecendo no celular.
 
 ### Diferenças pequenas em relação ao visual do branch
 
 - O cartão "Na fila segura" virou "Contatos" até a fila existir (Fase 5).
 - No lugar de "Controle rápido" entrou "Para começar a atender" (três passos).
-- O botão "IA Ativa" do topo dá lugar ao "Pausar tudo" (emergência). Ele e o liga/desliga de cada
-  chip entram na Fase 2, junto com o atendente de IA: antes disso não haveria o que ligar.
+- O botão "IA Ativa" do topo deu lugar ao "Pausar tudo" (emergência), que só aparece quando algum
+  chip está com a IA ligada. Ligar e desligar é em cada chip, na aba Instâncias.
   A busca (Ctrl+K) entra quando houver o que buscar.
 - No tema claro, o cinza do texto pequeno ficou um pouco mais escuro, para dar leitura
   (o original não atingia o contraste mínimo recomendado). Pelo mesmo motivo, os textos de erro
@@ -454,6 +546,8 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 - **"Esperando você" (decidido).** O cartão da Visão geral e o filtro da Inbox fazem a mesma
   conta: conversas em que a próxima resposta é de uma pessoa (novas, passadas pela IA ou já em
   atendimento). Quando você responde, a conversa sai da conta até o cliente escrever de novo.
+- **A IA ainda não foi conferida com um chip de verdade.** Vale o mesmo do item abaixo: sem um chip
+  seu conectado no painel publicado, ninguém viu ainda uma resposta da IA chegar a um celular.
 - **Envio ainda não conferido com um chip de verdade.** A Inbox foi conferida com o banco e a
   Evolution de verdade, a partir do painel rodando aqui (não do endereço publicado, que estava
   bloqueado), usando um chip de teste que nunca foi ligado a um WhatsApp: os avisos de mensagem
@@ -493,6 +587,28 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   ("400") para quase tudo, inclusive quando a mensagem já saiu e o problema foi depois. Por isso o
   painel só diz "não enviada" quando tem certeza (número sem WhatsApp, chip que não existe mais,
   chave recusada). No resto, fica "sem confirmação" e a pessoa decide.
+- **O atendente de IA e a hospedagem.** A resposta da IA é preparada depois que o painel dá o "ok"
+  à Evolution, dentro do mesmo pedido. Cada pedido tem 55 segundos para esperar o cliente, pedir a
+  resposta e enviar (cabe numa hospedagem que corta o pedido em 60 segundos). Num servidor próprio,
+  sem esse corte, dá para aumentar com a variável `IENVIA_ATENDENTE_ORCAMENTO_MS`.
+  - Se o tempo acabar antes de a IA responder, a conversa vai para uma pessoa com o motivo escrito.
+  - Se o servidor reiniciar no meio, a resposta que ficou para trás é retomada no próximo aviso da
+    Evolution para a mesma empresa. Passados 5 minutos, ela não é mais respondida pela IA: a
+    conversa vai para "Esperando você". Abrir qualquer tela do painel também faz essa arrumação.
+  - Ao publicar, a hospedagem precisa ter as variáveis do banco novo, da Evolution e o
+    `IENVIA_CHAVE_DOS_SEGREDOS` (sem ele, a IA não abre as chaves e toda conversa vai para uma pessoa).
+- **Quanto o atendente gasta do banco.** Cada resposta da IA busca no banco as instruções do
+  treinamento e as últimas mensagens da conversa: algo entre 10 kB e 50 kB por resposta, conforme o
+  tamanho dos arquivos de conhecimento. Com 500 respostas por dia, isso dá de 150 MB a 750 MB por
+  mês, dentro dos 5.000 MB gratuitos, mas é mais um motivo para o plano pago quando houver vários
+  clientes. Se fizer falta, dá para o servidor guardar o treinamento na memória e buscar de novo só
+  quando ele mudar.
+- **Estado do chip que o painel conhece.** A IA só responde por um chip que o painel vê como
+  conectado. Se um aviso de "conectou" da Evolution se perder, o chip fica marcado como desconectado
+  e as mensagens dele ficam para a equipe; abrir a aba Instâncias confere o chip e corrige.
+- **Ordem das mensagens.** O WhatsApp informa a hora de cada mensagem só até o segundo. Quando duas
+  caem no mesmo segundo (o cliente responde logo depois de nós), a conversa passa a mostrar as duas
+  na ordem em que chegaram ao painel.
 - **Mensagens novas aparecem por consulta, não por conexão permanente.** A Inbox aberta pergunta ao
   painel se algo mudou: a cada 4 segundos com a pessoa usando a tela, a cada 12 depois de 2 minutos
   parada e a cada 30 depois de 15 minutos; com a aba escondida, não pergunta. É simples e

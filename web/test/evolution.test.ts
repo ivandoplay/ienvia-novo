@@ -251,6 +251,19 @@ describe('enviar texto', () => {
     expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Oi')).toMatchObject({ situacao: 'incerta' });
   });
 
+  test('com "digitando…": o tempo vai no pedido (a Evolution mostra o aviso e espera antes de enviar)', async () => {
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Já te respondo!', { digitandoMs: 2400.6 })).toMatchObject({ situacao: 'enviada' });
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Sem digitando', { digitandoMs: 0 })).toMatchObject({ situacao: 'enviada' });
+    // Um pedido absurdo de espera é encurtado: a mensagem não pode ficar minutos "digitando".
+    expect(await enviarTexto('ienvia-fixo-conectado', '5585988880001', 'Encurtado', { digitandoMs: 900_000 })).toMatchObject({ situacao: 'enviada' });
+    const enviadas = (await (await fetch(`${endereco}/controle/enviadas`)).json()) as Array<{ texto: string; digitando?: number }>;
+    expect(enviadas.map((envio) => [envio.texto, envio.digitando])).toEqual([
+      ['Já te respondo!', 2401],
+      ['Sem digitando', undefined],
+      ['Encurtado', 15000],
+    ]);
+  });
+
   test('chip desconectado: a Evolution não responde e o envio fica incerto depois do tempo limite', async () => {
     const resultado = await enviarTexto('ienvia-fixo-desconectado', '5585988880001', 'Oi', { tempoLimite: 300 });
     expect(resultado).toMatchObject({ situacao: 'incerta' });

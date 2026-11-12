@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
+import type { FaixaDaIa } from '@/lib/atendente/painel';
 import type { ArquivoDaMensagem, ChipDaInbox, ConversaAberta, FiltrosDaInbox, ListaDaInbox, MensagemDaConversa } from '@/lib/dados/inbox';
 import { plural } from '@/lib/formato';
 import {
@@ -771,6 +772,72 @@ interface PropsDaConversa {
   evolutionConfigurada: boolean;
 }
 
+/** O que dá para fazer com a conversa pelos botões do alto dela. */
+type AcaoNaConversa = 'resolver' | 'reabrir' | 'assumir' | 'devolver';
+
+/**
+ * A faixa da IA no alto da conversa: diz se a IA está respondendo ali, por que parou, o recado que ela
+ * deixou ao passar a conversa, e traz os botões "Assumir" e "Devolver para a IA".
+ */
+function FaixaDaIaNaConversa({ faixa, ocupado, aoAgir }: { faixa: FaixaDaIa; ocupado: AcaoNaConversa | null; aoAgir: (acao: AcaoNaConversa) => void }) {
+  const { recado } = faixa;
+  return (
+    <div className={`inbox-ia inbox-ia--${faixa.tom}`} role="group" aria-label="A IA nesta conversa">
+      <Icone nome={faixa.tom === 'atencao' ? 'pessoa' : 'kpiIa'} className="inbox-ia-icone" />
+      <div className="inbox-ia-texto">
+        <p className="inbox-ia-titulo">{faixa.titulo}</p>
+        {recado ? (
+          recado.cenario || recado.gatilho || recado.proximaJogada ? (
+            <dl className="inbox-ia-recado">
+              {recado.cenario ? (
+                <div>
+                  <dt>Quem é</dt>
+                  <dd>{recado.cenario}</dd>
+                </div>
+              ) : null}
+              {recado.gatilho ? (
+                <div>
+                  <dt>O que pediu</dt>
+                  <dd>{recado.gatilho}</dd>
+                </div>
+              ) : null}
+              {recado.proximaJogada ? (
+                <div>
+                  <dt>Sugestão</dt>
+                  <dd>{recado.proximaJogada}</dd>
+                </div>
+              ) : null}
+              {recado.livre ? (
+                <div>
+                  <dt>Recado</dt>
+                  <dd>{recado.livre}</dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : (
+            <p className="inbox-ia-recado">{recado.livre}</p>
+          )
+        ) : null}
+        {faixa.detalhe ? <p className="inbox-ia-detalhe">{faixa.detalhe}</p> : null}
+      </div>
+      {faixa.podeAssumir || faixa.podeDevolver ? (
+        <div className="inbox-ia-acoes">
+          {faixa.podeAssumir ? (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => aoAgir('assumir')} disabled={ocupado !== null}>
+              {ocupado === 'assumir' ? 'Assumindo…' : 'Assumir'}
+            </button>
+          ) : null}
+          {faixa.podeDevolver ? (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => aoAgir('devolver')} disabled={ocupado !== null}>
+              {ocupado === 'devolver' ? 'Devolvendo…' : 'Devolver para a IA'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Conversa({
   conversa,
   filtros,
@@ -785,7 +852,7 @@ function Conversa({
   evolutionConfigurada,
 }: PropsDaConversa) {
   const router = useRouter();
-  const [ocupado, setOcupado] = useState<'resolver' | 'reabrir' | null>(null);
+  const [ocupado, setOcupado] = useState<AcaoNaConversa | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
   const [contatoAberto, setContatoAberto] = useState(false);
   const [fotoAberta, setFotoAberta] = useState<FotoAberta | null>(null);
@@ -853,7 +920,7 @@ function Conversa({
 
   const impedimento = motivoParaNaoResponder(conversa, ehDono, evolutionConfigurada);
 
-  async function agir(acao: 'resolver' | 'reabrir') {
+  async function agir(acao: AcaoNaConversa) {
     if (ocupado) return;
     setOcupado(acao);
     aoAvisar(conversa.id, null);
@@ -947,7 +1014,9 @@ function Conversa({
             </p>
           </div>
           <div className="inbox-conversa-acoes">
-            <span className={`estado${etapa.tom === 'ok' ? ' estado--ok' : etapa.tom === 'atencao' ? ' estado--atencao' : ''}`}>{etapa.texto}</span>
+            <span className={`estado${etapa.tom === 'ok' ? ' estado--ok' : etapa.tom === 'atencao' ? ' estado--atencao' : etapa.tom === 'ia' ? ' estado--ia' : ''}`}>
+              {etapa.texto}
+            </span>
             <button type="button" className="btn btn-secondary btn-sm inbox-abrir-contato" onClick={() => setContatoAberto(true)}>
               Contato
             </button>
@@ -962,6 +1031,8 @@ function Conversa({
             )}
           </div>
         </header>
+
+        {conversa.ia ? <FaixaDaIaNaConversa faixa={conversa.ia} ocupado={ocupado} aoAgir={(acao) => void agir(acao)} /> : null}
 
         <div
           ref={rolagem}
