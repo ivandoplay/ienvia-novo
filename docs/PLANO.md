@@ -338,15 +338,31 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 - **BANCO DE DADOS BLOQUEADO POR COTA (desde a noite de 11/11/2026).** O Supabase passou a recusar
   **todas** as chamadas dos dois projetos da organização "ZAP IA STUDIO" (o do sistema antigo e o
   novo "Ienvia") com a resposta `402 exceed_egress_quota`: a organização passou da cota de tráfego
-  de saída do plano. Isso vale para login, dados e arquivos. Conferido às 19h35 e de novo às 19h53
-  (horário de Brasília). **Enquanto durar, ninguém entra no painel novo
-  e o sistema antigo também fica sem banco.**
-  - O que o projeto novo gastou é pouco: ele não tem clientes, só os testes de conferência (alguns
-    megabytes). De onde veio o consumo aparece no painel do Supabase, em *Organization → Usage*,
-    separado por projeto.
-  - Para voltar: (1) passar a organização para o plano Pro, ou (2) se já for paga, tirar o teto de
-    gastos (*spend cap*), ou (3) esperar a cota renovar no próximo ciclo de cobrança. A mensagem do
-    próprio Supabase pede (1) ou (2).
+  de saída do plano. Isso vale para login, dados e arquivos. Conferido às 19h35, às 19h53 e de novo
+  às 22h20 de 11/11 (horário de Brasília), nos dois projetos. **Enquanto durar, ninguém entra no
+  painel novo e o sistema antigo também fica sem banco.**
+  - **Quem gastou a cota foi o sistema antigo** (medido em 12/11/2026 nos contadores do próprio
+    banco, que contam desde 26/10). Em 17 dias ele fez cerca de 1,5 milhão de chamadas ao banco:
+    perto de uma por segundo, dia e noite. O projeto novo fez 1.413 chamadas no total e não tem dado
+    de cliente (0 contatos, 0 conversas, 0 mensagens, nenhum arquivo guardado).
+    - O suspeito principal é a sincronização do sistema antigo, que relê tudo a cada vez: o
+      cadastro inteiro da empresa foi lido 85.624 vezes (o maior pesa 789 kB por leitura) e a lista
+      inteira de contatos, mais de 63 mil vezes (a maior pesa 565 kB).
+    - Há também um programa que pergunta ao banco "tem comando para mim?" a cada 11 segundos
+      (funções `pag_pegar_comando` e `pag_registrar`; 133 mil chamadas). Ele não está no código que
+      foi analisado; falta saber o que é.
+    - A divisão exata do consumo (por projeto e por serviço) só aparece no painel do Supabase, em
+      *Organization → Usage*.
+  - **O que isso muda:** levar o sistema antigo para uma conta gratuita nova não resolve, porque o
+    consumo vai junto. Para o sistema novo, a saída sem custo e dentro das regras do Supabase é uma
+    **organização nova na mesma conta**: cada organização tem a sua própria cota, e o limite é de 2
+    projetos gratuitos ativos por pessoa (projeto pausado não conta). O banco novo é remontado a
+    partir das migrações do Git. Os dois logins e as duas empresas que existem hoje no banco novo
+    já foram copiados para um arquivo guardado fora do repositório, para nada se perder na mudança.
+  - Para o sistema antigo voltar: (1) passar a organização para o plano Pro (US$ 25 por mês; libera
+    na hora), ou (2) esperar a cota renovar no próximo ciclo de cobrança (a data aparece em
+    *Organization → Billing*). Depois de um primeiro estouro, o Supabase volta a bloquear sem
+    período de aviso.
   - O acesso administrativo (o que aplica migrações e roda SQL) continua funcionando. Foi por ele
     que a migração dos arquivos foi aplicada e conferida.
   - **Cuidado daqui para a frente:** fotos, áudios e vídeos gastam essa mesma cota cada vez que
@@ -383,13 +399,17 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   "Payment required", e os outros projetos da mesma conta também. O que este projeto usou naquele
   dia foi pouco (algumas montagens e algumas dezenas de acessos de teste); qual limite estourou e
   de onde veio o consumo só aparece no painel da Vercel, em *Usage*.
-  A Inbox está no GitHub, mas **não está no ar**. Para voltar: (1) esperar o limite renovar,
-  (2) passar a conta para o plano Pro, ou (3) publicar em outra conta. O plano Hobby é para uso não
-  comercial; com clientes pagantes o Pro é necessário de qualquer forma.
+  A Inbox, o Motor de IA e o Treinamento estão no GitHub, mas **não estão no ar**. Para voltar:
+  (1) passar a conta para o plano Pro (US$ 20 por mês), (2) hospedar o painel em outro lugar, ou
+  (3) esperar o limite renovar (em geral, 30 dias).
+  **Abrir outra conta gratuita não é saída** (corrigido em 12/11/2026: uma versão anterior deste
+  plano listava "publicar em outra conta"). A política de uso aceitável da Vercel proíbe criar
+  contas para contornar limites e prevê suspensão do acesso; e o plano Hobby é só para uso pessoal,
+  não comercial. Com clientes pagantes, é o Pro ou outra hospedagem de qualquer forma.
   Enviar para o GitHub **não** publica sozinho: cada publicação é feita de propósito, depois dos
   testes.
   Na noite de 11/11 o bloqueio continuava: `ienvia-novo.vercel.app` e `zap-ia-studio.vercel.app`
-  respondiam "Payment required" (conferido às 19h38, horário de Brasília).
+  respondiam "Payment required" (conferido às 19h38 e de novo às 22h18, horário de Brasília).
 - **Conectar os chips pelo endereço publicado.** A Evolution avisa o painel pela internet, e o
   endereço da prévia só abre para quem está na conversa. Chip conectado pela prévia não entrega
   mensagens. Se um chip foi conectado por outro endereço, basta abrir a aba Instâncias no endereço
