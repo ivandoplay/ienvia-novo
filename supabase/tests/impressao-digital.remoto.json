@@ -1,6 +1,6 @@
 {
-  "_leiame": "Retrato do esquema do banco REAL (Supabase \"Ienvia\"), tirado com impressao-digital.sql. O teste esquema.test.ts compara este retrato com o banco montado a partir das migrações do Git. Ao aplicar uma migração nova no banco real, rode o SQL lá de novo e atualize este arquivo.",
-  "projeto": "jazvdlkyvwquoednmljf",
+  "_leiame": "Retrato do esquema do banco REAL (Supabase, projeto \"ienvia-001\" da organização \"ienvia\"), tirado com impressao-digital.sql. O teste esquema.test.ts compara este retrato com o banco montado a partir das migrações do Git. Ao aplicar uma migração nova no banco real, rode o SQL lá de novo e atualize este arquivo. Em 12/11/2026 o banco mudou de projeto (o anterior, \"Ienvia\", ficava numa organização que estourou a cota e foi pausado): o banco novo foi remontado a partir das mesmas migrações e o retrato saiu idêntico.",
+  "projeto": "rhcabqlwazvjcjjdknsc",
   "tirado_em": "2026-11-12",
   "ultima_migracao": "20261112002400_ai_engine_and_training.sql",
   "categorias": {

@@ -56,7 +56,10 @@ export interface PedidoDeResposta {
 
 export interface RespostaDeIa {
   provedor: Provedor;
-  /** O modelo que respondeu de fato (o provedor pode devolver um nome mais completo). */
+  /**
+   * O nome do modelo como o provedor informou na resposta. Pode ser diferente do nome pedido
+   * (a NVIDIA responde "private/nvidia/..."). Serve para registro; na tela, mostre o nome pedido.
+   */
   modelo: string;
   texto: string;
   tokens: { entrada: number | null; saida: number | null };

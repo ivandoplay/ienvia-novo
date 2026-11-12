@@ -9,9 +9,11 @@ as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do 
 
 **Situação:** Fase 0 (fundação) pronta. Fase 1 pronta no código e no banco: a aba **Instâncias**
 (conectar chips), o recebimento das mensagens e a **Inbox** com texto e com arquivos (fotos, áudios,
-vídeos, documentos e figurinhas). Falta a conferência final no ar, que está travada por dois bloqueios
-de conta desde 11/11/2026: a Vercel (publicação) e o Supabase (cota de tráfego do banco). Os detalhes
-e o que fazer estão no começo da seção 6 de [docs/PLANO.md](docs/PLANO.md).
+vídeos, documentos e figurinhas). Fase 2 em andamento: as abas **Motor de IA** e **Treinamento** estão
+prontas; falta o atendente em si (a IA respondendo no WhatsApp).
+O banco voltou a funcionar em 12/11/2026, num projeto Supabase novo e só dele (`ienvia-001`). Falta a
+conferência final no ar, que continua travada pelo bloqueio da conta da Vercel (publicação) desde
+11/11/2026. Os detalhes e o que fazer estão no começo da seção 6 de [docs/PLANO.md](docs/PLANO.md).
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta

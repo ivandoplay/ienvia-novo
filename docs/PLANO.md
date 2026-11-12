@@ -98,6 +98,10 @@ migração antiga, o teste acusa.
 
 Regra daqui para a frente: **migração aplicada não se edita**. Toda mudança é um arquivo novo.
 
+Desde 12/11/2026 o banco de verdade é o projeto **`ienvia-001`** (organização "ienvia" do Supabase).
+Ele foi montado do zero a partir dessas mesmas migrações, e o retrato saiu idêntico ao do Git. O
+motivo da mudança está no começo da seção 6.
+
 ## 4. As fases
 
 Cada fase só começa quando a anterior está com os testes passando.
@@ -335,38 +339,67 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
 
 ## 6. Pendências e cuidados
 
-- **BANCO DE DADOS BLOQUEADO POR COTA (desde a noite de 11/11/2026).** O Supabase passou a recusar
-  **todas** as chamadas dos dois projetos da organização "ZAP IA STUDIO" (o do sistema antigo e o
-  novo "Ienvia") com a resposta `402 exceed_egress_quota`: a organização passou da cota de tráfego
-  de saída do plano. Isso vale para login, dados e arquivos. Conferido às 19h35, às 19h53 e de novo
-  às 22h20 de 11/11 (horário de Brasília), nos dois projetos. **Enquanto durar, ninguém entra no
-  painel novo e o sistema antigo também fica sem banco.**
-  - **Quem gastou a cota foi o sistema antigo** (medido em 12/11/2026 nos contadores do próprio
-    banco, que contam desde 26/10). Em 17 dias ele fez cerca de 1,5 milhão de chamadas ao banco:
-    perto de uma por segundo, dia e noite. O projeto novo fez cerca de 1.400 chamadas no total e não tem dado
-    de cliente (0 contatos, 0 conversas, 0 mensagens, nenhum arquivo guardado).
-    - O suspeito principal é a sincronização do sistema antigo, que relê tudo a cada vez: o
-      cadastro inteiro da empresa foi lido 85.624 vezes (o maior pesa 789 kB por leitura) e a lista
-      inteira de contatos, mais de 63 mil vezes (a maior pesa 565 kB).
-    - Há também um programa que pergunta ao banco "tem comando para mim?" a cada 11 segundos
-      (funções `pag_pegar_comando` e `pag_registrar`; 133 mil chamadas). Ele não está no código que
-      foi analisado; falta saber o que é.
-    - A divisão exata do consumo (por projeto e por serviço) só aparece no painel do Supabase, em
-      *Organization → Usage*.
-  - **O que isso muda:** levar o sistema antigo para uma conta gratuita nova não resolve, porque o
-    consumo vai junto. Para o sistema novo, a saída sem custo e dentro das regras do Supabase é uma
-    **organização nova na mesma conta**: cada organização tem a sua própria cota, e o limite é de 2
-    projetos gratuitos ativos por pessoa (projeto pausado não conta). O banco novo é remontado a
-    partir das migrações do Git. Os dois logins e as duas empresas que existem hoje no banco novo
-    já foram copiados para um arquivo guardado fora do repositório, para nada se perder na mudança.
-  - Para o sistema antigo voltar: (1) passar a organização para o plano Pro (US$ 25 por mês; libera
-    na hora), ou (2) esperar a cota renovar no próximo ciclo de cobrança (a data aparece em
-    *Organization → Billing*). Depois de um primeiro estouro, o Supabase volta a bloquear sem
-    período de aviso.
-  - O acesso administrativo (o que aplica migrações e roda SQL) continua funcionando. Foi por ele
-    que a migração dos arquivos foi aplicada e conferida.
-  - **Cuidado daqui para a frente:** fotos, áudios e vídeos gastam essa mesma cota cada vez que
-    alguém abre uma conversa. Com clientes de verdade, o plano gratuito não aguenta.
+- **BANCO DO SISTEMA NOVO: RESOLVIDO EM 12/11/2026 (mudou de endereço).** O banco do Ienvia agora
+  fica num projeto do Supabase só dele, o **`ienvia-001`**, dentro da organização nova **"ienvia"**,
+  que você criou na mesma conta. Cada organização tem a sua própria cota, então o bloqueio da
+  organização antiga não alcança mais o sistema novo. Criar outra organização gratuita é permitido
+  pelas regras do Supabase (o limite é de 2 projetos gratuitos ativos por pessoa).
+  - **O que foi feito.** O banco foi remontado a partir das 14 migrações do Git, na mesma ordem e
+    com os mesmos nomes, e o retrato dele bate com o do Git nas 11 categorias conferidas (colunas,
+    funções, regras de acesso, permissões, depósito de arquivos e as demais). Os dois logins e as
+    duas empresas foram levados juntos, com as mesmas senhas: **você entra com o mesmo e-mail e a
+    mesma senha de antes.** O cadastro aberto de contas continua desligado.
+  - **O que foi conferido no banco novo.** As 71 conferências de segurança feitas direto no banco
+    (Motor de IA, Treinamento e arquivos da Inbox). E, pelo navegador, com o painel ligado ao banco
+    novo e ao servidor de verdade da Evolution: entrar; guardar e testar as chaves de IA; montar um
+    treinamento; criar um chip; receber avisos de mensagens; enviar foto, documento e áudio; baixar
+    de volta; e 25 tentativas de ver ou mexer em arquivos sem ter direito, todas recusadas. Os
+    testes apagam o que criam, e foi conferido que não sobrou nada.
+  - **O que não foi conferido.** A entrega de uma mensagem num celular de verdade (o chip de teste
+    nunca foi ligado a um WhatsApp) e o painel publicado (a hospedagem continua bloqueada).
+  - **O projeto anterior** ("Ienvia", na organização bloqueada) foi **pausado**, não apagado. Ele não
+    tinha dado de cliente. Pode ser apagado quando você quiser.
+  - **Antes de publicar de novo.** As variáveis do Supabase cadastradas na hospedagem ainda apontam
+    para o projeto pausado. É preciso trocar as três (endereço, chave pública e chave secreta) pelas
+    do `ienvia-001` e cadastrar `IENVIA_CHAVE_DOS_SEGREDOS`.
+  - **Cuidado com a pausa por falta de uso.** No plano gratuito, o Supabase pausa o projeto que fica
+    1 semana sem movimento, e ele não volta sozinho. Enquanto o painel não estiver no ar, isso pode
+    acontecer. Não se perde nada: basta abrir o projeto no site do Supabase e clicar em *Restore
+    project*.
+  - **O sistema novo não repete o problema do antigo (medido em 12/11/2026).** A Inbox aberta só
+    pergunta "mudou alguma coisa?", e cada pergunta tira cerca de 1 kB do banco. No antigo, cada
+    consulta relia a conta inteira (até 789 kB de uma vez). A Inbox pergunta a cada 4 segundos com a
+    pessoa usando, vai espaçando até 30 segundos com a tela parada e **para** quando a aba fica
+    escondida. Na conta: uma pessoa usando a Inbox sem parar, 8 horas por dia, gasta perto de 250 MB
+    por mês dos 5.000 MB gratuitos. A tela de chips confere o chip a cada 3 segundos só enquanto um
+    QR Code está aberto. Isso serve para começar; com vários clientes atendendo o dia inteiro, mais
+    as fotos e os áudios (que gastam a mesma cota cada vez que alguém abre uma conversa), o plano
+    gratuito acaba e entra o Pro.
+- **SISTEMA ANTIGO SEM BANCO ATÉ 26/11/2026.** A organização "ZAP IA STUDIO", onde fica o banco do
+  sistema antigo, usou **14,76 GB dos 5,5 GB** de tráfego de saída do plano gratuito. Desde a noite
+  de 11/11/2026 o Supabase recusa todas as chamadas dela (`402 exceed_egress_quota`): login, dados
+  e arquivos. O e-mail do Supabase diz que a cota volta **durante o dia 26/11/2026**.
+  - **Para voltar antes:** passar essa organização para o plano Pro (US$ 25 por mês); libera na
+    hora. Sem pagar, é esperar o dia 26.
+  - **Quem gastou a cota** (medido em 12/11/2026 nos contadores do próprio banco, que contam desde
+    26/10). Em 17 dias o sistema antigo fez cerca de 1,5 milhão de chamadas ao banco: perto de uma
+    por segundo, dia e noite. O cadastro inteiro da empresa foi lido 85.624 vezes (o maior pesa
+    789 kB por leitura) e a lista inteira de contatos, mais de 63 mil vezes (a maior pesa 565 kB).
+  - **A causa, encontrada no código antigo.**
+    1. **O painel antigo aberto no navegador.** Ele chama o servidor a cada 3,5 segundos (a cada
+       2 segundos enquanto conecta um chip e a cada 8 segundos mesmo com a aba escondida), e cada
+       chamada relê a conta inteira no banco (`startCloudPoller` em `public/app.js`, que aciona
+       `loadTenantContextFromCloud` em `src/supabaseCloud.js`). Uma aba esquecida aberta gasta o dia
+       todo.
+    2. **A extensão de navegador "Agente de Página".** Ela pergunta ao banco "tem comando para
+       mim?" a cada 11 segundos (funções `pag_pegar_comando` e `pag_registrar`; 133 mil chamadas no
+       período). Está descrita no documento `SUPABASE-CONEXÕES.md` do sistema antigo.
+  - **Para não bloquear de novo quando voltar:** fechar as abas do painel antigo que não estiverem
+    em uso e desligar a extensão "Agente de Página" nos navegadores onde ela está instalada.
+    Depois de um primeiro estouro, o Supabase volta a bloquear sem período de aviso.
+  - **Levar o sistema antigo para uma conta gratuita nova não resolve:** o consumo vai junto.
+  - A divisão exata do consumo (por projeto e por serviço) só aparece no site do Supabase, em
+    *Organization → Usage*.
 - **Chave do Gemini bloqueada pelo Google (12/11/2026).** A chave do Gemini que você mandou não
   funciona mais: o Google respondeu "Your API key was reported as leaked", que é o bloqueio
   automático de uma chave que apareceu em lugar público. Procurei no código e no histórico do
@@ -374,7 +407,7 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   uma chave nova em `aistudio.google.com/apikey`, apagar a antiga e não colar a nova em repositório,
   grupo ou documento público. Se essa chave também era usada no sistema antigo, a IA de lá parou.
 - **Segredo que protege as chaves de IA.** Já foi criado e está guardado (fora do repositório).
-  Falta cadastrá-lo na Vercel (`IENVIA_CHAVE_DOS_SEGREDOS`) quando a conta for desbloqueada; sem
+  Falta cadastrá-lo na hospedagem (`IENVIA_CHAVE_DOS_SEGREDOS`) quando houver onde publicar; sem
   ele, o painel publicado não guarda nem usa chave nenhuma (e avisa isso na tela). Se um dia esse
   segredo se perder, as chaves guardadas deixam de abrir e cada cliente cadastra a sua de novo.
 - **Senha exposta.** O repositório antigo é público e tem o usuário e a senha do painel escritos
@@ -399,6 +432,10 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   "Payment required", e os outros projetos da mesma conta também. O que este projeto usou naquele
   dia foi pouco (algumas montagens e algumas dezenas de acessos de teste); qual limite estourou e
   de onde veio o consumo só aparece no painel da Vercel, em *Usage*.
+  **Suspeita (não confirmada):** o mesmo painel antigo aberto. O sistema antigo roda na Vercel
+  (`zap-ia-studio.vercel.app`) e cada chamada do painel a cada 3,5 segundos aciona o servidor de
+  lá: são cerca de 25 mil acionamentos por dia para cada aba aberta, e o plano gratuito inclui
+  1 milhão por mês.
   A Inbox, o Motor de IA e o Treinamento estão no GitHub, mas **não estão no ar**. Para voltar:
   (1) passar a conta para o plano Pro (US$ 20 por mês), (2) hospedar o painel em outro lugar, ou
   (3) esperar o limite renovar (em geral, 30 dias).
@@ -433,10 +470,15 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
     ninguém troca nem apaga arquivo; o envio lê o tipo e o tamanho que o depósito registrou; o
     recebimento de uma foto grava a mensagem, reserva a busca do arquivo e marca como guardado.
     O roteiro está em `apoio-da-reconstrucao/ferramentas/conferir-arquivos-no-banco-real.sql`.
-  - **Falta, por causa do bloqueio de cota:** o mesmo caminho passando pela porta de entrada do
-    Supabase (subir e abrir um arquivo pelo navegador, com uma conta logada). O roteiro está
-    pronto (`conferir-arquivos-no-ambiente-real.mjs`) e para sozinho, sem fazer nada, enquanto o
-    serviço estiver bloqueado.
+  - **Conferido pelo navegador, no banco novo** (12/11/2026, com o painel rodando aqui, o depósito
+    de arquivos de verdade e o servidor de verdade da Evolution): 62 verificações, todas certas.
+    Chip criado pela tela; avisos de foto, áudio, documento, figurinha e vídeo grande demais
+    aceitos e mostrados na conversa; "Buscar de novo"; foto, documento e mensagem de voz enviados
+    pelo painel, com o navegador subindo o arquivo direto para o depósito; arquivo baixado de volta
+    idêntico ao enviado, com o nome acentuado certo; o aviso de "mensagem enviada" confirmando o
+    envio sem duplicar; e 25 tentativas de ver, subir, trocar ou apagar arquivo sem ter direito
+    (visitante, pessoa de outra empresa e a própria pessoa fora do que o painel precisa), todas
+    recusadas. O roteiro (`conferir-arquivos-no-ambiente-real.mjs`) apaga tudo o que cria.
   - **Falta, por depender de um chip seu conectado:** um arquivo de verdade chegando pelo WhatsApp
     e sendo buscado na Evolution, e um arquivo saindo de verdade para um contato.
 - **Arquivos: prazo de guarda.** Cada arquivo já é gravado com a data até quando deve ficar (30

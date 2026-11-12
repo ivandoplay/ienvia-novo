@@ -60,7 +60,9 @@ function mensagemDoBanco(onde: string, erro: { code?: string; message?: string }
 async function fazerTeste(provedor: Provedor, chave: string, modelo: string): Promise<Teste> {
   try {
     const resposta = await testarConexao(provedor, chave, modelo);
-    return { funcionou: true, texto: `Funcionou: o modelo ${resposta.modelo} respondeu em ${duracaoLegivel(resposta.duracaoMs)}.` };
+    // A frase usa o nome que a pessoa escolheu. Alguns provedores devolvem outro nome para o mesmo modelo
+    // (a NVIDIA responde "private/nvidia/..."), e mostrar esse nome só confundiria.
+    return { funcionou: true, texto: `Funcionou: o modelo ${modelo} respondeu em ${duracaoLegivel(resposta.duracaoMs)}.` };
   } catch (erro) {
     if (erro instanceof ErroDeIa) {
       console.error('[motor de ia] teste de conexão:', { provedor, motivo: erro.motivo, status: erro.status, mensagem: erro.message });

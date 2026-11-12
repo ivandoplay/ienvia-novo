@@ -295,7 +295,8 @@ describe('NVIDIA', () => {
     );
     expect(resposta).toMatchObject({
       provedor: 'nvidia',
-      modelo: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      // A NVIDIA devolve o modelo com outro nome ("private/..."): a resposta guarda o que o provedor informou.
+      modelo: 'private/nvidia/nemotron-3.5-lightning-30b-a3b',
       texto: 'Resposta de teste para: "Quero a de chocolate"',
       tokens: { entrada: 55, saida: 8 },
     });

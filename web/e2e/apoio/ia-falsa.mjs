@@ -371,7 +371,8 @@ export function criarIaFalsa({ responder: decidir = respostaPadrao } = {}) {
           id: `chatcmpl-${pedidos.length}`,
           object: 'chat.completion',
           created: Math.floor(Date.now() / 1000),
-          model: pedido.modelo,
+          // A NVIDIA de verdade devolve o modelo com outro nome ("private/nvidia/..."): a tela tem de mostrar o nome que a pessoa escolheu.
+          model: `private/${pedido.modelo}`,
           choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: decidir(pedido), reasoning_content: null } }],
           usage: { prompt_tokens: 55, completion_tokens: 8, total_tokens: 63, completion_tokens_details: { reasoning_tokens: 0 } },
         });
