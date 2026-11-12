@@ -214,12 +214,22 @@ function lerObjecao(bruto: unknown, indice: number): ObjecaoDeAtendimento | null
 export function lerCerebro(bruto: unknown): CerebroCompleto | null {
   const d = objeto(bruto);
   if (Object.keys(d).length === 0) return null;
+  const core = objeto(d.canonicalCore);
   const id = cortar(txt(d.id), 100);
   const nome = cortar(txt(d.nome) || txt(d.name), 200);
-  const playbookCentral = cortar(txt(d.playbookCentral) || txt(d.playbook_central), LIMITES_DO_ESTUDIO.playbookCentral);
-  const regrasCanonicas = cortar(txt(d.regrasCanonicas) || txt(d.canonical_rules), LIMITES_DO_ESTUDIO.regrasCanonicas);
-  const filtrosDeVoz = lista(d.filtrosDeVoz ?? d.voice_filters).map((x) => cortar(txt(x), 300)).filter(Boolean).slice(0, 30);
-  const personas = lista(d.personas ?? d.interlocutor_profiles)
+  const playbookCentral = cortar(
+    txt(d.playbookCentral) || txt(d.playbook_central) || txt(core.playbookMd) || txt(core.mainPromptMd),
+    LIMITES_DO_ESTUDIO.playbookCentral,
+  );
+  const regrasCanonicas = cortar(
+    txt(d.regrasCanonicas) || txt(d.canonical_rules) || txt(core.canonicalRulesMd),
+    LIMITES_DO_ESTUDIO.regrasCanonicas,
+  );
+  const filtrosDeVoz = lista(d.filtrosDeVoz ?? d.voice_filters ?? core.voiceFilters)
+    .map((x) => cortar(txt(x), 300))
+    .filter(Boolean)
+    .slice(0, 30);
+  const personas = lista(d.personas ?? d.interlocutor_profiles ?? d.interlocutorPersonas)
     .map((raw, i) => {
       const p = objeto(raw);
       const pn = cortar(txt(p.nome) || txt(p.name), 160);
@@ -233,7 +243,7 @@ export function lerCerebro(bruto: unknown): CerebroCompleto | null {
     })
     .filter((x): x is PersonaDoCerebro => x !== null)
     .slice(0, 20);
-  const paresBomRuim = lista(d.paresBomRuim ?? d.good_bad_pairs)
+  const paresBomRuim = lista(d.paresBomRuim ?? d.good_bad_pairs ?? d.goodBadPairs)
     .map((raw, i) => {
       const p = objeto(raw);
       const titulo = cortar(txt(p.titulo) || txt(p.title), 160);
@@ -249,7 +259,7 @@ export function lerCerebro(bruto: unknown): CerebroCompleto | null {
     })
     .filter((x): x is ParBomRuim => x !== null)
     .slice(0, 40);
-  const respostasDeReferencia = lista(d.respostasDeReferencia ?? d.reference_responses)
+  const respostasDeReferencia = lista(d.respostasDeReferencia ?? d.reference_responses ?? d.referenceResponses)
     .map((raw, i) => {
       const r = objeto(raw);
       const titulo = cortar(txt(r.titulo) || txt(r.title), 200);
@@ -275,11 +285,11 @@ export function lerCerebro(bruto: unknown): CerebroCompleto | null {
     id: id || 'cerebro-principal',
     nome: nome || 'Cérebro completo',
     versao: cortar(txt(d.versao) || txt(d.version) || '1.0', 40),
-    importadoEm: txt(d.importadoEm) || txt(d.imported_at) || null,
+    importadoEm: txt(d.importadoEm) || txt(d.imported_at) || txt(d.importedAt) || null,
     modoDeContexto: d.modoDeContexto === 'completo' || d.context_mode === 'full' ? 'completo' : 'inteligente',
     playbookCentral,
     regrasCanonicas,
-    fatosDoNegocio: objeto(d.fatosDoNegocio ?? d.business_facts),
+    fatosDoNegocio: objeto(d.fatosDoNegocio ?? d.business_facts ?? d.businessFacts),
     filtrosDeVoz,
     personas,
     paresBomRuim,

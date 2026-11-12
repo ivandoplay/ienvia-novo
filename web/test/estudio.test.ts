@@ -149,6 +149,41 @@ describe('Importador do Pacote Turbo e extrator de documentos', () => {
     expect(ext.objecoes.map((o) => o.id)).toEqual(['O001']);
   });
 
+  test('importa ienvia-pack-compilado.json com canonicalCore, goodBadPairs e businessFacts', async () => {
+    const zip = gerarZipDoTreinamento([
+      {
+        caminho: 'PACOTE/perfil-ienvia.json',
+        conteudo: JSON.stringify({ name: 'Lizandro', niche: 'Veículos', assistantName: 'Lizandro', soloIdentity: true }),
+      },
+      {
+        caminho: 'PACOTE/ienvia-pack-compilado.json',
+        conteudo: JSON.stringify({
+          id: 'lizandro-v3',
+          name: 'Cérebro Lizandro',
+          canonicalCore: {
+            playbookMd: '# Playbook Central',
+            canonicalRulesMd: 'Regras canônicas 1ª pessoa.',
+            approvedMessages: [{ id: 'M01', title: 'Oi', text: 'Olá!' }],
+          },
+          operationalSkills: [{ id: 'S01', name: 'Abertura', when: 'Oi' }],
+          humanizationSkills: [{ id: 'H01', name: 'Natural' }],
+          objections: [{ id: 'O001', input_pattern: 'Caro', response_strategy: 'Qualificar' }],
+          goodBadPairs: [{ title: '1ª pessoa', context: 'Quem fala', do_not_use: 'Equipe', better_response: 'Sou o Lizandro', lesson: '1ª pessoa' }],
+          businessFacts: { tom: 'direto' },
+        }),
+      },
+    ]);
+    const res = await importarPacoteDoTreinamento(zip, 'PACOTE-LIZANDRO.zip');
+    expect(res.estudio.cerebroCompleto).toMatchObject({
+      nome: 'Cérebro Lizandro',
+      playbookCentral: '# Playbook Central',
+      regrasCanonicas: 'Regras canônicas 1ª pessoa.',
+      fatosDoNegocio: { tom: 'direto' },
+    });
+    expect(res.estudio.cerebroCompleto?.paresBomRuim).toHaveLength(1);
+    expect(res.resumo).toMatchObject({ mensagens: 1, skillsOperacionais: 1, skillsHumanizacao: 1, objecoes: 1 });
+  });
+
   test('rejeita arquivo inválido ou vazio', async () => {
     await expect(importarPacoteDoTreinamento(enc(''), 'vazio.json')).rejects.toThrow(/vazio/);
     await expect(importarPacoteDoTreinamento(enc('{ruim'), 'quebrado.json')).rejects.toThrow(/JSON inválido/);
