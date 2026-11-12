@@ -343,7 +343,7 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
   painel novo e o sistema antigo também fica sem banco.**
   - **Quem gastou a cota foi o sistema antigo** (medido em 12/11/2026 nos contadores do próprio
     banco, que contam desde 26/10). Em 17 dias ele fez cerca de 1,5 milhão de chamadas ao banco:
-    perto de uma por segundo, dia e noite. O projeto novo fez 1.413 chamadas no total e não tem dado
+    perto de uma por segundo, dia e noite. O projeto novo fez cerca de 1.400 chamadas no total e não tem dado
     de cliente (0 contatos, 0 conversas, 0 mensagens, nenhum arquivo guardado).
     - O suspeito principal é a sincronização do sistema antigo, que relê tudo a cada vez: o
       cadastro inteiro da empresa foi lido 85.624 vezes (o maior pesa 789 kB por leitura) e a lista
