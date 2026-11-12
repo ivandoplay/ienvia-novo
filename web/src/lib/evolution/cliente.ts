@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { Buffer } from 'node:buffer';
 import { lerConfigEvolution } from '@/lib/env';
 import { telefoneDoJid } from '@/lib/instancias/regras';
 

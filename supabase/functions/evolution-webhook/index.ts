@@ -1,8 +1,12 @@
+import { Buffer } from 'node:buffer';
 import process from 'node:process';
 import { processarAvisoEvolution } from '../../../web/src/lib/evolution/processar-aviso.ts';
 
 if (!('process' in globalThis)) {
   (globalThis as Record<string, unknown>).process = process;
+}
+if (!('Buffer' in globalThis)) {
+  (globalThis as Record<string, unknown>).Buffer = Buffer;
 }
 
 interface RuntimeDeBorda {

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { Buffer } from 'node:buffer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { montarDossieParaAdmin } from '@/lib/atendente/dossie';
 import {

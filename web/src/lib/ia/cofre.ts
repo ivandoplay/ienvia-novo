@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { Buffer } from 'node:buffer';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 /**

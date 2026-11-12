@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { Buffer } from 'node:buffer';
 import { enderecoPublico } from '@/lib/env';
 import { PROVEDORES, type MotivoDoErroDeIa, type Provedor } from '@/lib/ia/regras';
 
