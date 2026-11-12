@@ -570,8 +570,10 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
     plano gratuito Hobby): `FAIR_USE_LIMITS_EXCEEDED`, no item **Fast Origin Transfer**. É o volume
     de dados que passa entre a rede da Vercel e o servidor dos sites. O plano gratuito inclui
     10 GB a cada 30 dias, e a conta passou disso.
-  - **Quando volta sozinha:** em **11/12/2026 às 16h42** (horário de Fortaleza), 30 dias depois do
-    bloqueio. É a data que a Vercel registrou (`unpauseAt`). Publicar de novo **não** tira a pausa.
+  - **Quando volta:** a data que a Vercel registrou para o fim da pausa (`unpauseAt`) é
+    **11/12/2026 às 16h42** (horário de Fortaleza), 30 dias depois do bloqueio. Pode não ser
+    automático: há relato, no fórum da própria Vercel, de conta que continuou pausada depois dos
+    30 dias e só voltou quando o suporte liberou à mão. Publicar de novo **não** tira a pausa.
   - **De onde veio o consumo (dedução, não medição).** A divisão por projeto só aparece no site da
     Vercel, em *Usage*. Mas o projeto do sistema novo foi criado no próprio dia 11/11, menos de
     duas horas antes do bloqueio, e só recebeu acessos de teste: não tem como ter gasto 10 GB. O
@@ -586,14 +588,24 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
     sistema de atendimento vendido a clientes é uso comercial.
   - **Abrir outra conta gratuita não é saída** (corrigido em 12/11/2026: uma versão anterior deste
     plano listava "publicar em outra conta"). As regras da Vercel dizem que contornar os limites é
-    violação e preveem suspensão.
-  - **Saídas** (preços conferidos em 12/11/2026; todas pedem cartão):
-    1. **Vercel Pro, US$ 20 por mês.** Libera na hora, e o projeto já está montado lá.
-    2. **Um servidor pequeno sempre ligado, cerca de US$ 5 a 7 por mês** (Fly.io com máquina em
+    violação, e que ela pode suspender o acesso na hora e tirar do ar projetos do plano gratuito
+    sem aviso. O risco prático é perder as duas contas com o sistema em uso. E não traz o sistema
+    antigo de volta: o banco dele continua bloqueado até 26/11.
+  - **Saídas** (preços conferidos em 12/11/2026):
+    1. **Teste gratuito do Vercel Pro, por 14 dias, na conta que você já tem** (acrescentado em
+       12/11/2026; eu não tinha visto esta opção). A Vercel dá um teste do Pro por conta, e a sua
+       ainda não usou. Cria-se um time novo **dentro da mesma conta**, escolhendo "Pro Trial"; sem
+       cartão cadastrado, nada é cobrado no fim. Serve para pôr o sistema **novo** no ar já e
+       conferir com um chip de verdade. O teste acaba em 14 dias ou antes, se passar dos limites
+       dele (US$ 20 de crédito, 1 milhão de acionamentos): por isso o sistema antigo não deve ir
+       junto. No fim, ou se paga o Pro, ou o painel precisa já estar em outro lugar (o time volta
+       para o plano gratuito, que não aceita uso comercial).
+    2. **Vercel Pro, US$ 20 por mês** (pede cartão). Libera na hora, e o projeto já está montado lá.
+    3. **Um servidor pequeno sempre ligado, cerca de US$ 5 a 7 por mês** (pede cartão; Fly.io com máquina em
        São Paulo: por volta de US$ 4 a 6; Railway: a partir de US$ 5; Render: US$ 7). Precisa de
        um ou dois dias para montar e conferir. É também o formato que melhor atende as próximas
        fases: campanhas com cadência e envios agendados pedem algo que fique ligado o tempo todo.
-    3. **Esperar 11/12 sem pagar.** Fica tudo parado até lá, e continua fora das regras (uso
+    4. **Esperar 11/12 sem pagar.** Fica tudo parado até lá, e continua fora das regras (uso
        comercial no plano gratuito).
   - **Hospedagem gratuita que aguente um atendimento de verdade: não encontrei.** O gratuito do
     Render dorme depois de 15 minutos sem acesso e leva cerca de um minuto para acordar (a própria
