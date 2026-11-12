@@ -291,6 +291,29 @@ const DESENHOS = {
       <line x1="8" y1="17" x2="13" y2="17" />
     </>
   ),
+  chave: (
+    <>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="m10.7 12.3 9.8-9.8" />
+      <path d="m16 7 3 3" />
+      <path d="m18.5 4.5 2 2" />
+    </>
+  ),
+  confere: (
+    <>
+      <path d="M20 6 9 17l-5-5" />
+    </>
+  ),
+  lista: (
+    <>
+      <path d="M8 6h13" />
+      <path d="M8 12h13" />
+      <path d="M8 18h13" />
+      <path d="M3 6h.01" />
+      <path d="M3 12h.01" />
+      <path d="M3 18h.01" />
+    </>
+  ),
   desligar: (
     <>
       <path d="M12 2v10" />

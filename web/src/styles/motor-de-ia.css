@@ -1,0 +1,154 @@
+/* Tela do Motor de IA (chaves, modelos e comportamento). */
+.motor-avisos {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.motor-avisos:empty {
+  display: none;
+}
+
+.motor-provedores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+}
+.motor-provedor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+/* Nomes de modelo são compridos ("nvidia/nemotron-3.5-super-vl-120b-a12b"): quando o cartão é
+   estreito, o campo fica com a linha inteira e o botão desce. */
+.motor-provedor .linha-de-campo {
+  flex-wrap: wrap;
+}
+.motor-provedor .linha-de-campo .campo {
+  flex: 1 1 250px;
+}
+.motor-provedor-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.motor-provedor-topo h3 {
+  color: var(--text-main);
+  font-size: 14.5px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.motor-provedor-resumo {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.motor-provedor-chave {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--text-main);
+  font-size: 12.8px;
+  line-height: 1.5;
+}
+.motor-provedor-chave .icon-svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+.motor-provedor-chave code {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-input);
+  font-size: 12px;
+}
+.motor-provedor-chave a,
+.dialogo-texto a {
+  color: var(--accent-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.motor-provedor-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.motor-provedor-modelo {
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+.motor-provedor-lista {
+  margin-top: 8px;
+}
+.motor-provedor [role='status']:not(:empty) {
+  margin-top: 12px;
+}
+
+.motor-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 0 16px;
+}
+.motor-interruptores {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.motor-regua {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--accent);
+}
+
+/* Barra de salvar: acompanha a rolagem para a pessoa nunca perder o botão de vista. */
+.motor-rodape {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+.motor-rodape-recado {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 12.8px;
+  line-height: 1.45;
+}
+.motor-rodape-acoes {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.motor-recado--ok {
+  color: var(--accent-bright);
+}
+.motor-recado--erro {
+  color: var(--danger-text);
+}
+.motor-recado--atencao {
+  color: var(--warning-text);
+}
+
+@media (max-width: 900px) {
+  .motor-rodape {
+    /* Fica acima da barra de navegação do celular. */
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+}

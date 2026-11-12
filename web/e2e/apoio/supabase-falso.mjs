@@ -8,6 +8,7 @@
  *   - contagem de linhas               (HEAD + Prefer: count=exact)
  *   - as ações dos chips               (/rest/v1/rpc/create_my_evolution_instance e afins)
  *   - a Inbox                          (/rest/v1/rpc/read_my_inbox, start_my_text_message e afins)
+ *   - o Motor de IA e o Treinamento    (/rest/v1/rpc/read_my_ai_settings, save_my_ai_agent e afins; ver ia-no-banco-falso.mjs)
  *   - o depósito de arquivos           (/storage/v1/object/...: assinar, subir, ler e baixar)
  *   - o que o servidor do painel faz com a "chave do servidor" ao receber um aviso da Evolution
  *     (ingest_evolution_message, begin_media_download, complete_media_download)
@@ -30,6 +31,7 @@ import {
   criarTabelas,
   previaDaMensagem,
 } from './dados.mjs';
+import { FUNCOES_DA_IA, criarIaDoBanco } from './ia-no-banco-falso.mjs';
 
 const PORTA = Number(process.env.PORTA_SUPABASE_FALSO ?? 54399);
 const SEGREDO_JWT = 'segredo-so-para-testes';
@@ -1030,6 +1032,9 @@ function receberMensagem(conversaId, texto) {
   return true;
 }
 
+/** O Motor de IA e o Treinamento (as regras estão em ia-no-banco-falso.mjs). */
+const iaDoBanco = criarIaDoBanco({ tabelas, responder });
+
 async function rotasDeDados(req, res, url) {
   const recurso = url.pathname.replace('/rest/v1/', '');
 
@@ -1045,6 +1050,10 @@ async function rotasDeDados(req, res, url) {
 
   if (req.method === 'POST' && FUNCOES_DA_INBOX.includes(recurso.slice(4)) && recurso.startsWith('rpc/')) {
     return acoesDaInbox(res, usuario, recurso.slice(4), await lerCorpo(req));
+  }
+
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DA_IA.includes(recurso.slice(4))) {
+    return iaDoBanco.acoesDaIa(res, usuario, recurso.slice(4), await lerCorpo(req));
   }
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && recurso !== 'rpc/is_my_platform_master') {
@@ -1106,6 +1115,10 @@ const servidor = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/controle/reiniciar-inbox') {
       reiniciarInbox();
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/reiniciar-ia') {
+      iaDoBanco.reiniciarIa();
       return responder(res, 200, { ok: true });
     }
     if (url.pathname === '/controle/receber-mensagem') {

@@ -63,8 +63,10 @@ Na primeira vez, os testes de navegador pedem: `npx playwright install chromium`
 - **Retrato do banco real** (`impressao-digital.remoto.json`): um teste compara o banco montado a
   partir do Git com o banco real. Se alguém mudar o banco por fora, o teste acusa.
 - **Navegador** (`web/e2e`): usam um "Supabase de mentira" com contas inventadas (inclusive o
-  depósito de arquivos) e uma "Evolution de mentira" que responde no mesmo formato da verdadeira.
-  Nenhum teste encosta no banco real, cria chip de verdade nem manda mensagem para ninguém.
+  depósito de arquivos), uma "Evolution de mentira" e uma "IA de mentira" (Gemini, OpenRouter e
+  NVIDIA) que respondem no mesmo formato das verdadeiras, com cópias das respostas de erro reais.
+  Nenhum teste encosta no banco real, cria chip de verdade, manda mensagem para ninguém nem gasta
+  chave de IA.
 
 ## Regras da casa
 
@@ -90,3 +92,7 @@ Explicadas uma a uma em [web/.env.example](web/.env.example).
 | `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` | (Servidor) Endereço e chave da Evolution, para conectar chips e enviar mensagens. |
 | `SUPABASE_SERVICE_ROLE_KEY` | (Servidor, segredo) Gravar os avisos da Evolution e guardar os arquivos recebidos. |
 | `IENVIA_URL_PUBLICA` | (Servidor) Endereço público do painel, para a Evolution avisar. Na Vercel não precisa. |
+| `IENVIA_CHAVE_DOS_SEGREDOS` | (Servidor, segredo) Cifra as chaves de IA de cada cliente antes de gravar no banco. Sem ela, o painel não guarda nem usa chave de IA. |
+
+As chaves de IA (Google Gemini, OpenRouter e NVIDIA) **não** são variáveis de ambiente: cada dono de
+conta cadastra as suas na tela Motor de IA.

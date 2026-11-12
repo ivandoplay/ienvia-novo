@@ -4,11 +4,15 @@ import { defineConfig, devices } from '@playwright/test';
  * Testes de ponta a ponta: abrem o painel num navegador de verdade e usam como uma pessoa usaria.
  *
  * Nenhum teste encosta no Supabase real nem cria chip de verdade. O painel é montado apontando
- * para um "Supabase de mentira" e uma "Evolution de mentira" (e2e/apoio), numa pasta de montagem separada.
+ * para um "Supabase de mentira", uma "Evolution de mentira" e uma "IA de mentira" (e2e/apoio), numa pasta
+ * de montagem separada. Nenhuma chave de IA de verdade é usada.
  */
 const PORTA_PAINEL = 3100;
 const PORTA_SUPABASE_FALSO = 54399;
 const PORTA_EVOLUTION_FALSA = 54398;
+const PORTA_IA_FALSA = 54397;
+/** O segredo que protege as chaves de IA nos testes (o mesmo de e2e/apoio/ia-no-banco-falso.mjs; nunca em produção). */
+const SEGREDO_DO_COFRE_DE_TESTE = '0f1e2d3c4b5a69788796a5b4c3d2e1f00123456789abcdeffedcba9876543210';
 
 const ambienteDoPainel = {
   IENVIA_PASTA_DE_MONTAGEM: '.next-e2e',
@@ -19,6 +23,11 @@ const ambienteDoPainel = {
   EVOLUTION_API_URL: `http://127.0.0.1:${PORTA_EVOLUTION_FALSA}`,
   EVOLUTION_API_KEY: 'chave-da-evolution-de-teste',
   IENVIA_URL_PUBLICA: 'https://painel.teste.invalid',
+  // O Gemini e o OpenRouter "de mentira" (e2e/apoio/ia-falsa.mjs). Só endereços desta máquina são aceitos.
+  IENVIA_GEMINI_URL: `http://127.0.0.1:${PORTA_IA_FALSA}`,
+  IENVIA_OPENROUTER_URL: `http://127.0.0.1:${PORTA_IA_FALSA}/openrouter/api/v1`,
+  IENVIA_NVIDIA_URL: `http://127.0.0.1:${PORTA_IA_FALSA}/nvidia/v1`,
+  IENVIA_CHAVE_DOS_SEGREDOS: SEGREDO_DO_COFRE_DE_TESTE,
   NEXT_TELEMETRY_DISABLED: '1',
 };
 
@@ -46,7 +55,7 @@ export default defineConfig({
     {
       command: 'node e2e/apoio/supabase-falso.mjs',
       url: `http://127.0.0.1:${PORTA_SUPABASE_FALSO}/saude`,
-      env: { PORTA_SUPABASE_FALSO: String(PORTA_SUPABASE_FALSO) },
+      env: { PORTA_SUPABASE_FALSO: String(PORTA_SUPABASE_FALSO), IENVIA_CHAVE_DOS_SEGREDOS: SEGREDO_DO_COFRE_DE_TESTE },
       reuseExistingServer: false,
       timeout: 20_000,
     },
@@ -54,6 +63,13 @@ export default defineConfig({
       command: 'node e2e/apoio/evolution-falsa.mjs',
       url: `http://127.0.0.1:${PORTA_EVOLUTION_FALSA}/`,
       env: { PORTA_EVOLUTION_FALSA: String(PORTA_EVOLUTION_FALSA) },
+      reuseExistingServer: false,
+      timeout: 20_000,
+    },
+    {
+      command: 'node e2e/apoio/ia-falsa.mjs',
+      url: `http://127.0.0.1:${PORTA_IA_FALSA}/controle/pedidos`,
+      env: { PORTA_IA_FALSA: String(PORTA_IA_FALSA) },
       reuseExistingServer: false,
       timeout: 20_000,
     },

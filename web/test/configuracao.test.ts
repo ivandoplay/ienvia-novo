@@ -112,3 +112,10 @@ describe('endereço do depósito de arquivos para o navegador', () => {
     expect(enderecoDoDepositoParaONavegador('https://outro.exemplo.com/arquivo', comDesvio)).toBe('https://outro.exemplo.com/arquivo');
   });
 });
+
+describe('registros (logs) do servidor', () => {
+  test('as ações do servidor não são escritas no terminal com os argumentos (ali passam chaves de IA e mensagens)', async () => {
+    const { default: configuracao } = await import('../next.config');
+    expect(configuracao.logging).toMatchObject({ serverFunctions: false });
+  });
+});

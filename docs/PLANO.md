@@ -26,7 +26,7 @@ Respondidas por você nos três questionários:
 | Funcionalidades | Enxugar, mostrando a lista antes de cortar: [O-QUE-FICA-E-O-QUE-SAI.md](./O-QUE-FICA-E-O-QUE-SAI.md). |
 | Visual | O do branch `feat/modernizacao-painel-oficial`. |
 | Pessoas por conta | Um login por cliente agora; o banco já está pronto para equipe depois. |
-| Chaves de IA | Cada cliente usa as suas (Gemini e OpenRouter), como hoje. |
+| Chaves de IA | Cada cliente usa as suas: Google Gemini, OpenRouter e **NVIDIA** (a NVIDIA entrou em 11/11/2026, a seu pedido, como opção gratuita). |
 | Repositório | Novo e **privado** no GitHub: `ivandoplay/ienvia-novo`. O repositório antigo e a primeira tentativa (`ivandoplay/ienvia`) não foram tocados. |
 | Lista de cortes | Aprovada em 11/11/2026, como está em [O-QUE-FICA-E-O-QUE-SAI.md](./O-QUE-FICA-E-O-QUE-SAI.md). |
 | Skills | Ficam: Estúdio de Skills, "Cérebro completo" e "Pacote Turbo" (você usa). Entram com o Treinamento. |
@@ -106,7 +106,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
 | 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Pronta no código e no banco; falta conferir no ar.** Feitos e testados: Instâncias, recebimento das mensagens e a Inbox com texto e com **arquivos** (fotos, áudios, vídeos, documentos e figurinhas). A conferência final com os serviços de verdade está **travada por dois bloqueios de conta** (Vercel e Supabase): ver o começo da seção 6. |
-| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | |
+| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Pronto: a tela **Motor de IA**, com Gemini, OpenRouter e NVIDIA. Falta: a tela de Treinamento e o atendente em si (a IA ainda **não responde** no WhatsApp). Detalhes abaixo. |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
 | 5 | Campanhas e segurança | **Campanhas** com prévia, cadência segura, rodízio de chips, pausar/retomar. **Segurança**: anti-ban, fila segura, horário de atendimento, contatos ignorados, alerta no seu WhatsApp. | |
@@ -188,6 +188,83 @@ trocam de lugar sem prejuízo.
     "sem confirmação" quando a Evolution não responde. A diferença: um arquivo que não foi enviado
     precisa ser anexado de novo (o painel não guarda o arquivo de um envio que falhou para reenviar).
 
+### O que a Fase 2 entregou até aqui (12/11/2026)
+
+**A IA ainda não responde ninguém.** O que existe é a tela **Motor de IA**, que guarda e testa as
+chaves e os ajustes. A tela diz isso com todas as letras enquanto o atendente não estiver pronto.
+
+- **Três provedores**, cada um com o seu cartão: **Google Gemini**, **OpenRouter** e **NVIDIA**.
+  Em cada cartão: cadastrar, trocar, testar e remover a chave; escolher o modelo (digitando ou pela
+  lista que o próprio provedor devolve).
+- **A chave de cada cliente fica cifrada.** O painel cifra a chave antes de gravar no banco, com um
+  segredo que só o servidor conhece (`IENVIA_CHAVE_DOS_SEGREDOS`). No banco fica só o texto cifrado
+  e os 4 últimos caracteres. Depois de cadastrada, a chave não volta para a tela de ninguém, e
+  só o dono da conta vê os 4 últimos caracteres. O banco recusa qualquer coisa que pareça uma chave
+  em texto puro.
+- **Ordem de uso**: provedor principal, reserva e segunda reserva (as duas últimas são opcionais).
+  Se o principal falha numa mensagem, a reserva assume aquela resposta. A tela avisa de qual
+  provedor falta chave.
+- **Comportamento nas conversas**: mostrar "digitando…", dividir respostas longas, parar a IA quando
+  uma pessoa responde (e em quanto tempo ela volta), esperar o cliente terminar de escrever, quanto
+  da conversa a IA relê, e a criatividade.
+- **Só o dono da conta altera.** A equipe vê como está configurado, sem botões.
+- No banco entraram também as tabelas do **Treinamento** (bases, perguntas frequentes, arquivos de
+  conhecimento e qual base cada chip usa). Estão testadas, mas ainda **sem tela**.
+
+Decisões tomadas nesta parte (diga se quiser diferente):
+
+- **"Modo de rota" saiu; entrou a ordem de uso.** O painel antigo tinha dois modos ("Auto: áudio no
+  Gemini, texto no OpenRouter" e "Principal + reserva"). Com três provedores isso virou uma coisa
+  só: você escolhe a ordem, e **mensagem de voz vai sempre para o Gemini** (quando ele está na
+  ordem e tem chave), porque só ele escuta.
+- **Áudio nunca vai para a NVIDIA nem para o OpenRouter.** Testei de verdade: vários modelos da
+  NVIDIA recebem o áudio, descartam calados e respondem como se o cliente não tivesse mandado nada.
+  Num atendimento, isso seria uma resposta inventada. Sem o Gemini na ordem, a IA não entende áudio.
+- **Foto** vai para qualquer um dos três, mas só funciona quando o modelo escolhido enxerga. Modelo
+  que só lê texto devolve um erro claro, e o painel passa para o próximo da ordem.
+- **Modelo padrão da NVIDIA: `nvidia/nemotron-3.5-super-vl-120b-a12b`.** Escolhido com um teste de
+  verdade (instruções de uma loja e quatro perguntas, entre elas uma fora da base e uma tentativa
+  de enganar a IA): foi o único que acertou as quatro e respondeu em menos de 1 segundo. Também
+  enxerga fotos. O modelo mais rápido de lá (`nemotron-3.5-lightning`) **inventou** uma resposta.
+- **Na NVIDIA, o painel pede ao modelo para não "raciocinar" antes de responder.** Sem isso, as
+  respostas levam de 10 a 40 segundos (ou nem vêm). Com isso, menos de 1 segundo.
+- **A NVIDIA é um serviço de testes.** É gratuita, mas a lista de modelos muda, alguns demoram e
+  vários modelos da lista não estão liberados para toda conta. Por isso a tela pede para testar
+  depois de escolher, e recomendo deixar o Gemini ou o OpenRouter como reserva.
+- **Não trouxe o "pool de chaves extras do Gemini"** (várias chaves grátis para multiplicar a cota).
+  No lugar dele há três provedores com reserva. Se fizer falta, diga.
+- **Ainda não decidido:** a "mensagem enviada quando a IA está desligada" do painel antigo. Entra
+  (ou não) junto com o atendente.
+- **Nova opção no Treinamento (ainda sem tela):** o que a IA faz quando perguntam "estou falando com
+  um robô?". Padrão: passa a conversa para uma pessoa. Alternativa: admitir que é uma assistente
+  virtual. O painel antigo mandava negar; o novo não nega.
+
+O que foi conferido de verdade, e o que não foi:
+
+- **NVIDIA e OpenRouter, com as suas chaves**: teste de conexão, lista de modelos, uma conversa
+  curta, foto num modelo que enxerga, foto num modelo que só lê texto, chave errada e modelo que
+  não existe. Tudo pelo código do próprio painel, e cada erro virou a frase certa na tela.
+- **Gemini: nada conferido com chave boa.** A chave que você mandou é recusada pelo Google com
+  "API key was reported as leaked" (o Google bloqueia sozinho uma chave que encontra publicada).
+  O painel reconhece esse caso e explica na tela. Conversa, foto, **áudio** e lista de modelos do
+  Gemini seguem a documentação do Google, mas só serão conferidos com uma chave nova.
+- **Banco real**: a migração `20261112002400_ai_engine_and_training` foi aplicada e o retrato do
+  banco bate com o do Git. Um roteiro de 31 passos rodou no banco de verdade (gravar a ordem com a
+  NVIDIA, recusar ordem repetida, guardar/ler/apagar chave cifrada, recusar chave em texto puro,
+  criar base, pergunta, arquivo, base por chip; conta de fora e visitante recusados; auditoria sem
+  a chave) e desfez tudo no fim: 31 de 31, nada ficou gravado.
+- **Não conferido**: a tela falando com o banco de verdade pelo navegador (o Supabase está
+  bloqueado para o painel), e nada disto está publicado (a Vercel está bloqueada).
+
+O que falta na Fase 2:
+
+1. Tela de **Treinamento** (identidade, regras e blindagem, perguntas frequentes, arquivos, modelos
+   prontos, várias bases, Skills, "Cérebro completo", "Pacote Turbo").
+2. O **atendente**: ler a mensagem que chega, montar as instruções, pedir a resposta ao provedor,
+   enviar, passar para uma pessoa quando precisa. Com ele: liga/desliga da IA em cada chip,
+   "Pausar tudo", assumir e devolver a conversa na Inbox, corrigir resposta em 1 clique.
+3. Cadastrar na Vercel o segredo que protege as chaves (já criado e guardado; a Vercel está bloqueada).
+
 ### Diferenças pequenas em relação ao visual do branch
 
 - O cartão "Na fila segura" virou "Contatos" até a fila existir (Fase 5).
@@ -237,6 +314,16 @@ de ensaio (só conta e mostra o que faria), depois de verdade, com um relatório
     que a migração dos arquivos foi aplicada e conferida.
   - **Cuidado daqui para a frente:** fotos, áudios e vídeos gastam essa mesma cota cada vez que
     alguém abre uma conversa. Com clientes de verdade, o plano gratuito não aguenta.
+- **Chave do Gemini bloqueada pelo Google (12/11/2026).** A chave do Gemini que você mandou não
+  funciona mais: o Google respondeu "Your API key was reported as leaked", que é o bloqueio
+  automático de uma chave que apareceu em lugar público. Procurei no código e no histórico do
+  sistema antigo (a cópia que tenho) e ela não está lá; não sei onde vazou. **O que fazer:** criar
+  uma chave nova em `aistudio.google.com/apikey`, apagar a antiga e não colar a nova em repositório,
+  grupo ou documento público. Se essa chave também era usada no sistema antigo, a IA de lá parou.
+- **Segredo que protege as chaves de IA.** Já foi criado e está guardado (fora do repositório).
+  Falta cadastrá-lo na Vercel (`IENVIA_CHAVE_DOS_SEGREDOS`) quando a conta for desbloqueada; sem
+  ele, o painel publicado não guarda nem usa chave nenhuma (e avisa isso na tela). Se um dia esse
+  segredo se perder, as chaves guardadas deixam de abrir e cada cliente cadastra a sua de novo.
 - **Senha exposta.** O repositório antigo é público e tem o usuário e a senha do painel escritos
   em dois documentos (`GUIA_PARA_IA.md` e `CONTEXTO_SISTEMA.md`), além de telefones reais.
   Recomendo trocar essa senha e tornar o repositório privado.

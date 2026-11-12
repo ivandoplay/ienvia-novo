@@ -41,6 +41,9 @@ const config: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, '..'),
   turbopack: { root: path.join(__dirname, '..') },
   allowedDevOrigins: origensDev,
+  // Em desenvolvimento, o Next escreve no terminal cada ação do servidor COM os argumentos. Aqui os
+  // argumentos incluem chaves de IA e mensagens de clientes: isso não pode ir para registro nenhum.
+  logging: { serverFunctions: false },
   experimental: {
     serverActions: {
       allowedOrigins: emProducao ? [] : origensDev,
