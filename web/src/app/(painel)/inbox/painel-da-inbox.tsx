@@ -1,5 +1,6 @@
 'use client';
 
+import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
@@ -49,6 +50,10 @@ interface Props {
   workspaceId: string;
   /** Muda quando qualquer conversa ou chip da empresa muda. `null` quando não deu para ler. */
   versao: string | null;
+  /** Canal privado de Broadcast no Supabase Realtime (opaco, sem o ID da empresa). `null` ativa o modo reserva por consulta. */
+  canalRealtime?: string | null;
+  /** Chave pública do Supabase para assinar o Realtime sem ler nenhum cookie de sessão. */
+  supabasePublico?: { url: string; chavePublica: string } | null;
   filtros: FiltrosDaInbox;
   lista: ListaDaInbox;
   chips: ChipDaInbox[];
@@ -220,15 +225,22 @@ function novaChave(): string {
 }
 
 /**
- * Pergunta ao painel, de tempos em tempos, se algo mudou; quando muda, recarrega os dados da tela
- * (sem perder o que a pessoa está escrevendo). Só pergunta com a aba visível, e mais devagar quando
- * ninguém mexe na tela há alguns minutos.
+ * Mantém a Inbox atualizada em tempo real via Supabase Realtime Broadcast (sem gastar chamadas HTTP
+ * periódicas no servidor do painel). Se o Realtime estiver indisponível ou cair, volta sozinho
+ * para a conferência periódica em `/api/inbox/versao` enquanto a aba estiver visível.
  */
-function useNovidades(workspaceId: string, versao: string | null): void {
+function useNovidades(
+  workspaceId: string,
+  versao: string | null,
+  canalRealtime: string | null = null,
+  supabasePublico: { url: string; chavePublica: string } | null = null,
+): void {
   const router = useRouter();
   const versaoNaTela = useRef(versao);
   /** Hora em que a tela pediu uma recarga que ainda não chegou (0 = nenhuma pendente). */
   const recargaPedidaEm = useRef(0);
+  const supabaseUrl = supabasePublico?.url ?? null;
+  const supabaseChave = supabasePublico?.chavePublica ?? null;
 
   useEffect(() => {
     // Chegaram dados novos: a recarga pedida (se havia) foi atendida.
@@ -242,6 +254,29 @@ function useNovidades(workspaceId: string, versao: string | null): void {
     let pausadoAte = 0;
     let ultimaAtividade = Date.now();
     let relogio: ReturnType<typeof setTimeout> | undefined;
+    let atrasoRealtime: ReturnType<typeof setTimeout> | undefined;
+    let realtimeAtivo = false;
+    let mudouNoSilencio = false;
+
+    function pedirRecargaAgora() {
+      if (desmontado || document.visibilityState !== 'visible') return;
+      if (pedidosEmAndamento > 0) {
+        mudouNoSilencio = true;
+        clearTimeout(atrasoRealtime);
+        atrasoRealtime = setTimeout(() => {
+          if (!desmontado && mudouNoSilencio && pedidosEmAndamento === 0) {
+            mudouNoSilencio = false;
+            pedirRecargaAgora();
+          }
+        }, 600);
+        return;
+      }
+      const desdeOPedido = Date.now() - recargaPedidaEm.current;
+      if (recargaPedidaEm.current !== 0 && desdeOPedido < 15_000) return;
+      recargaPedidaEm.current = Date.now();
+      ultimaAtividade = Date.now();
+      router.refresh();
+    }
 
     async function conferir() {
       if (desmontado || perguntando || document.visibilityState !== 'visible' || Date.now() < pausadoAte) return;
@@ -283,14 +318,23 @@ function useNovidades(workspaceId: string, versao: string | null): void {
 
     function agendar() {
       clearTimeout(relogio);
-      if (desmontado) return;
+      if (desmontado || realtimeAtivo) return;
       relogio = setTimeout(() => {
+        if (realtimeAtivo) return;
         void conferir().finally(agendar);
       }, intervaloDeNovidades(Date.now() - ultimaAtividade));
     }
 
-    /** A pessoa mexeu na tela (ou voltou para a aba): ritmo rápido de novo; se estava no lento, confere já. */
+    /** A pessoa mexeu na tela (ou voltou para a aba): no modo reserva, confere se estava lento ou voltou à aba. */
     function acordar(conferirJa: boolean) {
+      if (realtimeAtivo) {
+        ultimaAtividade = Date.now();
+        if (conferirJa && mudouNoSilencio) {
+          mudouNoSilencio = false;
+          pedirRecargaAgora();
+        }
+        return;
+      }
       const estavaLento = Date.now() - ultimaAtividade >= NOVIDADES_EM_RITMO_LENTO_APOS;
       ultimaAtividade = Date.now();
       if (conferirJa || estavaLento) {
@@ -307,21 +351,64 @@ function useNovidades(workspaceId: string, versao: string | null): void {
     window.addEventListener('keydown', aoMexer);
     document.addEventListener('visibilitychange', aoVoltar);
     window.addEventListener('focus', aoVoltar);
+
+    let clienteRealtime: ReturnType<typeof createClient> | null = null;
+    if (canalRealtime && supabaseUrl && supabaseChave) {
+      clienteRealtime = createClient(supabaseUrl, supabaseChave, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
+      clienteRealtime
+        .channel(canalRealtime)
+        .on('broadcast', { event: 'changed' }, () => {
+          if (desmontado) return;
+          if (document.visibilityState !== 'visible') {
+            mudouNoSilencio = true;
+            return;
+          }
+          clearTimeout(atrasoRealtime);
+          atrasoRealtime = setTimeout(pedirRecargaAgora, 150);
+        })
+        .subscribe((estado) => {
+          if (desmontado) return;
+          if (estado === 'SUBSCRIBED') {
+            realtimeAtivo = true;
+            clearTimeout(relogio);
+            if (mudouNoSilencio && document.visibilityState === 'visible') {
+              mudouNoSilencio = false;
+              pedirRecargaAgora();
+            }
+          } else if (estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT' || estado === 'CLOSED') {
+            if (realtimeAtivo) {
+              realtimeAtivo = false;
+              agendar();
+            }
+          }
+        });
+    }
+
     agendar();
     return () => {
       desmontado = true;
       clearTimeout(relogio);
+      clearTimeout(atrasoRealtime);
       window.removeEventListener('pointerdown', aoMexer);
       window.removeEventListener('keydown', aoMexer);
       document.removeEventListener('visibilitychange', aoVoltar);
       window.removeEventListener('focus', aoVoltar);
+      if (clienteRealtime) void clienteRealtime.removeAllChannels();
     };
-  }, [workspaceId, router]);
+  }, [workspaceId, canalRealtime, supabaseUrl, supabaseChave, router]);
 }
 
 export function PainelDaInbox({
   workspaceId,
   versao,
+  canalRealtime = null,
+  supabasePublico = null,
   filtros,
   lista,
   chips,
@@ -335,7 +422,7 @@ export function PainelDaInbox({
   const [pendentes, setPendentes] = useState<Pendente[]>([]);
   const [avisos, setAvisos] = useState<Record<string, Aviso | undefined>>({});
 
-  useNovidades(workspaceId, versao);
+  useNovidades(workspaceId, versao, canalRealtime, supabasePublico);
 
   const avisar = useCallback((conversa: string, aviso: Aviso | null) => {
     setAvisos((atuais) => ({ ...atuais, [conversa]: aviso ?? undefined }));

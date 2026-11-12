@@ -41,11 +41,29 @@ export function lerConfigEvolution(): ConfigEvolution | null {
 
 /**
  * Endereço público do painel (sem barra no final). É para onde a Evolution avisa quando chega
- * mensagem ou quando o chip conecta. Na Vercel vem sozinho; fora dela, defina IENVIA_URL_PUBLICA.
+ * mensagem ou quando o chip conecta, e também entra no cabeçalho opcional do OpenRouter.
+ * Reconhece automaticamente IENVIA_URL_PUBLICA, Netlify (URL), Render (RENDER_EXTERNAL_URL) e Vercel.
  */
-export function enderecoPublico(): string | null {
-  const definido = process.env.IENVIA_URL_PUBLICA?.trim().replace(/\/+$/, '');
+export function enderecoPublico(ambiente: Record<string, string | undefined> = process.env): string | null {
+  const definido = ambiente.IENVIA_URL_PUBLICA?.trim().replace(/\/+$/, '');
   if (definido) return definido;
-  const daVercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  return daVercel ? `https://${daVercel}` : null;
+  const daVercel = ambiente.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (daVercel) return `https://${daVercel}`;
+  const daNetlify = ambiente.URL?.trim().replace(/\/+$/, '');
+  if (daNetlify && /^https?:\/\//i.test(daNetlify)) return daNetlify;
+  const doRender = ambiente.RENDER_EXTERNAL_URL?.trim().replace(/\/+$/, '');
+  if (doRender && /^https?:\/\//i.test(doRender)) return doRender;
+  return null;
+}
+
+/**
+ * Endereço de webhook cadastrado na Evolution API quando um chip é criado ou conferido.
+ * Quando IENVIA_WEBHOOK_URL está definida (por exemplo, o porteiro Cloudflare ou a Supabase Edge
+ * Function), a Evolution passa a avisar diretamente esse endereço em vez do painel.
+ */
+export function enderecoDoAviso(ambiente: Record<string, string | undefined> = process.env): string | null {
+  const direto = ambiente.IENVIA_WEBHOOK_URL?.trim().replace(/\/+$/, '');
+  if (direto && /^https?:\/\//i.test(direto)) return direto;
+  const base = enderecoPublico(ambiente);
+  return base ? `${base}/api/webhooks/evolution` : null;
 }

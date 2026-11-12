@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { carregarConversa, carregarInbox, lerVersaoDaInbox, listarChipsDaInbox } from '@/lib/dados/inbox';
-import { lerConfigEvolution } from '@/lib/env';
+import { carregarConversa, carregarInbox, lerCanalDaInbox, lerVersaoDaInbox, listarChipsDaInbox } from '@/lib/dados/inbox';
+import { lerConfigEvolution, lerConfigSupabase } from '@/lib/env';
 import { lerBusca, lerLimite, lerLimiteDeMensagens, lerVisao } from '@/lib/inbox/regras';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { obterSessao } from '@/lib/sessao';
@@ -41,7 +41,7 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
   const agora = new Date();
   // A versão é lida ANTES dos dados: assim o que vai para a tela nunca é mais velho do que a versão
   // que a tela guarda (se fosse, uma mensagem nova poderia passar despercebida).
-  const versao = await lerVersaoDaInbox(workspace.id);
+  const [versao, canalRealtime] = await Promise.all([lerVersaoDaInbox(workspace.id), lerCanalDaInbox(workspace.id)]);
   const [lista, chips, aberta] = await Promise.all([
     carregarInbox(workspace.id, filtros, agora),
     listarChipsDaInbox(workspace.id),
@@ -52,6 +52,8 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
     <PainelDaInbox
       workspaceId={workspace.id}
       versao={versao}
+      canalRealtime={canalRealtime}
+      supabasePublico={lerConfigSupabase()}
       filtros={filtros}
       lista={lista}
       chips={chips}

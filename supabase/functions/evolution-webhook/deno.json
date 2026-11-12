@@ -1,0 +1,25 @@
+{
+  "imports": {
+    "server-only": "./vazio.ts",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "@ienvia/shared": "../../../shared/src/auth/usuario.ts",
+    "@/lib/atendente/atendente": "../../../web/src/lib/atendente/atendente.ts",
+    "@/lib/atendente/regras": "../../../web/src/lib/atendente/regras.ts",
+    "@/lib/evolution/aviso": "../../../web/src/lib/evolution/aviso.ts",
+    "@/lib/evolution/cliente": "../../../web/src/lib/evolution/cliente.ts",
+    "@/lib/evolution/processar-aviso": "../../../web/src/lib/evolution/processar-aviso.ts",
+    "@/lib/ia/cofre": "../../../web/src/lib/ia/cofre.ts",
+    "@/lib/ia/instrucoes": "../../../web/src/lib/ia/instrucoes.ts",
+    "@/lib/ia/modelos-prontos": "../../../web/src/lib/ia/modelos-prontos.ts",
+    "@/lib/ia/provedores": "../../../web/src/lib/ia/provedores.ts",
+    "@/lib/ia/regras": "../../../web/src/lib/ia/regras.ts",
+    "@/lib/ia/treinamento": "../../../web/src/lib/ia/treinamento.ts",
+    "@/lib/inbox/arquivos": "../../../web/src/lib/inbox/arquivos.ts",
+    "@/lib/inbox/buscar-arquivo": "../../../web/src/lib/inbox/buscar-arquivo.ts",
+    "@/lib/inbox/regras": "../../../web/src/lib/inbox/regras.ts",
+    "@/lib/instancias/regras": "../../../web/src/lib/instancias/regras.ts",
+    "@/lib/supabase/servico": "../../../web/src/lib/supabase/servico.ts",
+    "@/lib/env": "../../../web/src/lib/env.ts",
+    "@/lib/tempo": "../../../web/src/lib/tempo.ts"
+  }
+}

@@ -16,19 +16,21 @@ vídeos, documentos e figurinhas). Fase 2 em andamento: as abas **Motor de IA** 
 pessoa quando precisa e para quando alguém responde) e o **corrigir resposta em 1 clique** (na Inbox,
 guardar no Treinamento o jeito certo de responder) estão prontos no código e no banco. Faltam: as
 Mensagens prontas e as Skills.
-O banco voltou a funcionar em 12/11/2026, num projeto Supabase novo e só dele (`ienvia-001`). Falta a
-conferência final no ar, que continua travada: a Vercel pausou a conta inteira em 11/11/2026 (limite
-do plano gratuito) e só libera sozinha em 11/12/2026. Os detalhes e as saídas estão no começo da
-seção 6 de [docs/PLANO.md](docs/PLANO.md).
+O banco voltou a funcionar em 12/11/2026, num projeto Supabase novo e só dele (`ienvia-001`), já com
+a Edge Function `evolution-webhook` no ar e o canal de Realtime da Inbox aplicado. A arquitetura foi
+blindada fora da Vercel: webhooks e atendente de IA rodam na Supabase Edge Function protegidos por um
+porteiro Cloudflare Worker (`cloudflare/porteiro/`) com failover automático para o painel na Netlify
+(principal) e na Render (reserva), e a Inbox atualiza em tempo real via Supabase Realtime Broadcast.
 As outras abas aparecem no menu e avisam em que fase ficam prontas.
 
 ## O que tem em cada pasta
 
 ```
-web/        O painel (Next.js). É o que o cliente abre no navegador.
-shared/     Regras usadas pelo painel e pelo motor local (código puro, sem rede).
-supabase/   O banco: migrações em ordem e os testes de segurança.
-docs/       O plano, a lista do que fica e do que sai e a documentação do projeto.
+web/         O painel (Next.js) e a rota reserva de webhooks.
+shared/      Regras usadas pelo painel e pelo motor local (código puro, sem rede).
+supabase/    O banco (migrações + testes de segurança) e a Edge Function `evolution-webhook`.
+cloudflare/  Porteiro Cloudflare Worker (`porteiro/`) com filtro na borda e failover automático.
+docs/        O plano, a lista do que fica e do que sai e a documentação do projeto.
 ```
 
 O motor local do WhatsApp (pasta `motor/`) entra na Fase 4.
@@ -99,7 +101,8 @@ Explicadas uma a uma em [web/.env.example](web/.env.example).
 | `AUTH_DOMINIO_USUARIO` | (Opcional) Domínio interno dos logins por nome de usuário. Padrão: `zapia.local`. |
 | `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` | (Servidor) Endereço e chave da Evolution, para conectar chips e enviar mensagens. |
 | `SUPABASE_SERVICE_ROLE_KEY` | (Servidor, segredo) Gravar os avisos da Evolution, guardar os arquivos recebidos e fazer o atendente de IA responder. |
-| `IENVIA_URL_PUBLICA` | (Servidor) Endereço público do painel, para a Evolution avisar. Na Vercel não precisa. |
+| `IENVIA_URL_PUBLICA` | (Servidor) Endereço público do painel. Na Netlify (`URL`) e na Render (`RENDER_EXTERNAL_URL`) vem sozinho. |
+| `IENVIA_WEBHOOK_URL` | (Servidor, recomendado) URL direta do webhook gravada nos chips (ex.: o porteiro Cloudflare Worker ou a Supabase Edge Function). Se vazia, usa `${IENVIA_URL_PUBLICA}/api/webhooks/evolution`. |
 | `IENVIA_CHAVE_DOS_SEGREDOS` | (Servidor, segredo) Cifra as chaves de IA de cada cliente antes de gravar no banco. Sem ela, o painel não guarda nem usa chave de IA. |
 | `IENVIA_ATENDENTE_ORCAMENTO_MS` | (Servidor, opcional) Tempo total que o atendente de IA tem para responder uma mensagem. Padrão: 55000 (cabe numa hospedagem que corta o pedido em 60 s). |
 

@@ -135,11 +135,13 @@ interface Resposta {
   bruto: string;
 }
 
+const MODO_SEM_CACHE: RequestInit = 'Deno' in globalThis ? {} : { cache: 'no-store' };
+
 async function chamar(provedor: Provedor, url: string, inicio: RequestInit, tempoLimiteMs: number): Promise<Resposta> {
   let resposta: Response;
   let bruto: string;
   try {
-    resposta = await fetch(url, { ...inicio, signal: AbortSignal.timeout(tempoLimiteMs), cache: 'no-store' });
+    resposta = await fetch(url, { ...inicio, signal: AbortSignal.timeout(tempoLimiteMs), ...MODO_SEM_CACHE });
     bruto = await resposta.text();
   } catch (erro) {
     const nome = erro instanceof Error ? erro.name : '';

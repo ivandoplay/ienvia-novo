@@ -74,6 +74,8 @@ function extrairMensagem(dado: unknown): string {
   return 'A Evolution não explicou o motivo.';
 }
 
+const MODO_SEM_CACHE: RequestInit = 'Deno' in globalThis ? {} : { cache: 'no-store' };
+
 async function chamar<T>(
   metodo: 'GET' | 'POST' | 'DELETE',
   caminho: string,
@@ -92,7 +94,7 @@ async function chamar<T>(
       },
       body: opcoes.corpo === undefined ? undefined : JSON.stringify(opcoes.corpo),
       signal: AbortSignal.timeout(opcoes.tempoLimite ?? TEMPO_LIMITE_PADRAO),
-      cache: 'no-store',
+      ...MODO_SEM_CACHE,
     });
   } catch {
     // Sem resposta (demorou demais, rede caiu): não sabemos se a Evolution executou.

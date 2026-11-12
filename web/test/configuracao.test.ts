@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { atributosDeCookie, atributosDoCookieDeSessao } from '@/lib/cookies';
-import { dominioDeUsuario, lerConfigSupabase } from '@/lib/env';
+import { dominioDeUsuario, enderecoDoAviso, enderecoPublico, lerConfigSupabase } from '@/lib/env';
 import { nomeDaFase } from '@/lib/fases';
 import { enderecoDoDepositoParaONavegador } from '@/lib/supabase/deposito';
 import { lerTema } from '@/lib/tema';
@@ -71,6 +71,23 @@ describe('configuração do Supabase', () => {
     expect(dominioDeUsuario()).toBe('zapia.local');
     vi.stubEnv('AUTH_DOMINIO_USUARIO', 'ienvia.local');
     expect(dominioDeUsuario()).toBe('ienvia.local');
+  });
+
+  test('reconhece endereço público (Netlify, Render, Vercel ou manual) e endereço direto do webhook', () => {
+    expect(enderecoPublico({})).toBeNull();
+    expect(enderecoPublico({ IENVIA_URL_PUBLICA: 'https://painel.ienvia.com/' })).toBe('https://painel.ienvia.com');
+    expect(enderecoPublico({ VERCEL_PROJECT_PRODUCTION_URL: 'ienvia.vercel.app' })).toBe('https://ienvia.vercel.app');
+    expect(enderecoPublico({ URL: 'https://ienvia.netlify.app/' })).toBe('https://ienvia.netlify.app');
+    expect(enderecoPublico({ RENDER_EXTERNAL_URL: 'https://ienvia.onrender.com/' })).toBe('https://ienvia.onrender.com');
+
+    expect(enderecoDoAviso({})).toBeNull();
+    expect(enderecoDoAviso({ URL: 'https://ienvia.netlify.app' })).toBe('https://ienvia.netlify.app/api/webhooks/evolution');
+    expect(
+      enderecoDoAviso({
+        URL: 'https://ienvia.netlify.app',
+        IENVIA_WEBHOOK_URL: 'https://ienvia-porteiro.exemplo.workers.dev/',
+      }),
+    ).toBe('https://ienvia-porteiro.exemplo.workers.dev');
   });
 });
 

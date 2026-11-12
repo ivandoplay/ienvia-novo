@@ -1,0 +1,28 @@
+# Blueprint da Render (painel reserva gratuito, sem cartão).
+# Para criar: Dashboard da Render -> Blueprints -> New Blueprint Instance -> selecione este repositório.
+
+services:
+  - type: web
+    name: ienvia-painel
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/saude
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: EVOLUTION_API_URL
+        sync: false
+      - key: EVOLUTION_API_KEY
+        sync: false
+      - key: IENVIA_CHAVE_DOS_SEGREDOS
+        sync: false
+      - key: IENVIA_WEBHOOK_URL
+        sync: false

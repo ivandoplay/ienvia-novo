@@ -342,4 +342,28 @@ describe('"mudou alguma coisa?"', () => {
       expect(await versao()).not.toBe(comMensagem);
     });
   });
+
+  test('canal ao vivo da Inbox devolve tópico secreto por empresa e bloqueia quem não participa', async () => {
+    const lerCanal = async (empresa = LOJA_A) =>
+      (await banco.db.query<{ c: string | null }>('select public.read_my_inbox_channel($1) as c', [empresa])).rows[0]?.c ?? null;
+
+    const canalA = await banco.comoUsuario(DONA_A, () => lerCanal(LOJA_A));
+    const canalAtendenteA = await banco.comoUsuario(ATENDENTE_A, () => lerCanal(LOJA_A));
+    const canalB = await banco.comoUsuario(DONO_B, () => lerCanal(LOJA_B));
+
+    expect(canalA).toMatch(/^inbox:[0-9a-f-]{36}$/);
+    expect(canalAtendenteA).toBe(canalA);
+    expect(canalB).toMatch(/^inbox:[0-9a-f-]{36}$/);
+    expect(canalB).not.toBe(canalA);
+    expect(canalA).not.toContain(LOJA_A);
+
+    for (const usuario of [DONO_B, INTRUSO, SUSPENSO_A]) {
+      await banco.comoUsuario(usuario, async () => {
+        expect(await banco.esperarErro(() => lerCanal(LOJA_A))).toMatch(/Workspace membership required/);
+      });
+    }
+    await banco.comoAnonimo(async () => {
+      expect(await banco.esperarErro(() => lerCanal(LOJA_A))).toMatch(/permission denied/);
+    });
+  });
 });

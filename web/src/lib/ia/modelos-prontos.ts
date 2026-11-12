@@ -1,4 +1,5 @@
-[
+// Modelos prontos por ramo de negócio (mesmos dados do legado, em TS para rodar igual no Next e no Deno).
+export const MODELOS_PRONTOS_DADOS = [
   {
     "id": "assessoria_lizandro_turbo",
     "icone": "🚗",
@@ -246,4 +247,4 @@
       ]
     }
   }
-]
+];

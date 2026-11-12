@@ -1,0 +1,9 @@
+name = "ienvia-porteiro"
+main = "worker.ts"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Preencha pelo painel da Cloudflare (Workers -> Settings -> Variables) ou antes de rodar `wrangler deploy`:
+# DESTINO_PRINCIPAL = "https://SEU_PROJETO.supabase.co/functions/v1/evolution-webhook"
+# DESTINOS_RESERVA = "https://SEU-PAINEL.netlify.app/api/webhooks/evolution,https://SEU-PAINEL.onrender.com/api/webhooks/evolution"
+TIMEOUT_MS = "12000"

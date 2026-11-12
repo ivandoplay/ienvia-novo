@@ -4,7 +4,7 @@
  * arquivos de conhecimento. A tela, as ações do servidor e os testes usam as mesmas.
  * O banco confere tudo de novo ao gravar (supabase/migrations/20261112002400_ai_engine_and_training.sql).
  */
-import modelos from './modelos-prontos.json';
+import { MODELOS_PRONTOS_DADOS } from '@/lib/ia/modelos-prontos';
 
 export type Tom = 'consultivo' | 'acolhedor' | 'descontraido' | 'profissional' | 'formal';
 
@@ -440,7 +440,7 @@ export interface ModeloPronto {
 }
 
 /** Os modelos por ramo de negócio, trazidos do painel antigo (os textos são os mesmos). */
-export const MODELOS_PRONTOS: readonly ModeloPronto[] = modelos as ModeloPronto[];
+export const MODELOS_PRONTOS: readonly ModeloPronto[] = MODELOS_PRONTOS_DADOS as unknown as readonly ModeloPronto[];
 
 /**
  * Aplica um modelo pronto sobre os campos de uma base: troca os textos e as perguntas frequentes.

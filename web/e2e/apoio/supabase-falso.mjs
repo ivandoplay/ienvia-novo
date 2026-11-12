@@ -295,6 +295,7 @@ const FUNCOES_DA_INBOX = [
   'read_my_inbox',
   'read_my_conversation',
   'read_my_inbox_version',
+  'read_my_inbox_channel',
   'start_my_text_message',
   'start_my_media_message',
   'finish_my_text_message',
@@ -401,6 +402,9 @@ function acoesDaInbox(res, usuario, nome, corpo) {
       .filter((conversa) => conversa.workspace_id === workspaceId)
       .reduce((soma, conversa) => soma + (conversa.unread_count ?? 0), 0);
     return responder(res, 200, `${mudancas.get(workspaceId) ?? 0}|${naoLidas}`);
+  }
+  if (nome === 'read_my_inbox_channel') {
+    return responder(res, 200, null);
   }
   if (!participa) return erro(403, '42501', 'Workspace membership required');
 

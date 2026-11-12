@@ -360,3 +360,14 @@ export async function lerVersaoDaInbox(workspaceId: string): Promise<string | nu
   }
   return data;
 }
+
+/**
+ * Nome do canal privado de Broadcast (Supabase Realtime) da empresa.
+ * Só contém um segredo aleatório opaco, nunca o ID da empresa; `null` quando indisponível.
+ */
+export async function lerCanalDaInbox(workspaceId: string): Promise<string | null> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('read_my_inbox_channel', { p_workspace_id: workspaceId });
+  if (error || typeof data !== 'string' || !data.trim()) return null;
+  return data.trim();
+}

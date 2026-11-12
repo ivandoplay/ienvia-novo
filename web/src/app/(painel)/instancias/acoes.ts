@@ -3,7 +3,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { explicarRecusaDoChip } from '@/lib/atendente/painel';
-import { enderecoPublico, lerConfigEvolution } from '@/lib/env';
+import { enderecoDoAviso, lerConfigEvolution } from '@/lib/env';
 import {
   ErroEvolution,
   apagarInstancia,
@@ -86,11 +86,6 @@ async function buscarChip(contexto: Contexto, chipId: unknown): Promise<LinhaDoC
 function novoSegredo(): { token: string; resumo: string } {
   const token = randomBytes(32).toString('hex');
   return { token, resumo: createHash('sha256').update(token).digest('hex') };
-}
-
-function enderecoDoAviso(): string | null {
-  const base = enderecoPublico();
-  return base ? `${base}/api/webhooks/evolution` : null;
 }
 
 function registrarErro(onde: string, erro: unknown): void {

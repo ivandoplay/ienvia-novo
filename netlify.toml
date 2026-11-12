@@ -1,0 +1,12 @@
+# Configuração da Netlify (plano Free, sem cartão, uso comercial permitido).
+# Ao importar o repositório na Netlify:
+#   - Base directory: deixe vazio (raiz do monorepo, para instalar o workspace @ienvia/shared junto);
+#   - Package directory (se a Netlify perguntar no assistente de monorepo): selecione "web".
+#   - Configure as variáveis de ambiente (veja web/.env.example) no painel da Netlify.
+
+[build]
+  command = "npm run build -w web"
+  publish = "web/.next"
+
+[build.environment]
+  NODE_VERSION = "24"

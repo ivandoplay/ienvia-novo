@@ -40,11 +40,11 @@ antigo e reescrevendo limpo, fase por fase.
 | O quê | Onde | Observação |
 | --- | --- | --- |
 | Código | GitHub, repositório privado `ivandoplay/ienvia-novo`, ramo `main` | Enviar para o GitHub não publica nada sozinho. |
-| Banco do sistema novo | Supabase, projeto `ienvia-001` (`rhcabqlwazvjcjjdknsc`), organização "ienvia", São Paulo, plano gratuito | 16 migrações aplicadas, idêntico ao que está no Git. |
+| Banco do sistema novo | Supabase, projeto `ienvia-001` (`rhcabqlwazvjcjjdknsc`), organização "ienvia", São Paulo, plano gratuito | 17 migrações aplicadas (incluindo canal de Realtime da Inbox), Edge Function `evolution-webhook` publicada com segredos configurados, idêntico ao Git. |
 | Banco anterior do sistema novo | Supabase, projeto "Ienvia" (`jazvdlkyvwquoednmljf`), organização "ZAP IA STUDIO" | Pausado em 12/11. Não tinha dado de cliente. Pode ser apagado. |
 | Banco do sistema antigo | Supabase, projeto `iuysmojhaxplnhfrxqkv`, organização "ZAP IA STUDIO" | Bloqueado por cota até 26/11/2026. Nele só se lê, nunca se escreve. |
-| Hospedagem (conta de sempre) | Vercel, conta `ivandoplay`, plano gratuito | Pausada pela Vercel até 11/12/2026. Lá está a versão de 11/11 do sistema novo (`ienvia-novo.vercel.app`) e o sistema antigo (`zap-ia-studio.vercel.app`). |
-| Hospedagem (conta nova) | Vercel, conta `jeffersonivan748-7132`, plano gratuito | Criada pelo dono em 12/11 para deixar o Ienvia separado. Nada foi publicado nela pelo assistente. |
+| Porteiro + Webhooks + IA | Cloudflare Workers (porteiro `cloudflare/porteiro/`) -> Supabase Edge Function (`evolution-webhook`) | Plano gratuito sem cartão (uso comercial permitido). Faz filtro de ruído na borda e failover automático para as rotas `/api/webhooks/evolution` do painel na Netlify/Render. |
+| Hospedagem do painel | Netlify Free (principal, `netlify.toml`) + Render Free (reserva, `render.yaml`) | Zero cartão, uso comercial permitido na Netlify. Vercel excluída do projeto pelo dono em 12/11. |
 | Chips do WhatsApp | Servidor Evolution API 2.3.7 (endereço e chave no `.env`) | Falta confirmar se o servidor é do próprio dono. |
 | Chaves de IA do dono (para testes) | Gemini, OpenRouter e NVIDIA, no `.env` | A do Gemini está bloqueada pelo Google. |
 | Cópia de segurança | Google Drive do dono, pasta "Ienvia — cópia de segurança e documentação" | <https://drive.google.com/drive/folders/170L0zRiKjBpkUecpLHrUAdr6QoviplLQ> |
@@ -313,11 +313,13 @@ que ele mesmo vai criar o projeto e ligar o GitHub nessa conta. O token dela est
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave do servidor (segredo). Sem ela as mensagens não entram e a IA não responde. |
 | `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` | Endereço e chave da Evolution (segredo). |
 | `IENVIA_CHAVE_DOS_SEGREDOS` | Abre as chaves de IA guardadas (segredo). Tem de ser o mesmo valor do `.env`. |
-| `IENVIA_URL_PUBLICA` | Endereço público do painel. Na Vercel não precisa. |
+| `IENVIA_URL_PUBLICA` | Endereço público do painel. Na Netlify (`URL`) e na Render (`RENDER_EXTERNAL_URL`) vem sozinho. |
+| `IENVIA_WEBHOOK_URL` | (Recomendado) URL do porteiro Cloudflare Worker ou Edge Function gravada nos chips na Evolution. |
 
-Os valores estão no `.env` e no `web/.env.local` (seção 8). A região do servidor deve ser São Paulo,
-ao lado do banco (na Vercel isso já está no arquivo `web/vercel.json`). Depois de publicar, é preciso
-cadastrar o endereço novo no Supabase (endereço do site e endereços permitidos para o login).
+Os valores estão no `.env` e no `web/.env.local` (seção 8). O projeto já traz `netlify.toml` (Netlify Free),
+`render.yaml` (Render Free), `supabase/functions/evolution-webhook` (Edge Function) e `cloudflare/porteiro/`
+(Cloudflare Worker com failover automático). Depois de publicar o painel, é preciso cadastrar os endereços
+novos no Supabase (Site URL e Redirect URLs para o login).
 
 Cuidados que valem para qualquer hospedagem:
 
@@ -445,7 +447,9 @@ Sobem um Postgres de verdade na memória, aplicam as migrações e conferem as r
 | `web/eslint.config.mjs` | Regras de estilo do código. |
 | `web/tsconfig.json`, `web/tsconfig.testes.json` | Regras do TypeScript do painel e dos testes dele. |
 | `web/package.json` | Dependências e comandos do painel. |
-| `web/vercel.json` | Diz à Vercel para rodar o servidor em São Paulo (`gru1`). |
+| `netlify.toml`, `render.yaml` | Configuração pronta de publicação do painel na Netlify (principal) e na Render (reserva), sem Vercel. |
+| `cloudflare/porteiro/` | Porteiro Cloudflare Worker (`worker.ts`, `wrangler.toml`, `README.md`) com failover automático entre Edge Function e painéis reserva. |
+| `supabase/functions/evolution-webhook/` | Supabase Edge Function que executa o núcleo compartilhado de recebimento, mídia e atendente de IA em Deno. |
 | `web/public/ienvia-icone.png`, `ienvia-logo.png`, `pwa/192.png`, `pwa/512.png` | A marca e os ícones do aplicativo. |
 
 ### 8.8 `web/src/app/` — as telas e as portas do servidor
