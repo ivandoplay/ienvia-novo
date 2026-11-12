@@ -1,10 +1,13 @@
-/* Tela do Motor de IA (chaves, modelos e comportamento). */
-.motor-avisos {
+/* Tela do Motor de IA (chaves, modelos e comportamento).
+   Os nomes sem "motor-" são os mesmos blocos, usados também pelo Treinamento. */
+.motor-avisos,
+.pilha-de-avisos {
   display: grid;
   gap: 8px;
   margin-bottom: 14px;
 }
-.motor-avisos:empty {
+.motor-avisos:empty,
+.pilha-de-avisos:empty {
   display: none;
 }
 
@@ -93,12 +96,14 @@
   margin-top: 12px;
 }
 
-.motor-grade {
+.motor-grade,
+.grade-de-campos {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 0 16px;
 }
-.motor-interruptores {
+.motor-interruptores,
+.lista-de-interruptores {
   display: grid;
   gap: 4px;
   margin-bottom: 16px;
@@ -110,7 +115,8 @@
 }
 
 /* Barra de salvar: acompanha a rolagem para a pessoa nunca perder o botão de vista. */
-.motor-rodape {
+.motor-rodape,
+.barra-de-salvar {
   position: sticky;
   bottom: 12px;
   z-index: 5;
@@ -125,29 +131,35 @@
   background: var(--bg-elevated);
   box-shadow: var(--shadow-sm);
 }
-.motor-rodape-recado {
+.motor-rodape-recado,
+.barra-de-salvar-recado {
   flex: 1 1 200px;
   min-width: 0;
   font-size: 12.8px;
   line-height: 1.45;
 }
-.motor-rodape-acoes {
+.motor-rodape-acoes,
+.barra-de-salvar-acoes {
   display: flex;
   gap: 8px;
   margin-left: auto;
 }
-.motor-recado--ok {
+.motor-recado--ok,
+.recado--ok {
   color: var(--accent-bright);
 }
-.motor-recado--erro {
+.motor-recado--erro,
+.recado--erro {
   color: var(--danger-text);
 }
-.motor-recado--atencao {
+.motor-recado--atencao,
+.recado--atencao {
   color: var(--warning-text);
 }
 
 @media (max-width: 900px) {
-  .motor-rodape {
+  .motor-rodape,
+  .barra-de-salvar {
     /* Fica acima da barra de navegação do celular. */
     bottom: calc(74px + env(safe-area-inset-bottom, 0px));
   }

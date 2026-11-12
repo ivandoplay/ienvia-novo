@@ -106,7 +106,7 @@ Cada fase só começa quando a anterior está com os testes passando.
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
 | 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Pronta no código e no banco; falta conferir no ar.** Feitos e testados: Instâncias, recebimento das mensagens e a Inbox com texto e com **arquivos** (fotos, áudios, vídeos, documentos e figurinhas). A conferência final com os serviços de verdade está **travada por dois bloqueios de conta** (Vercel e Supabase): ver o começo da seção 6. |
-| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Pronto: a tela **Motor de IA**, com Gemini, OpenRouter e NVIDIA. Falta: a tela de Treinamento e o atendente em si (a IA ainda **não responde** no WhatsApp). Detalhes abaixo. |
+| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Prontas: as telas **Motor de IA** (Gemini, OpenRouter e NVIDIA) e **Treinamento** (identidade, regras, perguntas frequentes, arquivos, modelos prontos e várias bases). Falta: o atendente em si (a IA ainda **não responde** no WhatsApp), as Skills e as Mensagens prontas. Detalhes abaixo. |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
 | 5 | Campanhas e segurança | **Campanhas** com prévia, cadência segura, rodízio de chips, pausar/retomar. **Segurança**: anti-ban, fila segura, horário de atendimento, contatos ignorados, alerta no seu WhatsApp. | |
@@ -190,8 +190,11 @@ trocam de lugar sem prejuízo.
 
 ### O que a Fase 2 entregou até aqui (12/11/2026)
 
-**A IA ainda não responde ninguém.** O que existe é a tela **Motor de IA**, que guarda e testa as
-chaves e os ajustes. A tela diz isso com todas as letras enquanto o atendente não estiver pronto.
+**A IA ainda não responde ninguém.** O que existe são as telas **Motor de IA** (guarda e testa as
+chaves e os ajustes) e **Treinamento** (guarda o que a IA sabe e mostra as instruções que ela vai
+receber). As duas dizem isso com todas as letras enquanto o atendente não estiver pronto.
+
+#### Motor de IA
 
 - **Três provedores**, cada um com o seu cartão: **Google Gemini**, **OpenRouter** e **NVIDIA**.
   Em cada cartão: cadastrar, trocar, testar e remover a chave; escolher o modelo (digitando ou pela
@@ -208,10 +211,45 @@ chaves e os ajustes. A tela diz isso com todas as letras enquanto o atendente n�
   uma pessoa responde (e em quanto tempo ela volta), esperar o cliente terminar de escrever, quanto
   da conversa a IA relê, e a criatividade.
 - **Só o dono da conta altera.** A equipe vê como está configurado, sem botões.
-- No banco entraram também as tabelas do **Treinamento** (bases, perguntas frequentes, arquivos de
-  conhecimento e qual base cada chip usa). Estão testadas, mas ainda **sem tela**.
+
+#### Treinamento
+
+- **As quatro partes do painel antigo**: Identidade, Regras, Perguntas frequentes e Arquivos, com os
+  mesmos campos (inclusive a "atuação individual em 1ª pessoa" e a "trava permanente").
+- **Arquivos de conhecimento** (.txt, .csv, .md, .json): só entra texto de verdade, e **inteiro**. Um
+  arquivo grande demais (mais de 30 mil caracteres) é recusado com a explicação; nunca entra cortado.
+- **Começar com um modelo pronto**: os nove modelos por ramo do painel antigo. O modelo troca os
+  textos na tela e só grava quando você salva.
+- **Várias bases de treinamento**: criar, abrir, escolher a padrão, apagar, e dizer qual base cada
+  chip usa. Quem tem um chip só nem precisa pensar nisso: usa a base "Principal".
+- **Ver instruções geradas**: mostra o texto exato que a IA recebe a cada conversa. É o mesmo texto
+  que o atendente vai usar.
+- **Só o dono da conta altera.** A equipe vê, sem botões.
+- Ainda **não refeitos** (a tela avisa): Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro
+  completo", "Pacote Turbo" e "corrigir resposta em 1 clique".
+
+As instruções da IA foram postas à prova com dois modelos de verdade (NVIDIA e OpenRouter), em 14
+situações: pergunta que está na base, pergunta que não está, "é um robô?", tentativa de arrancar as
+regras, pedido de foto, preço que está num arquivo, "ok, obrigada", recusa, pedido para parar,
+desconto forçado e três situações em 1ª pessoa. A primeira rodada achou três defeitos no texto (a IA
+passava para uma pessoa perguntas de preço que ela sabia responder; um modelo inventou "não temos
+esse produto"; outro disse "vou chamar alguém" sem avisar ninguém). Corrigidos, a segunda rodada
+deu 14 de 14 nos dois modelos.
 
 Decisões tomadas nesta parte (diga se quiser diferente):
+
+- **A IA não mente quando perguntam se é um robô.** O painel antigo mandava a IA negar ("nunca
+  admita que é uma IA", "sou eu mesmo falando"). O novo não manda. Você escolhe entre duas
+  respostas: **passar a conversa para uma pessoa** (padrão: a IA não responde a pergunta, avisa você)
+  ou **dizer que é a assistente virtual**. No resto da conversa ela continua escrevendo de forma
+  natural, e em 1ª pessoa se você ligar essa opção. Por isso tirei dois trechos dos modelos prontos:
+  no modelo do Lizandro, a frase "a pessoa deve sempre saber que está falando diretamente com o
+  próprio Lizandro"; no modelo "Profissional Liberal · 1ª Pessoa", a pergunta frequente "Estou
+  falando direto com você? → Sim! Sou eu mesmo".
+- **A IA só responde o que está escrito no treinamento.** O que não está, ela não chuta: diz que vai
+  confirmar e passa para uma pessoa.
+- **Por enquanto a IA só escreve texto.** Fotos do catálogo, áudios e PIX são da Fase 6. Até lá, as
+  instruções dizem à IA para não prometer envio de foto, arquivo ou PIX: ela passa para uma pessoa.
 
 - **"Modo de rota" saiu; entrou a ordem de uso.** O painel antigo tinha dois modos ("Auto: áudio no
   Gemini, texto no OpenRouter" e "Principal + reserva"). Com três provedores isso virou uma coisa
@@ -258,11 +296,10 @@ O que foi conferido de verdade, e o que não foi:
 
 O que falta na Fase 2:
 
-1. Tela de **Treinamento** (identidade, regras e blindagem, perguntas frequentes, arquivos, modelos
-   prontos, várias bases, Skills, "Cérebro completo", "Pacote Turbo").
-2. O **atendente**: ler a mensagem que chega, montar as instruções, pedir a resposta ao provedor,
+1. O **atendente**: ler a mensagem que chega, montar as instruções, pedir a resposta ao provedor,
    enviar, passar para uma pessoa quando precisa. Com ele: liga/desliga da IA em cada chip,
    "Pausar tudo", assumir e devolver a conversa na Inbox, corrigir resposta em 1 clique.
+2. No Treinamento: Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro completo" e "Pacote Turbo".
 3. Cadastrar na Vercel o segredo que protege as chaves (já criado e guardado; a Vercel está bloqueada).
 
 ### Diferenças pequenas em relação ao visual do branch

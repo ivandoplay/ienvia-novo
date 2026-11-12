@@ -74,7 +74,7 @@ export const MENU: GrupoMenu[] = [
             rota: '/treinamento',
             rotulo: 'Treinamento',
             icone: 'treinamento',
-            descricao: 'Ensine o atendente: identidade do negócio, regras, perguntas frequentes, arquivos e skills.',
+            descricao: 'Ensine o atendente: identidade do negócio, regras, perguntas frequentes, arquivos de consulta e modelos prontos por ramo.',
             fase: 2,
           },
           {
@@ -102,7 +102,7 @@ export const MENU: GrupoMenu[] = [
             rota: '/inteligencia-artificial',
             rotulo: 'Motor de IA',
             icone: 'motorIa',
-            descricao: 'Chaves do Gemini e do OpenRouter, modelos e o que fazer quando um deles falha.',
+            descricao: 'Chaves do Gemini, do OpenRouter e da NVIDIA, modelos e o que fazer quando um deles falha.',
             fase: 2,
           },
         ],

@@ -1,0 +1,272 @@
+/* Tela de Treinamento (bases, identidade, regras, perguntas frequentes e arquivos). */
+
+/* Sub-abas: o treinamento é dividido em partes para não virar uma página sem fim. */
+.subabas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+.subaba {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.subaba:hover {
+  color: var(--text-main);
+}
+.subaba--ativa {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+/* A barra de salvar é o fim do formulário: o que vem depois precisa de respiro. */
+.treino form {
+  margin-bottom: 14px;
+}
+
+.treino-comeco-acoes,
+.treino-ferramentas,
+.treino-base-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.treino-ferramentas {
+  margin-bottom: 12px;
+}
+.treino-base-acoes {
+  margin-top: 12px;
+}
+.treino-comeco [role='status']:not(:empty),
+.treino [role='status'] > .aviso {
+  margin-top: 12px;
+}
+
+/* A lista das bases: cada uma é um cartão pequeno; a aberta fica destacada. */
+.treino-bases {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.treino-base {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+  font-size: 13px;
+  text-decoration: none;
+}
+.treino-base small {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+a.treino-base:hover {
+  border-color: var(--border-strong);
+}
+.treino-base--aberta {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.treino-base--travada {
+  opacity: 0.6;
+}
+.treino-base-padrao {
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.treino-chips {
+  margin-top: 16px;
+}
+.treino-chips h3 {
+  margin-bottom: 8px;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+}
+.treino-chips ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 8px 16px;
+  list-style: none;
+}
+.treino-chips li {
+  display: grid;
+  gap: 4px;
+}
+.treino-chips label {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.treino-vazio {
+  margin: 4px 0 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.treino-perguntas {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  list-style: none;
+}
+.treino-perguntas li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+.treino-pergunta-campos .form-group:last-child {
+  margin-bottom: 0;
+}
+.treino-perguntas li > .btn {
+  margin-top: 22px;
+}
+
+.treino-anexar {
+  margin-bottom: 4px;
+}
+.treino-anexar .linha-de-campo {
+  flex-wrap: wrap;
+}
+.treino-anexar .linha-de-campo .campo {
+  flex: 1 1 240px;
+}
+.treino-arquivos {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  list-style: none;
+}
+.treino-arquivos li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+  font-size: 13px;
+}
+.treino-arquivos .icon-svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.treino-arquivo-nome {
+  min-width: 0;
+  color: var(--text-main);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.treino-arquivos small {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.campo-dica--erro {
+  color: var(--danger-text);
+}
+
+/* Modelos prontos, dentro da janela. */
+.treino-modelos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 8px;
+  list-style: none;
+}
+.treino-modelo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+}
+.treino-modelo:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.treino-modelo strong {
+  display: block;
+  font-size: 13px;
+}
+.treino-modelo small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.treino-modelo-icone {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+/* O texto das instruções: letra de máquina, com rolagem própria. */
+.treino-instrucoes {
+  max-height: min(60dvh, 560px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.treino-falta .panel-desc {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .treino-perguntas li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .treino-perguntas li > .btn {
+    margin-top: 0;
+    justify-self: start;
+  }
+}
