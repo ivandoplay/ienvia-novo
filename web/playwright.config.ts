@@ -14,8 +14,16 @@ const PORTA_IA_FALSA = 54397;
 /** O segredo que protege as chaves de IA nos testes (o mesmo de e2e/apoio/ia-no-banco-falso.mjs; nunca em produção). */
 const SEGREDO_DO_COFRE_DE_TESTE = '0f1e2d3c4b5a69788796a5b4c3d2e1f00123456789abcdeffedcba9876543210';
 
+/**
+ * Onde o painel dos testes é montado. São mais de 100 MB que se refazem sozinhos a cada rodada.
+ * Fica dentro de ".cache" de propósito: é uma pasta que o Git ignora e que as ferramentas que guardam
+ * cópia do projeto (a área de trabalho onde ele é desenvolvido, por exemplo) deixam de fora.
+ * Com outro nome, essa montagem entra na cópia e estoura o limite de tamanho dela.
+ */
+const PASTA_DE_MONTAGEM_DOS_TESTES = '.cache/next-e2e';
+
 const ambienteDoPainel = {
-  IENVIA_PASTA_DE_MONTAGEM: '.next-e2e',
+  IENVIA_PASTA_DE_MONTAGEM: PASTA_DE_MONTAGEM_DOS_TESTES,
   NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${PORTA_SUPABASE_FALSO}`,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'chave-publica-de-teste',
   // A "chave do servidor": só o Supabase de mentira a conhece (e2e/apoio/dados.mjs).

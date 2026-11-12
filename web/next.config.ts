@@ -30,8 +30,8 @@ const cabecalhosDeSeguranca = [
 ];
 
 const config: NextConfig = {
-  // Os testes de ponta a ponta montam o painel numa pasta separada (.next-e2e),
-  // para não misturar com a montagem normal.
+  // Os testes de ponta a ponta montam o painel numa pasta separada (.cache/next-e2e, definida em
+  // playwright.config.ts), para não misturar com a montagem normal.
   distDir: process.env.IENVIA_PASTA_DE_MONTAGEM || '.next',
   poweredByHeader: false,
   reactStrictMode: true,

@@ -1,7 +1,7 @@
 # dependências e builds
 node_modules/
 .next/
-.next-e2e/
+.cache/
 out/
 dist/
 build/
