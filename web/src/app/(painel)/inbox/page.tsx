@@ -1,7 +1,25 @@
 import type { Metadata } from 'next';
-import { carregarConversa, carregarInbox, lerCanalDaInbox, lerVersaoDaInbox, listarChipsDaInbox } from '@/lib/dados/inbox';
+import {
+  carregarCatalogosDoCrm,
+  carregarConversa,
+  carregarDiretorioDeContatos,
+  carregarInbox,
+  carregarKanban,
+  lerCanalDaInbox,
+  lerVersaoDaInbox,
+  listarChipsDaInbox,
+} from '@/lib/dados/inbox';
 import { lerConfigEvolution, lerConfigSupabase } from '@/lib/env';
-import { lerBusca, lerLimite, lerLimiteDeMensagens, lerVisao } from '@/lib/inbox/regras';
+import {
+  lerAbaDoCrm,
+  lerBusca,
+  lerEtapaDoKanban,
+  lerFiltroDeNegocio,
+  lerLimite,
+  lerLimiteDeMensagens,
+  lerUuidOpcional,
+  lerVisao,
+} from '@/lib/inbox/regras';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { obterSessao } from '@/lib/sessao';
 import { PainelDaInbox } from './painel-da-inbox';
@@ -16,36 +34,49 @@ type Parametros = Record<string, string | string[] | undefined>;
 const primeiro = (valor: string | string[] | undefined): string | undefined => (Array.isArray(valor) ? valor[0] : valor);
 
 /**
- * Inbox: as conversas do WhatsApp, a conversa aberta e os dados do contato.
- * Tudo o que está na tela mora no endereço (?ver=, ?chip=, ?busca=, ?c=), então o botão "voltar"
- * do navegador funciona e um endereço copiado abre exatamente a mesma coisa.
+ * Inbox & CRM completo: Conversas (WhatsApp), Contatos (Agenda) e Kanban (Funil de Vendas).
+ * Tudo fica sincronizado na URL (?aba=, ?ver=, ?chip=, ?etiqueta=, ?negocio=, ?busca=, ?c=).
  */
 export default async function PaginaDaInbox({ searchParams }: { searchParams: Promise<Parametros> }) {
   const sessao = await obterSessao();
   const workspace = sessao?.workspaceAtivo;
-  // Sem login ou sem workspace, a moldura do painel já mostrou a tela certa.
   if (!workspace) return null;
 
   const parametros = await searchParams;
   const chip = primeiro(parametros.chip);
   const conversa = primeiro(parametros.c);
+  const conversaId = ehIdentificador(conversa) ? conversa : null;
+  const abaSolicitada = lerAbaDoCrm(primeiro(parametros.aba));
+  // Abrir ?c= diretamente mostra sempre a conversa.
+  const aba = conversaId ? 'conversas' : abaSolicitada;
+
   const filtros = {
     visao: lerVisao(primeiro(parametros.ver)),
     chipId: ehIdentificador(chip) ? chip : null,
     busca: lerBusca(primeiro(parametros.busca)),
     limite: lerLimite(primeiro(parametros.limite)),
+    etiquetaId: lerUuidOpcional(primeiro(parametros.etiqueta)),
+    negocio: lerFiltroDeNegocio(primeiro(parametros.negocio)),
+    etapaCrm: lerEtapaDoKanban(primeiro(parametros.etapa)),
   };
-  const conversaId = ehIdentificador(conversa) ? conversa : null;
   const limiteDeMensagens = lerLimiteDeMensagens(primeiro(parametros.m));
 
   const agora = new Date();
-  // A versão é lida ANTES dos dados: assim o que vai para a tela nunca é mais velho do que a versão
-  // que a tela guarda (se fosse, uma mensagem nova poderia passar despercebida).
   const [versao, canalRealtime] = await Promise.all([lerVersaoDaInbox(workspace.id), lerCanalDaInbox(workspace.id)]);
-  const [lista, chips, aberta] = await Promise.all([
-    carregarInbox(workspace.id, filtros, agora),
+
+  const [chips, catalogos, lista, aberta, contatosDir, kanban] = await Promise.all([
     listarChipsDaInbox(workspace.id),
-    conversaId ? carregarConversa(workspace.id, conversaId, limiteDeMensagens, agora) : null,
+    carregarCatalogosDoCrm(workspace.id),
+    aba === 'conversas'
+      ? carregarInbox(workspace.id, filtros, agora)
+      : Promise.resolve({ conversas: [], temMais: false, contagens: null, falhou: false }),
+    aba === 'conversas' && conversaId ? carregarConversa(workspace.id, conversaId, limiteDeMensagens, agora) : Promise.resolve(null),
+    aba === 'contatos'
+      ? carregarDiretorioDeContatos(workspace.id, { busca: filtros.busca, etiquetaId: filtros.etiquetaId }, agora)
+      : Promise.resolve({ contatos: [], total: 0, falhou: false }),
+    aba === 'kanban'
+      ? carregarKanban(workspace.id, { chipId: filtros.chipId, etiquetaId: filtros.etiquetaId, busca: filtros.busca }, agora)
+      : Promise.resolve({ cartoes: [], falhou: false }),
   ]);
 
   return (
@@ -54,9 +85,13 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
       versao={versao}
       canalRealtime={canalRealtime}
       supabasePublico={lerConfigSupabase()}
+      aba={aba}
       filtros={filtros}
       lista={lista}
       chips={chips}
+      catalogos={catalogos}
+      contatosDir={contatosDir}
+      kanban={kanban}
       conversaId={conversaId}
       aberta={aberta}
       limiteDeMensagens={limiteDeMensagens}

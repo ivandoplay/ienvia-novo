@@ -7,7 +7,19 @@ import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, 
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import type { FaixaDaIa } from '@/lib/atendente/painel';
-import type { ArquivoDaMensagem, ChipDaInbox, ConversaAberta, FiltrosDaInbox, ListaDaInbox, MensagemDaConversa } from '@/lib/dados/inbox';
+import type {
+  ArquivoDaMensagem,
+  CartaoDoKanban,
+  CatalogosDoCrm,
+  ChipDaInbox,
+  ContatoDoDiretorio,
+  ConversaAberta,
+  EtiquetaDoCrm,
+  FiltrosDaInbox,
+  ListaDaInbox,
+  MensagemDaConversa,
+  RespostaRapida,
+} from '@/lib/dados/inbox';
 import { plural } from '@/lib/formato';
 import { mensagensQueEnsinam, sugerirEnsino, type SugestaoDeEnsino } from '@/lib/ia/ensino';
 import {
@@ -21,22 +33,30 @@ import {
   type TipoDeEnvio,
 } from '@/lib/inbox/arquivos';
 import {
+  ABAS_DO_CRM,
   BUSCA_MAXIMA,
+  ETAPAS_DO_KANBAN,
   TEXTO_MAXIMO,
   VISOES,
   descreverEtapa,
   enderecoDaInbox,
+  formatarReais,
   NOVIDADES_EM_RITMO_LENTO_APOS,
   horaDaMensagem,
   intervaloDeNovidades,
   lerBusca,
   proximoLimite,
   proximoLimiteDeMensagens,
+  type AbaDoCrm,
+  type FiltroDeNegocio,
   type SituacaoDoEnvio,
 } from '@/lib/inbox/regras';
 import { descreverEstado } from '@/lib/instancias/regras';
 import {
+  aplicarAcaoEmLote,
+  atualizarNegocioConversa,
   buscarArquivo,
+  cancelarMensagemAgendada,
   decidirEnvio,
   enviarArquivo,
   enviarMensagem,
@@ -44,6 +64,8 @@ import {
   prepararEnvioDeArquivo,
   type ResultadoDoEnvio,
 } from './acoes';
+import { ModalAgendarMensagem, ModalCatalogosCrm, ModalNovaConversa } from './crm-modais';
+import { AgendaDeContatos, CartaoCrmDoContato, QuadroKanban } from './crm-visoes';
 import { JanelaDeEnsino } from './janela-de-ensino';
 
 interface Props {
@@ -54,9 +76,13 @@ interface Props {
   canalRealtime?: string | null;
   /** Chave pública do Supabase para assinar o Realtime sem ler nenhum cookie de sessão. */
   supabasePublico?: { url: string; chavePublica: string } | null;
+  aba?: AbaDoCrm;
   filtros: FiltrosDaInbox;
   lista: ListaDaInbox;
   chips: ChipDaInbox[];
+  catalogos?: CatalogosDoCrm;
+  contatosDir?: { contatos: ContatoDoDiretorio[]; total: number; falhou: boolean };
+  kanban?: { cartoes: CartaoDoKanban[]; falhou: boolean };
   /** Conversa pedida no endereço (?c=...). */
   conversaId: string | null;
   aberta: { conversa: ConversaAberta | null; falhou: boolean } | null;
@@ -409,9 +435,13 @@ export function PainelDaInbox({
   versao,
   canalRealtime = null,
   supabasePublico = null,
+  aba = 'conversas',
   filtros,
   lista,
   chips,
+  catalogos = { etiquetas: [], respostasRapidas: [], falhou: false },
+  contatosDir = { contatos: [], total: 0, falhou: false },
+  kanban = { cartoes: [], falhou: false },
   conversaId,
   aberta,
   limiteDeMensagens,
@@ -421,6 +451,8 @@ export function PainelDaInbox({
   const router = useRouter();
   const [pendentes, setPendentes] = useState<Pendente[]>([]);
   const [avisos, setAvisos] = useState<Record<string, Aviso | undefined>>({});
+  const [modalNovaConversa, setModalNovaConversa] = useState(false);
+  const [modalCatalogos, setModalCatalogos] = useState(false);
 
   useNovidades(workspaceId, versao, canalRealtime, supabasePublico);
 
@@ -523,58 +555,145 @@ export function PainelDaInbox({
 
   const conversa = aberta?.conversa ?? null;
   const enderecoDaLista = enderecoDaInbox({ ...filtros, conversaId: null });
+  const atualizarTela = useCallback(() => router.refresh(), [router]);
+  const temChipsAtivos = chips.some((c) => !c.removido);
 
   return (
-    <div className="inbox" data-aberta={conversaId ? 'sim' : 'nao'}>
+    <div className="inbox" data-aberta={aba === 'conversas' && conversaId ? 'sim' : 'nao'}>
       <div className="page-header inbox-titulo">
         <div>
           <h1>Inbox</h1>
           <p>As conversas do WhatsApp dos seus chips, num lugar só.</p>
         </div>
-      </div>
 
-      <div className={`inbox-grade${conversa ? ' inbox-grade--com-contato' : ''}`}>
-        <ListaDeConversas lista={lista} filtros={filtros} chips={chips} conversaId={conversaId} ehDono={ehDono} />
-
-        {conversa ? (
-          <Conversa
-            key={conversa.id}
-            conversa={conversa}
-            filtros={filtros}
-            limiteDeMensagens={limiteDeMensagens}
-            enderecoDaLista={enderecoDaLista}
-            pendentes={pendentes}
-            aviso={avisos[conversa.id] ?? null}
-            aoAvisar={avisar}
-            aoEnviar={enviar}
-            aoDescartar={descartar}
-            ehDono={ehDono}
-            evolutionConfigurada={evolutionConfigurada}
-          />
-        ) : (
-          <section className="inbox-conversa inbox-conversa--vazia" aria-label="Conversa">
-            {conversaId ? (
-              <div className="inbox-vazio">
-                <strong>{aberta?.falhou ? 'Não foi possível abrir esta conversa agora' : 'Esta conversa não existe mais'}</strong>
-                <p>
-                  {aberta?.falhou
-                    ? 'Nada foi alterado. Espere um instante e tente de novo.'
-                    : 'Ela pode ter sido apagada, ou o endereço está incompleto.'}
-                </p>
-                <Link href={enderecoDaLista} className="btn btn-secondary btn-sm" prefetch={false}>
-                  Voltar para as conversas
+        <div className="inbox-crm-topo">
+          <nav className="crm-abas" aria-label="Modos do CRM">
+            {ABAS_DO_CRM.map((item) => {
+              const ativo = aba === item.valor;
+              return (
+                <Link
+                  key={item.valor}
+                  href={enderecoDaInbox({
+                    aba: item.valor,
+                    chipId: filtros.chipId,
+                    etiquetaId: filtros.etiquetaId,
+                  })}
+                  className={`crm-aba${ativo ? ' crm-aba--ativa' : ''}`}
+                  aria-current={ativo ? 'page' : undefined}
+                  prefetch={false}
+                >
+                  <Icone nome={item.valor === 'conversas' ? 'inbox' : item.valor === 'contatos' ? 'contatos' : 'kanban'} className="icon-15" />
+                  <span>{item.rotulo}</span>
                 </Link>
-              </div>
-            ) : (
-              <div className="inbox-vazio">
-                <Icone nome="inbox" />
-                <strong>Selecione uma conversa</strong>
-                <p>Escolha uma conversa na lista ao lado para ler e responder.</p>
-              </div>
-            )}
-          </section>
-        )}
+              );
+            })}
+          </nav>
+
+          <div className="inbox-crm-acoes">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setModalCatalogos(true)}>
+              <Icone nome="etiqueta" className="icon-15" />
+              <span>Etiquetas & /</span>
+            </button>
+            {temChipsAtivos ? (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalNovaConversa(true)}>
+                <Icone nome="adicionar" className="icon-15" />
+                <span>Nova conversa</span>
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
+
+      {aba === 'contatos' ? (
+        <AgendaDeContatos
+          contatos={contatosDir.contatos}
+          total={contatosDir.total}
+          etiquetas={catalogos.etiquetas}
+          chips={chips}
+          buscaAtual={filtros.busca}
+          etiquetaAtual={filtros.etiquetaId ?? null}
+          aoAtualizar={atualizarTela}
+        />
+      ) : aba === 'kanban' ? (
+        <QuadroKanban
+          cartoes={kanban.cartoes}
+          etiquetas={catalogos.etiquetas}
+          chips={chips}
+          chipAtual={filtros.chipId}
+          etiquetaAtual={filtros.etiquetaId ?? null}
+          aoAtualizar={atualizarTela}
+        />
+      ) : (
+        <div className={`inbox-grade${conversa ? ' inbox-grade--com-contato' : ''}`}>
+          <ListaDeConversas
+            lista={lista}
+            filtros={filtros}
+            chips={chips}
+            etiquetas={catalogos.etiquetas}
+            conversaId={conversaId}
+            ehDono={ehDono}
+            aoAtualizar={atualizarTela}
+          />
+
+          {conversa ? (
+            <Conversa
+              key={conversa.id}
+              conversa={conversa}
+              filtros={filtros}
+              limiteDeMensagens={limiteDeMensagens}
+              enderecoDaLista={enderecoDaLista}
+              pendentes={pendentes}
+              aviso={avisos[conversa.id] ?? null}
+              aoAvisar={avisar}
+              aoEnviar={enviar}
+              aoDescartar={descartar}
+              ehDono={ehDono}
+              evolutionConfigurada={evolutionConfigurada}
+              etiquetasDoWorkspace={catalogos.etiquetas}
+              respostasRapidas={catalogos.respostasRapidas}
+              aoAbrirEtiquetas={() => setModalCatalogos(true)}
+              aoAtualizar={atualizarTela}
+            />
+          ) : (
+            <section className="inbox-conversa inbox-conversa--vazia" aria-label="Conversa">
+              {conversaId ? (
+                <div className="inbox-vazio">
+                  <strong>{aberta?.falhou ? 'Não foi possível abrir esta conversa agora' : 'Esta conversa não existe mais'}</strong>
+                  <p>
+                    {aberta?.falhou
+                      ? 'Nada foi alterado. Espere um instante e tente de novo.'
+                      : 'Ela pode ter sido apagada, ou o endereço está incompleto.'}
+                  </p>
+                  <Link href={enderecoDaLista} className="btn btn-secondary btn-sm" prefetch={false}>
+                    Voltar para as conversas
+                  </Link>
+                </div>
+              ) : (
+                <div className="inbox-vazio">
+                  <Icone nome="inbox" />
+                  <strong>Selecione uma conversa</strong>
+                  <p>Escolha uma conversa na lista ao lado para ler e responder.</p>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+      )}
+
+      <ModalNovaConversa
+        aberto={modalNovaConversa}
+        aoFechar={() => setModalNovaConversa(false)}
+        chips={chips}
+        aoAbrirConversa={(id) => router.push(`/inbox?c=${id}`)}
+      />
+
+      <ModalCatalogosCrm
+        aberto={modalCatalogos}
+        aoFechar={() => setModalCatalogos(false)}
+        etiquetas={catalogos.etiquetas}
+        respostasRapidas={catalogos.respostasRapidas}
+        aoAtualizar={atualizarTela}
+      />
     </div>
   );
 }
@@ -587,15 +706,20 @@ interface PropsDaLista {
   lista: ListaDaInbox;
   filtros: FiltrosDaInbox;
   chips: ChipDaInbox[];
+  etiquetas: EtiquetaDoCrm[];
   conversaId: string | null;
   ehDono: boolean;
+  aoAtualizar: () => void;
 }
 
-function ListaDeConversas({ lista, filtros, chips, conversaId, ehDono }: PropsDaLista) {
+function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono, aoAtualizar }: PropsDaLista) {
   const router = useRouter();
   const idBusca = useId();
   const idChip = useId();
   const idTitulo = useId();
+  const [modoLote, setModoLote] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<string[]>([]);
+  const [ocupadoLote, setOcupadoLote] = useState(false);
 
   const ir = (mudancas: Partial<FiltrosDaInbox>) =>
     enderecoDaInbox({ ...filtros, limite: null, conversaId, ...mudancas });
@@ -606,12 +730,38 @@ function ListaDeConversas({ lista, filtros, chips, conversaId, ehDono }: PropsDa
     router.push(ir({ busca: lerBusca(digitado) }));
   }
 
+  function alternarSelecao(id: string) {
+    setSelecionadas((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
+  }
+
+  async function executarLote(acao: 'mark_read' | 'mark_unread' | 'resolve' | 'archive' | 'unarchive', etapaCrm?: string) {
+    if (ocupadoLote || selecionadas.length === 0) return;
+    setOcupadoLote(true);
+    const res = await aplicarAcaoEmLote({
+      conversaIds: selecionadas,
+      acao: etapaCrm ? 'set_crm_stage' : acao,
+      ...(etapaCrm ? { etapaCrm } : {}),
+    });
+    setOcupadoLote(false);
+    if (res.ok) {
+      setSelecionadas([]);
+      setModoLote(false);
+      aoAtualizar();
+    }
+  }
+
   const chipsAtivos = chips.filter((chip) => !chip.removido);
   const chipsRemovidos = chips.filter((chip) => chip.removido);
   const chipDoFiltro = chips.find((chip) => chip.id === filtros.chipId);
   const mostrarChipNoItem = chips.length > 1 && !filtros.chipId;
   const contagem = (valor: string): number | null =>
-    valor === 'nao-lidas' ? (lista.contagens?.naoLidas ?? null) : valor === 'esperando' ? (lista.contagens?.esperando ?? null) : null;
+    valor === 'nao-lidas'
+      ? (lista.contagens?.naoLidas ?? null)
+      : valor === 'esperando'
+        ? (lista.contagens?.esperando ?? null)
+        : valor === 'arquivadas'
+          ? (lista.contagens?.arquivadas ?? null)
+          : null;
   const proximo = lista.temMais ? proximoLimite(filtros.limite) : null;
 
   return (
@@ -620,6 +770,8 @@ function ListaDeConversas({ lista, filtros, chips, conversaId, ehDono }: PropsDa
         <form className="inbox-busca" role="search" action="/inbox" method="get" onSubmit={buscar}>
           {filtros.visao !== 'ativas' ? <input type="hidden" name="ver" value={filtros.visao} /> : null}
           {filtros.chipId ? <input type="hidden" name="chip" value={filtros.chipId} /> : null}
+          {filtros.etiquetaId ? <input type="hidden" name="etiqueta" value={filtros.etiquetaId} /> : null}
+          {filtros.negocio ? <input type="hidden" name="negocio" value={filtros.negocio} /> : null}
           <label htmlFor={idBusca} className="so-leitor-de-tela">
             Buscar conversa
           </label>
@@ -662,6 +814,38 @@ function ListaDeConversas({ lista, filtros, chips, conversaId, ehDono }: PropsDa
           })}
         </nav>
 
+        {etiquetas.length > 0 || filtros.etiquetaId || filtros.negocio ? (
+          <div className="inbox-filtros-crm">
+            {etiquetas.length > 0 || filtros.etiquetaId ? (
+              <select
+                className="campo"
+                aria-label="Filtrar por etiqueta"
+                value={filtros.etiquetaId ?? ''}
+                onChange={(e) => router.push(ir({ etiquetaId: e.target.value || null }))}
+              >
+                <option value="">Todas etiquetas</option>
+                {etiquetas.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nome}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <select
+              className="campo"
+              aria-label="Filtrar por negócio"
+              value={filtros.negocio ?? ''}
+              onChange={(e) => router.push(ir({ negocio: (e.target.value || null) as FiltroDeNegocio | null }))}
+            >
+              <option value="">Todos negócios</option>
+              <option value="open">Em negociação</option>
+              <option value="won">Ganhos</option>
+              <option value="lost">Perdidos</option>
+              <option value="with_value">Com valor R$</option>
+            </select>
+          </div>
+        ) : null}
+
         {chips.length > 1 || filtros.chipId ? (
           <div className="inbox-ver-por-chip">
             <label htmlFor={idChip}>Ver por chip</label>
@@ -694,13 +878,76 @@ function ListaDeConversas({ lista, filtros, chips, conversaId, ehDono }: PropsDa
 
       <div className="inbox-lista-cabecalho">
         <h2 id={idTitulo}>{filtros.busca ? 'Resultado da busca' : 'Fila de atendimento'}</h2>
-        {lista.falhou ? null : (
-          <span>
-            {lista.temMais ? 'mais de ' : ''}
-            {plural(lista.conversas.length, 'conversa', 'conversas')}
-          </span>
-        )}
+        <div className="inbox-lista-cabecalho-dir">
+          {lista.falhou ? null : (
+            <span>
+              {lista.temMais ? 'mais de ' : ''}
+              {plural(lista.conversas.length, 'conversa', 'conversas')}
+            </span>
+          )}
+          {lista.conversas.length > 0 ? (
+            <button
+              type="button"
+              className="contato-copiar"
+              onClick={() => {
+                setModoLote((v) => !v);
+                setSelecionadas([]);
+              }}
+            >
+              {modoLote ? 'Concluir' : 'Selecionar'}
+            </button>
+          ) : null}
+        </div>
       </div>
+
+      {modoLote ? (
+        <div className="inbox-lote-barra" role="region" aria-label="Ações em lote">
+          <div className="inbox-lote-topo">
+            <span>{selecionadas.length} selecionada(s)</span>
+            <button
+              type="button"
+              className="contato-copiar"
+              onClick={() =>
+                setSelecionadas(selecionadas.length === lista.conversas.length ? [] : lista.conversas.map((c) => c.id))
+              }
+            >
+              {selecionadas.length === lista.conversas.length ? 'Desmarcar' : 'Todas'}
+            </button>
+          </div>
+          {selecionadas.length > 0 ? (
+            <div className="inbox-lote-botoes">
+              <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('mark_read')}>
+                Lidas
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('mark_unread')}>
+                Não lidas
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('resolve')}>
+                Resolver
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('archive')}>
+                Arquivar
+              </button>
+              <select
+                className="campo"
+                aria-label="Mover selecionadas para etapa"
+                value=""
+                disabled={ocupadoLote}
+                onChange={(e) => {
+                  if (e.target.value) void executarLote('mark_read', e.target.value);
+                }}
+              >
+                <option value="">Etapa…</option>
+                {ETAPAS_DO_KANBAN.map((et) => (
+                  <option key={et.valor} value={et.valor}>
+                    {et.rotulo}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {filtros.busca ? (
         <p className="inbox-busca-ativa">
@@ -725,38 +972,73 @@ function ListaDeConversas({ lista, filtros, chips, conversaId, ehDono }: PropsDa
         <ul className="inbox-itens">
           {lista.conversas.map((item) => {
             const etapa = descreverEtapa(item.etapa);
+            const marcada = selecionadas.includes(item.id);
+            const conteudoItem = (
+              <>
+                <span className="inbox-avatar" aria-hidden="true">
+                  {item.iniciais}
+                </span>
+                <span className="inbox-item-corpo">
+                  <span className="inbox-item-linha">
+                    <span className="inbox-item-nome">
+                      {item.fixada ? <Icone nome="alfinete" className="icon-15 inbox-pin-icone" /> : null}
+                      {item.nome}
+                    </span>
+                    <span className="inbox-item-quando">{item.quando}</span>
+                  </span>
+                  <span className="inbox-item-linha">
+                    <span className="inbox-item-previa">{item.previa || 'Sem mensagens ainda'}</span>
+                    {item.naoLidas > 0 ? (
+                      <span className="inbox-nao-lidas">
+                        <span aria-hidden="true">{item.naoLidas > 99 ? '99+' : item.naoLidas}</span>
+                        <span className="so-leitor-de-tela">{plural(item.naoLidas, 'mensagem não lida', 'mensagens não lidas')}</span>
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="inbox-item-etiquetas">
+                    <span className={`inbox-etiqueta inbox-etiqueta--${etapa.tom}`}>{etapa.texto}</span>
+                    {item.valorNegocio > 0 ? (
+                      <span className={`crm-valor-pill crm-valor-pill--${item.situacaoNegocio}`}>{formatarReais(item.valorNegocio)}</span>
+                    ) : null}
+                    {item.iaIgnorada ? <span className="inbox-etiqueta inbox-etiqueta--atencao">IA off</span> : null}
+                    {item.agendadasPendentes > 0 ? (
+                      <span className="inbox-etiqueta">{item.agendadasPendentes} agend.</span>
+                    ) : null}
+                    {item.etiquetas.slice(0, 2).map((t) => (
+                      <span key={t.id} className="crm-tag-pill" style={{ borderColor: t.cor, color: t.cor }}>
+                        <span className="crm-tag-dot" style={{ background: t.cor }} />
+                        {t.nome}
+                      </span>
+                    ))}
+                    {mostrarChipNoItem && item.chipNome ? <span className="inbox-etiqueta">{item.chipNome}</span> : null}
+                  </span>
+                </span>
+              </>
+            );
+
             return (
-              <li key={item.id}>
-                <Link
-                  href={enderecoDaInbox({ ...filtros, conversaId: item.id })}
-                  className={`inbox-item${item.naoLidas > 0 ? ' inbox-item--nao-lida' : ''}`}
-                  aria-current={item.id === conversaId ? 'true' : undefined}
-                  prefetch={false}
-                  scroll={false}
-                >
-                  <span className="inbox-avatar" aria-hidden="true">
-                    {item.iniciais}
-                  </span>
-                  <span className="inbox-item-corpo">
-                    <span className="inbox-item-linha">
-                      <span className="inbox-item-nome">{item.nome}</span>
-                      <span className="inbox-item-quando">{item.quando}</span>
-                    </span>
-                    <span className="inbox-item-linha">
-                      <span className="inbox-item-previa">{item.previa || 'Sem mensagens ainda'}</span>
-                      {item.naoLidas > 0 ? (
-                        <span className="inbox-nao-lidas">
-                          <span aria-hidden="true">{item.naoLidas > 99 ? '99+' : item.naoLidas}</span>
-                          <span className="so-leitor-de-tela">{plural(item.naoLidas, 'mensagem não lida', 'mensagens não lidas')}</span>
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="inbox-item-etiquetas">
-                      <span className={`inbox-etiqueta inbox-etiqueta--${etapa.tom}`}>{etapa.texto}</span>
-                      {mostrarChipNoItem && item.chipNome ? <span className="inbox-etiqueta">{item.chipNome}</span> : null}
-                    </span>
-                  </span>
-                </Link>
+              <li key={item.id} className={modoLote ? 'inbox-item-lote-linha' : undefined}>
+                {modoLote ? (
+                  <label className="inbox-item inbox-item--selecionavel">
+                    <input
+                      type="checkbox"
+                      checked={marcada}
+                      onChange={() => alternarSelecao(item.id)}
+                      aria-label={`Selecionar ${item.nome}`}
+                    />
+                    {conteudoItem}
+                  </label>
+                ) : (
+                  <Link
+                    href={enderecoDaInbox({ ...filtros, conversaId: item.id })}
+                    className={`inbox-item${item.naoLidas > 0 ? ' inbox-item--nao-lida' : ''}`}
+                    aria-current={item.id === conversaId ? 'true' : undefined}
+                    prefetch={false}
+                    scroll={false}
+                  >
+                    {conteudoItem}
+                  </Link>
+                )}
               </li>
             );
           })}
@@ -812,6 +1094,22 @@ function ListaVazia({ filtros, temChip, ehDono }: { filtros: FiltrosDaInbox; tem
       </div>
     );
   }
+  if (filtros.visao === 'arquivadas') {
+    return (
+      <div className="inbox-vazio">
+        <strong>Nenhuma conversa arquivada</strong>
+        <p>Conversas arquivadas saem da fila principal e ficam guardadas aqui.</p>
+      </div>
+    );
+  }
+  if (filtros.etiquetaId || filtros.negocio) {
+    return (
+      <div className="inbox-vazio">
+        <strong>Nenhuma conversa neste filtro</strong>
+        <p>Limpe a etiqueta ou o filtro de negócio para ver todas as conversas.</p>
+      </div>
+    );
+  }
   if (filtros.chipId) {
     return (
       <div className="inbox-vazio">
@@ -859,10 +1157,14 @@ interface PropsDaConversa {
   aoDescartar: (chave: string) => void;
   ehDono: boolean;
   evolutionConfigurada: boolean;
+  etiquetasDoWorkspace: EtiquetaDoCrm[];
+  respostasRapidas: RespostaRapida[];
+  aoAbrirEtiquetas: () => void;
+  aoAtualizar: () => void;
 }
 
 /** O que dá para fazer com a conversa pelos botões do alto dela. */
-type AcaoNaConversa = 'resolver' | 'reabrir' | 'assumir' | 'devolver';
+type AcaoNaConversa = 'resolver' | 'reabrir' | 'assumir' | 'devolver' | 'fixar' | 'arquivar' | 'desarquivar';
 
 /**
  * A faixa da IA no alto da conversa: diz se a IA está respondendo ali, por que parou, o recado que ela
@@ -939,12 +1241,18 @@ function Conversa({
   aoDescartar,
   ehDono,
   evolutionConfigurada,
+  etiquetasDoWorkspace,
+  respostasRapidas,
+  aoAbrirEtiquetas,
+  aoAtualizar,
 }: PropsDaConversa) {
   const router = useRouter();
   const [ocupado, setOcupado] = useState<AcaoNaConversa | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
   const [contatoAberto, setContatoAberto] = useState(false);
   const [fotoAberta, setFotoAberta] = useState<FotoAberta | null>(null);
+  const [agendarTexto, setAgendarTexto] = useState<string | null>(null);
+  const [cancelandoAgendaId, setCancelandoAgendaId] = useState<string | null>(null);
   /** Mensagem cujo arquivo está sendo buscado de novo no WhatsApp. */
   const [buscando, setBuscando] = useState<string | null>(null);
   /** Texto colocado no campo por um "tentar de novo". Cada pedido tem um número, para o campo recomeçar. */
@@ -1016,14 +1324,31 @@ function Conversa({
     setOcupado(acao);
     aoAvisar(conversa.id, null);
     try {
-      const resultado = await pedir(() => mudarConversa({ conversaId: conversa.id, acao }));
+      const resultado =
+        acao === 'fixar'
+          ? await pedir(() => atualizarNegocioConversa({ conversaId: conversa.id, fixada: !conversa.fixada }))
+          : acao === 'arquivar'
+            ? await pedir(() => atualizarNegocioConversa({ conversaId: conversa.id, etapa: 'archived' }))
+            : acao === 'desarquivar'
+              ? await pedir(() => atualizarNegocioConversa({ conversaId: conversa.id, etapa: 'human' }))
+              : await pedir(() => mudarConversa({ conversaId: conversa.id, acao }));
       if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+      else aoAtualizar();
     } catch {
       aoAvisar(conversa.id, { tipo: 'erro', texto: 'Não foi possível falar com o painel. Confira a internet e tente de novo.' });
       router.refresh();
     } finally {
       setOcupado(null);
     }
+  }
+
+  async function cancelarAgenda(agendamentoId: string) {
+    if (cancelandoAgendaId) return;
+    setCancelandoAgendaId(agendamentoId);
+    const res = await pedir(() => cancelarMensagemAgendada({ agendamentoId }));
+    setCancelandoAgendaId(null);
+    if (!res.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: res.erro });
+    else aoAtualizar();
   }
 
   const decidir = useCallback(
@@ -1118,6 +1443,16 @@ function Conversa({
             <span className={`estado${etapa.tom === 'ok' ? ' estado--ok' : etapa.tom === 'atencao' ? ' estado--atencao' : etapa.tom === 'ia' ? ' estado--ia' : ''}`}>
               {etapa.texto}
             </span>
+            <button
+              type="button"
+              className={`btn btn-secondary btn-sm${conversa.fixada ? ' crm-btn-aviso' : ''}`}
+              onClick={() => void agir('fixar')}
+              disabled={ocupado !== null}
+              title={conversa.fixada ? 'Desafixar do topo' : 'Fixar conversa no topo'}
+            >
+              <Icone nome="alfinete" className="icon-15" />
+              <span className="so-leitor-de-tela">{conversa.fixada ? 'Desafixar' : 'Fixar'}</span>
+            </button>
             <button type="button" className="btn btn-secondary btn-sm inbox-abrir-contato" onClick={() => setContatoAberto(true)}>
               Contato
             </button>
@@ -1125,10 +1460,19 @@ function Conversa({
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => void agir('reabrir')} disabled={ocupado !== null}>
                 {ocupado === 'reabrir' ? 'Reabrindo…' : 'Reabrir'}
               </button>
-            ) : conversa.etapa === 'archived' ? null : (
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void agir('resolver')} disabled={ocupado !== null}>
-                {ocupado === 'resolver' ? 'Resolvendo…' : 'Resolver'}
+            ) : conversa.etapa === 'archived' ? (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void agir('desarquivar')} disabled={ocupado !== null}>
+                {ocupado === 'desarquivar' ? 'Desarquivando…' : 'Desarquivar'}
               </button>
+            ) : (
+              <>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => void agir('resolver')} disabled={ocupado !== null}>
+                  {ocupado === 'resolver' ? 'Resolvendo…' : 'Resolver'}
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => void agir('arquivar')} disabled={ocupado !== null}>
+                  {ocupado === 'arquivar' ? 'Arquivando…' : 'Arquivar'}
+                </button>
+              </>
             )}
           </div>
         </header>
@@ -1203,6 +1547,46 @@ function Conversa({
           </p>
         ) : null}
 
+        {conversa.agendadas.filter((a) => a.situacao !== 'cancelled').length > 0 ? (
+          <div className="inbox-agendadas" aria-label="Mensagens agendadas">
+            <div className="inbox-agendadas-titulo">
+              <Icone nome="calendario" className="icon-15" />
+              <span>Mensagens agendadas</span>
+            </div>
+            <ul className="inbox-agendadas-lista">
+              {conversa.agendadas
+                .filter((a) => a.situacao !== 'cancelled')
+                .map((ag) => (
+                  <li key={ag.id} className="inbox-agendada-item">
+                    <div>
+                      <strong>{ag.paraQuandoLabel}</strong>
+                      <span>
+                        {ag.situacao === 'sent'
+                          ? ' · Enviada'
+                          : ag.situacao === 'failed'
+                            ? ` · Falhou (${ag.erro || 'erro'})`
+                            : ag.situacao === 'processing'
+                              ? ' · Enviando…'
+                              : ' · Pendente'}
+                      </span>
+                      <p>{ag.texto}</p>
+                    </div>
+                    {ag.situacao === 'pending' ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={cancelandoAgendaId === ag.id}
+                        onClick={() => void cancelarAgenda(ag.id)}
+                      >
+                        {cancelandoAgendaId === ag.id ? 'Cancelando…' : 'Cancelar'}
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ) : null}
+
         {impedimento ? (
           <div className="inbox-impedimento">
             <p>{impedimento.texto}</p>
@@ -1221,19 +1605,56 @@ function Conversa({
             key={preenchimento?.vez ?? 0}
             conversaId={conversa.id}
             textoInicial={preenchimento?.texto ?? null}
+            respostasRapidas={respostasRapidas}
             aoEnviar={enviarDoCampo}
+            aoAgendar={(textoAtual) => setAgendarTexto(textoAtual)}
+            aoGerenciarRespostas={aoAbrirEtiquetas}
           />
         )}
       </section>
 
       <aside className="inbox-contato" aria-label="Dados do contato">
-        <CartaoDoContato conversa={conversa} etapa={etapa.texto} estadoDoChip={chipRemovido ? 'Removido' : estadoDoChip.texto} />
+        <CartaoCrmDoContato
+          key={`${conversa.id}:${conversa.valorNegocio}:${conversa.motivoPerda}:${conversa.retornoEm ?? ''}`}
+          conversa={conversa}
+          etapa={etapa.texto}
+          estadoDoChip={chipRemovido ? 'Removido' : estadoDoChip.texto}
+          etiquetasDoWorkspace={etiquetasDoWorkspace}
+          aoAtualizar={aoAtualizar}
+          aoAbrirEtiquetas={aoAbrirEtiquetas}
+          aoApagarContato={() => router.push(enderecoDaLista)}
+        />
       </aside>
 
       {contatoAberto ? (
         <Dialogo titulo="Dados do contato" aoFechar={() => setContatoAberto(false)}>
-          <CartaoDoContato conversa={conversa} etapa={etapa.texto} estadoDoChip={chipRemovido ? 'Removido' : estadoDoChip.texto} />
+          <CartaoCrmDoContato
+            key={`modal:${conversa.id}:${conversa.valorNegocio}:${conversa.motivoPerda}:${conversa.retornoEm ?? ''}`}
+            conversa={conversa}
+            etapa={etapa.texto}
+            estadoDoChip={chipRemovido ? 'Removido' : estadoDoChip.texto}
+            etiquetasDoWorkspace={etiquetasDoWorkspace}
+            aoAtualizar={aoAtualizar}
+            aoAbrirEtiquetas={() => {
+              setContatoAberto(false);
+              aoAbrirEtiquetas();
+            }}
+            aoApagarContato={() => {
+              setContatoAberto(false);
+              router.push(enderecoDaLista);
+            }}
+          />
         </Dialogo>
+      ) : null}
+
+      {agendarTexto !== null ? (
+        <ModalAgendarMensagem
+          aberto
+          aoFechar={() => setAgendarTexto(null)}
+          conversaId={conversa.id}
+          textoInicial={agendarTexto}
+          aoAgendar={aoAtualizar}
+        />
       ) : null}
 
       {ensinando ? (
@@ -1645,16 +2066,23 @@ function AnexoNoBalao({ anexo }: { anexo: Anexo }) {
 function CampoDeMensagem({
   conversaId,
   textoInicial,
+  respostasRapidas,
   aoEnviar,
+  aoAgendar,
+  aoGerenciarRespostas,
 }: {
   conversaId: string;
   textoInicial: string | null;
+  respostasRapidas: RespostaRapida[];
   aoEnviar: (texto: string, anexo?: Anexo) => void;
+  aoAgendar: (textoAtual: string) => void;
+  aoGerenciarRespostas: () => void;
 }) {
   const [texto, setTexto] = useState(() => textoInicial ?? rascunhos.get(conversaId) ?? '');
   const [anexo, setAnexo] = useState<Anexo | null>(null);
   const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
   const [soltando, setSoltando] = useState(false);
+  const [menuRapidasForcado, setMenuRapidasForcado] = useState(false);
   const campo = useRef<HTMLTextAreaElement>(null);
   const seletor = useRef<HTMLInputElement>(null);
   /** O anexo que está no campo agora (para as medidas que chegam depois, e para a limpeza ao sair). */
@@ -1742,6 +2170,24 @@ function CampoDeMensagem({
   const sobrando = limite - texto.length;
   const passouDoLimite = Boolean(anexo) && !semLegenda && sobrando < 0;
   const podeEnviar = anexo ? !passouDoLimite : Boolean(texto.trim());
+
+  const comandoBarra = /(?:^|\s)\/([^\s/]*)$/.exec(texto);
+  const filtroSlash = comandoBarra ? comandoBarra[1]!.toLowerCase() : null;
+  const mostrarMenuRapidas = menuRapidasForcado || filtroSlash !== null;
+  const opcoesRapidas = useMemo(() => {
+    if (!mostrarMenuRapidas) return [];
+    const termo = filtroSlash ?? '';
+    return respostasRapidas
+      .filter((qr) => !termo || qr.atalho.toLowerCase().includes(termo) || qr.titulo.toLowerCase().includes(termo))
+      .slice(0, 8);
+  }, [mostrarMenuRapidas, filtroSlash, respostasRapidas]);
+
+  function aplicarRespostaRapida(qr: RespostaRapida) {
+    const atualizado = comandoBarra ? texto.slice(0, texto.length - comandoBarra[1]!.length - 1) + qr.texto : texto ? `${texto}\n${qr.texto}` : qr.texto;
+    mudar(atualizado.slice(0, TEXTO_MAXIMO));
+    setMenuRapidasForcado(false);
+    campo.current?.focus();
+  }
 
   function enviar() {
     if (!podeEnviar) return;
@@ -1840,6 +2286,15 @@ function CampoDeMensagem({
           <Icone nome="clipe" />
           <span className="so-leitor-de-tela">Anexar arquivo</span>
         </button>
+        <button
+          type="button"
+          className={`btn btn-secondary btn-icon-only inbox-anexar${mostrarMenuRapidas ? ' crm-btn-aviso' : ''}`}
+          onClick={() => setMenuRapidasForcado((v) => !v)}
+          title="Respostas rápidas (ou digite /)"
+        >
+          <Icone nome="raio" />
+          <span className="so-leitor-de-tela">Respostas rápidas</span>
+        </button>
         <label htmlFor={idCampo} className="so-leitor-de-tela">
           {anexo ? (semLegenda ? 'Mensagem (o áudio vai sem legenda)' : 'Legenda do arquivo') : 'Mensagem'}
         </label>
@@ -1852,12 +2307,23 @@ function CampoDeMensagem({
           value={texto}
           maxLength={TEXTO_MAXIMO}
           readOnly={semLegenda}
-          placeholder={anexo ? (semLegenda ? 'Áudio vai sem legenda' : 'Legenda (opcional)') : 'Escreva uma mensagem'}
+          placeholder={anexo ? (semLegenda ? 'Áudio vai sem legenda' : 'Legenda (opcional)') : 'Escreva uma mensagem ou digite /'}
           aria-describedby={anexo ? `${idAnexo} ${idDica}` : idDica}
           aria-invalid={passouDoLimite || undefined}
           enterKeyHint="enter"
           onChange={(evento) => mudar(evento.target.value)}
-          onKeyDown={aoTeclar}
+          onKeyDown={(evento) => {
+            if (evento.key === 'Escape' && menuRapidasForcado) {
+              setMenuRapidasForcado(false);
+              return;
+            }
+            if (evento.key === 'Enter' && !evento.shiftKey && opcoesRapidas.length > 0 && filtroSlash !== null) {
+              evento.preventDefault();
+              aplicarRespostaRapida(opcoesRapidas[0]!);
+              return;
+            }
+            aoTeclar(evento);
+          }}
           onPaste={(evento) => {
             // Colar um print (Ctrl+V) anexa a imagem.
             const colado = evento.clipboardData.files[0];
@@ -1866,12 +2332,60 @@ function CampoDeMensagem({
             anexar(colado);
           }}
         />
+        {!anexo ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon-only inbox-anexar"
+            onClick={() => aoAgendar(texto.trim())}
+            title="Agendar envio automático"
+          >
+            <Icone nome="calendario" />
+            <span className="so-leitor-de-tela">Agendar envio</span>
+          </button>
+        ) : null}
         <button type="submit" className="btn btn-primary" disabled={!podeEnviar}>
           Enviar
         </button>
       </div>
+
+      {mostrarMenuRapidas ? (
+        opcoesRapidas.length === 0 ? (
+          <div className="inbox-rapidas-popover" role="region" aria-label="Respostas rápidas">
+            <div className="inbox-rapidas-vazio">
+              <span>Nenhuma resposta rápida encontrada.</span>
+              <button
+                type="button"
+                className="contato-copiar"
+                onClick={() => {
+                  setMenuRapidasForcado(false);
+                  aoGerenciarRespostas();
+                }}
+              >
+                Criar agora
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="inbox-rapidas-popover" role="listbox" aria-label="Respostas rápidas">
+            {opcoesRapidas.map((qr) => (
+              <button
+                key={qr.id}
+                type="button"
+                role="option"
+                aria-selected="false"
+                className="inbox-rapidas-opcao"
+                onClick={() => aplicarRespostaRapida(qr)}
+              >
+                <code>/{qr.atalho}</code>
+                <strong>{qr.titulo}</strong>
+                <span>{qr.texto}</span>
+              </button>
+            ))}
+          </div>
+        )
+      ) : null}
       <p id={idDica} className="inbox-escrever-dica">
-        <span className="inbox-dica-do-teclado">Enter envia · Shift + Enter pula a linha · o clipe anexa foto, áudio, vídeo ou documento</span>
+        <span className="inbox-dica-do-teclado">Enter envia · Shift + Enter pula a linha · digite / para respostas rápidas</span>
         {passouDoLimite ? (
           <span className="inbox-escrever-excesso">
             A legenda vai até {LEGENDA_MAXIMA.toLocaleString('pt-BR')} letras: tire {plural(-sobrando, 'letra', 'letras')}.
@@ -1881,75 +2395,5 @@ function CampoDeMensagem({
         ) : null}
       </p>
     </form>
-  );
-}
-
-/* --------------------------- Dados do contato ------------------------------ */
-
-function CartaoDoContato({ conversa, etapa, estadoDoChip }: { conversa: ConversaAberta; etapa: string; estadoDoChip: string }) {
-  const [copiado, setCopiado] = useState<'sim' | 'falhou' | null>(null);
-
-  async function copiarTelefone() {
-    try {
-      await navigator.clipboard.writeText(conversa.contato.telefone);
-      setCopiado('sim');
-    } catch {
-      setCopiado('falhou');
-    }
-  }
-
-  return (
-    <div className="contato-cartao">
-      <div className="contato-topo">
-        <span className="inbox-avatar inbox-avatar--grande" aria-hidden="true">
-          {conversa.contato.iniciais}
-        </span>
-        <div>
-          <p className="contato-nome">{conversa.contato.nome}</p>
-          {conversa.contato.temNome ? null : <p className="contato-sem-nome">Este contato ainda não tem nome.</p>}
-        </div>
-      </div>
-
-      <dl className="contato-dados">
-        <div>
-          <dt>Telefone</dt>
-          <dd>
-            {conversa.contato.telefone ? (
-              <>
-                <span>{conversa.contato.telefone}</span>
-                <button type="button" className="contato-copiar" onClick={() => void copiarTelefone()}>
-                  Copiar
-                </button>
-                <span role="status" className="contato-copiado">
-                  {copiado === 'sim' ? 'Copiado' : copiado === 'falhou' ? 'Não deu para copiar' : ''}
-                </span>
-              </>
-            ) : (
-              'Não informado'
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Chip</dt>
-          <dd>
-            {conversa.chip.apelido} <span className="contato-detalhe">({estadoDoChip.toLowerCase()})</span>
-          </dd>
-        </div>
-        <div>
-          <dt>Situação da conversa</dt>
-          <dd>{etapa}</dd>
-        </div>
-        <div>
-          <dt>Conversa aberta em</dt>
-          <dd>{conversa.desde}</dd>
-        </div>
-        <div>
-          <dt>Contato desde</dt>
-          <dd>{conversa.contato.desde}</dd>
-        </div>
-      </dl>
-
-      <p className="contato-rodape">Etiquetas, etapa do funil, valor do negócio e anotações entram aqui na Fase 3 (CRM completo).</p>
-    </div>
   );
 }

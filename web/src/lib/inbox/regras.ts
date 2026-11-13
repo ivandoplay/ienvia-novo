@@ -11,9 +11,89 @@ export const VISOES = [
   { valor: 'nao-lidas', noBanco: 'unread', rotulo: 'Não lidas' },
   { valor: 'esperando', noBanco: 'waiting', rotulo: 'Esperando você' },
   { valor: 'resolvidas', noBanco: 'resolved', rotulo: 'Resolvidas' },
+  { valor: 'arquivadas', noBanco: 'archived', rotulo: 'Arquivadas' },
 ] as const;
 
 export type Visao = (typeof VISOES)[number]['valor'];
+
+export const ABAS_DO_CRM = [
+  { valor: 'conversas', rotulo: 'Conversas' },
+  { valor: 'contatos', rotulo: 'Contatos' },
+  { valor: 'kanban', rotulo: 'Kanban' },
+] as const;
+
+export type AbaDoCrm = (typeof ABAS_DO_CRM)[number]['valor'];
+
+export function lerAbaDoCrm(valor: unknown): AbaDoCrm {
+  return ABAS_DO_CRM.find((aba) => aba.valor === valor)?.valor ?? 'conversas';
+}
+
+export const ETAPAS_DO_KANBAN = [
+  { valor: 'novo', rotulo: 'Novos contatos', tom: 'atencao' },
+  { valor: 'qualificando', rotulo: 'Qualificando', tom: 'ia' },
+  { valor: 'em_atendimento', rotulo: 'Em atendimento', tom: 'neutro' },
+  { valor: 'proposta', rotulo: 'Negociação / Proposta', tom: 'atencao' },
+  { valor: 'concluido', rotulo: 'Concluído', tom: 'ok' },
+] as const;
+
+export type EtapaDoKanban = (typeof ETAPAS_DO_KANBAN)[number]['valor'];
+
+export function lerEtapaDoKanban(valor: unknown): EtapaDoKanban | null {
+  return ETAPAS_DO_KANBAN.find((etapa) => etapa.valor === valor)?.valor ?? null;
+}
+
+export function descreverEtapaCrm(etapa: string | null | undefined): { texto: string; tom: TomDaEtapa } {
+  const encontrada = ETAPAS_DO_KANBAN.find((item) => item.valor === etapa);
+  return encontrada ? { texto: encontrada.rotulo, tom: encontrada.tom } : { texto: 'Novos contatos', tom: 'atencao' };
+}
+
+export const SITUACOES_DE_NEGOCIO = [
+  { valor: 'open', rotulo: 'Em negociação' },
+  { valor: 'won', rotulo: 'Ganho' },
+  { valor: 'lost', rotulo: 'Perdido' },
+] as const;
+
+export type SituacaoDeNegocio = (typeof SITUACOES_DE_NEGOCIO)[number]['valor'];
+export type FiltroDeNegocio = SituacaoDeNegocio | 'with_value';
+
+export function lerFiltroDeNegocio(valor: unknown): FiltroDeNegocio | null {
+  if (valor === 'open' || valor === 'won' || valor === 'lost' || valor === 'with_value') return valor;
+  return null;
+}
+
+export const CORES_DE_ETIQUETA = [
+  '#10b981',
+  '#3b82f6',
+  '#f59e0b',
+  '#f43f5e',
+  '#8b5cf6',
+  '#14b8a6',
+  '#f97316',
+  '#64748b',
+] as const;
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function lerUuidOpcional(valor: unknown): string | null {
+  return typeof valor === 'string' && UUID_REGEX.test(valor.trim()) ? valor.trim() : null;
+}
+
+export function formatarReais(valor: number | null | undefined): string {
+  const num = typeof valor === 'number' && Number.isFinite(valor) ? valor : 0;
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+}
+
+export function normalizarValorMonetario(valor: string): number {
+  const limpo = valor.replace(/[^\d.,-]/g, '').trim();
+  if (!limpo) return 0;
+  const normalizado = limpo.includes(',') ? limpo.replace(/\./g, '').replace(',', '.') : limpo;
+  const num = Number(normalizado);
+  return Number.isFinite(num) && num >= 0 ? Math.round(num * 100) / 100 : 0;
+}
+
+export function limparAtalhoRapido(valor: string): string {
+  return valor.trim().replace(/^\/+/, '').replace(/\s+/g, '-').toLowerCase().slice(0, 40);
+}
 
 export function lerVisao(valor: unknown): Visao {
   return VISOES.find((visao) => visao.valor === valor)?.valor ?? 'ativas';
@@ -99,6 +179,7 @@ export function variacoesDeTelefone(busca: string): string[] {
 
 /** Monta o endereço da Inbox guardando só o que foge do padrão. */
 export function enderecoDaInbox(filtros: {
+  aba?: AbaDoCrm;
   visao?: Visao;
   chipId?: string | null;
   busca?: string | null;
@@ -106,11 +187,18 @@ export function enderecoDaInbox(filtros: {
   limite?: number | null;
   /** Quantas mensagens da conversa aberta carregar (só entra no endereço quando passa do padrão). */
   mensagens?: number | null;
+  etiquetaId?: string | null;
+  negocio?: FiltroDeNegocio | null;
+  etapaCrm?: EtapaDoKanban | null;
 }): string {
   const consulta = new URLSearchParams();
+  if (filtros.aba && filtros.aba !== 'conversas') consulta.set('aba', filtros.aba);
   if (filtros.visao && filtros.visao !== 'ativas') consulta.set('ver', filtros.visao);
   if (filtros.chipId) consulta.set('chip', filtros.chipId);
   if (filtros.busca) consulta.set('busca', filtros.busca);
+  if (filtros.etiquetaId) consulta.set('etiqueta', filtros.etiquetaId);
+  if (filtros.negocio) consulta.set('negocio', filtros.negocio);
+  if (filtros.etapaCrm) consulta.set('etapa', filtros.etapaCrm);
   if (filtros.limite && filtros.limite !== CONVERSAS_POR_PAGINA) consulta.set('limite', String(filtros.limite));
   if (filtros.conversaId) consulta.set('c', filtros.conversaId);
   if (filtros.conversaId && filtros.mensagens && filtros.mensagens !== MENSAGENS_POR_VEZ) consulta.set('m', String(filtros.mensagens));
@@ -285,4 +373,40 @@ export function numeroParaEnvio(destinatario: unknown): string | null {
   if (typeof destinatario !== 'string') return null;
   const encontrado = /^([1-9][0-9]{7,14})@s\.whatsapp\.net$/.exec(destinatario.trim());
   return encontrado ? encontrado[1]! : null;
+}
+
+/** Formata data e hora curtas no fuso operacional: "15/11 · 09:30". */
+export function formatarDataHoraCurta(iso: string | null | undefined, fuso: string = FUSO_PADRAO): string {
+  if (!iso) return '';
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return '';
+  const { dia, mes, hora, minuto } = partesDaData(data, fuso);
+  return `${dia}/${mes} · ${hora}:${minuto}`;
+}
+
+/** Converte ISO para valor `<input type="datetime-local">` no fuso operacional (`YYYY-MM-DDTHH:mm`). */
+export function paraInputDateTimeLocal(iso: string | null | undefined, fuso: string = FUSO_PADRAO): string {
+  if (!iso) return '';
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return '';
+  const { dia, mes, ano, hora, minuto } = partesDaData(data, fuso);
+  return `${ano}-${mes}-${dia}T${hora}:${minuto}`;
+}
+
+/** Interpreta `YYYY-MM-DDTHH:mm` no horário de Brasília (-03:00) e devolve ISO UTC, ou `null`. */
+export function deInputDateTimeLocal(valor: unknown): string | null {
+  if (typeof valor !== 'string') return null;
+  const limpo = valor.trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(limpo)) return null;
+  const data = new Date(`${limpo}:00-03:00`);
+  return Number.isNaN(data.getTime()) ? null : data.toISOString();
+}
+
+/** Sugestão rápida de agendamento no futuro: +N minutos ou amanhã às 09:00 (-03:00). */
+export function atalhoDeHorario(tipo: '1h' | '3h' | 'amanha', agora: Date = new Date()): string {
+  if (tipo === '1h') return paraInputDateTimeLocal(new Date(agora.getTime() + 60 * 60_000).toISOString());
+  if (tipo === '3h') return paraInputDateTimeLocal(new Date(agora.getTime() + 3 * 60 * 60_000).toISOString());
+  const amanha = new Date(agora.getTime() + 24 * 60 * 60_000);
+  const { ano, mes, dia } = partesDaData(amanha, FUSO_PADRAO);
+  return `${ano}-${mes}-${dia}T09:00`;
 }

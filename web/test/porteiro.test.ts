@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { atenderNoPorteiro, listarDestinos, type AmbienteDoPorteiro } from '../../cloudflare/porteiro/worker';
+import { atenderNoPorteiro, dispararAgendamentosNoPorteiro, listarDestinos, type AmbienteDoPorteiro } from '../../cloudflare/porteiro/worker';
 
 const ENV_PADRAO: AmbienteDoPorteiro = {
   DESTINO_PRINCIPAL: 'https://proj.supabase.co/functions/v1/evolution-webhook/',
@@ -123,5 +123,20 @@ describe('porteiro Cloudflare', () => {
     const res = await atenderNoPorteiro(pedidoWebhook(MENSAGEM_VALIDA), ENV_PADRAO, buscar);
     expect(res.status).toBe(503);
     expect(buscar).toHaveBeenCalledTimes(3);
+  });
+
+  test('dispara agendamentos via x-ienvia-cron e faz failover se o principal falhar', async () => {
+    const semSegredo = await dispararAgendamentosNoPorteiro(ENV_PADRAO);
+    expect(semSegredo).toBe(false);
+
+    const buscar = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('erro', { status: 502 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, processadas: 1 }), { status: 200 }));
+
+    const ok = await dispararAgendamentosNoPorteiro({ ...ENV_PADRAO, CRON_SECRET: 'segredo-cron' }, buscar);
+    expect(ok).toBe(true);
+    expect(buscar).toHaveBeenCalledTimes(2);
+    expect((buscar.mock.calls[1]?.[1]?.headers as Record<string, string>)['x-ienvia-cron']).toBe('segredo-cron');
   });
 });

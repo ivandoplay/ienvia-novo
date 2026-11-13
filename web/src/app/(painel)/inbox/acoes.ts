@@ -506,3 +506,339 @@ export async function ensinarIa(dados: { mensagemId: string; destino: string; pe
   // O banco aceitou. Se a resposta dele vier num formato inesperado, o ensino está guardado do mesmo jeito.
   return { ok: true, texto: resultado ? descreverEnsino(resultado) : 'Guardado no Treinamento. A IA já usa na próxima resposta.' };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Fase 3 — CRM completo (contatos, negócio, notas, etiquetas, agendas, lote) */
+/* -------------------------------------------------------------------------- */
+
+function traduzirErroCrm(mensagem: string): string {
+  if (/invalid_phone/.test(mensagem)) return 'Informe um número de WhatsApp válido (com DDD, ex: 86 99999-0000).';
+  if (/invalid_name/.test(mensagem)) return 'Informe o nome do contato.';
+  if (/invalid_crm_stage/.test(mensagem)) return 'Etapa do funil inválida.';
+  if (/invalid_deal_status/.test(mensagem)) return 'Situação do negócio inválida.';
+  if (/invalid_tag_name/.test(mensagem)) return 'Escreva o nome da etiqueta.';
+  if (/tag_already_exists/.test(mensagem)) return 'Já existe uma etiqueta com esse nome.';
+  if (/invalid_quick_reply/.test(mensagem)) return 'Preencha o atalho e o texto da resposta rápida.';
+  if (/quick_reply_shortcut_exists/.test(mensagem)) return 'Já existe uma resposta rápida com este atalho.';
+  if (/invalid_schedule_time/.test(mensagem)) return 'Escolha um horário futuro para o agendamento.';
+  if (/instance_unavailable/.test(mensagem)) return 'Escolha um chip conectado ou ativo para iniciar a conversa.';
+  if (/Contact not found/.test(mensagem)) return 'Contato não encontrado.';
+  if (/Conversation not found/.test(mensagem)) return 'Conversa não encontrada.';
+  if (/Tag not found/.test(mensagem)) return 'Etiqueta não encontrada.';
+  if (/Scheduled message cannot be cancelled/.test(mensagem)) return 'Este agendamento já foi processado.';
+  if (/Workspace membership required/.test(mensagem)) return 'Você não participa mais desta empresa.';
+  return ALGO_DEU_ERRADO;
+}
+
+export async function salvarContato(dados: {
+  contatoId?: string | null;
+  nome: string;
+  telefone?: string;
+  email?: string;
+  empresa?: string;
+  documento?: string;
+  cidade?: string;
+  origem?: string;
+  observacoes?: string;
+  iaIgnorada?: boolean;
+  bloqueado?: boolean;
+}): Promise<{ ok: true; contatoId: string } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (dados.contatoId && !ehIdentificador(dados.contatoId)) return { ok: false, erro: 'Contato inválido.' };
+  const nome = dados.nome?.trim() ?? '';
+  if (!nome && !dados.contatoId) return { ok: false, erro: 'Informe o nome do contato.' };
+
+  const { data, error } = await contexto.supabase.rpc('save_my_contact', {
+    p_workspace_id: contexto.workspaceId,
+    p_contact_id: dados.contatoId ?? null,
+    p_patch: {
+      display_name: nome,
+      phone: dados.telefone ?? null,
+      email: dados.email ?? null,
+      company: dados.empresa ?? null,
+      document_id: dados.documento ?? null,
+      city: dados.cidade ?? null,
+      lead_source: dados.origem ?? null,
+      notes: dados.observacoes ?? null,
+      ...(typeof dados.iaIgnorada === 'boolean' ? { ai_ignored: dados.iaIgnorada } : {}),
+      ...(typeof dados.bloqueado === 'boolean' ? { is_blocked: dados.bloqueado } : {}),
+    },
+  });
+  if (error || !data) {
+    return { ok: false, erro: traduzirErroCrm(error?.message ?? '') };
+  }
+  atualizarTelas();
+  return { ok: true, contatoId: String((data as { id?: string }).id ?? dados.contatoId ?? '') };
+}
+
+export async function iniciarConversaManual(dados: {
+  chipId: string;
+  telefone: string;
+  nome?: string | null;
+}): Promise<{ ok: true; conversaId: string; contatoId: string; criada: boolean } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.chipId)) return { ok: false, erro: 'Escolha um chip para enviar pelo WhatsApp.' };
+
+  const { data, error } = await contexto.supabase.rpc('start_or_open_my_conversation', {
+    p_workspace_id: contexto.workspaceId,
+    p_instance_id: dados.chipId,
+    p_phone: dados.telefone ?? '',
+    p_display_name: dados.nome?.trim() || null,
+  });
+  if (error || !data) {
+    return { ok: false, erro: traduzirErroCrm(error?.message ?? '') };
+  }
+  atualizarTelas();
+  const res = data as { conversation_id: string; contact_id: string; created: boolean };
+  return { ok: true, conversaId: res.conversation_id, contatoId: res.contact_id, criada: Boolean(res.created) };
+}
+
+export async function atualizarFlagsContato(dados: {
+  contatoId: string;
+  iaIgnorada?: boolean | null;
+  bloqueado?: boolean | null;
+}): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.contatoId)) return { ok: false, erro: 'Contato inválido.' };
+
+  const { error } = await contexto.supabase.rpc('update_my_contact_flags', {
+    p_workspace_id: contexto.workspaceId,
+    p_contact_id: dados.contatoId,
+    p_ai_ignored: typeof dados.iaIgnorada === 'boolean' ? dados.iaIgnorada : null,
+    p_is_blocked: typeof dados.bloqueado === 'boolean' ? dados.bloqueado : null,
+  });
+  if (error) return { ok: false, erro: traduzirErroCrm(error.message) };
+  atualizarTelas();
+  return { ok: true };
+}
+
+export async function atualizarNegocioConversa(dados: {
+  conversaId: string;
+  etapaCrm?: string;
+  valorNegocio?: number;
+  situacaoNegocio?: 'open' | 'won' | 'lost';
+  motivoPerda?: string;
+  fixada?: boolean;
+  retornoEm?: string | null;
+  etapa?: 'resolved' | 'archived' | 'human';
+}): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.conversaId)) return { ok: false, erro: 'Conversa inválida.' };
+
+  const patch: Record<string, unknown> = {};
+  if (dados.etapaCrm !== undefined) patch.crm_stage = dados.etapaCrm;
+  if (dados.valorNegocio !== undefined) patch.deal_value = dados.valorNegocio;
+  if (dados.situacaoNegocio !== undefined) patch.deal_status = dados.situacaoNegocio;
+  if (dados.motivoPerda !== undefined) patch.deal_lost_reason = dados.motivoPerda;
+  if (dados.fixada !== undefined) patch.is_pinned = dados.fixada;
+  if (dados.retornoEm !== undefined) patch.follow_up_at = dados.retornoEm;
+  if (dados.etapa !== undefined) patch.stage = dados.etapa;
+
+  const { error } = await contexto.supabase.rpc('update_my_conversation_crm', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_id: dados.conversaId,
+    p_patch: patch,
+  });
+  if (error) return { ok: false, erro: traduzirErroCrm(error.message) };
+  atualizarTelas();
+  return { ok: true };
+}
+
+export async function aplicarAcaoEmLote(dados: {
+  conversaIds: string[];
+  acao: 'mark_read' | 'mark_unread' | 'resolve' | 'reopen' | 'archive' | 'unarchive' | 'set_crm_stage' | 'add_tag' | 'remove_tag';
+  etapaCrm?: string;
+  etiquetaId?: string;
+}): Promise<{ ok: true; atualizadas: number } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  const ids = dados.conversaIds.filter((id) => ehIdentificador(id));
+  if (ids.length === 0) return { ok: false, erro: 'Selecione ao menos uma conversa.' };
+
+  const { data, error } = await contexto.supabase.rpc('bulk_update_my_conversations', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_ids: ids,
+    p_action: dados.acao,
+    p_payload: {
+      ...(dados.etapaCrm ? { crm_stage: dados.etapaCrm } : {}),
+      ...(dados.etiquetaId ? { tag_id: dados.etiquetaId } : {}),
+    },
+  });
+  if (error) return { ok: false, erro: traduzirErroCrm(error.message) };
+  atualizarTelas();
+  return { ok: true, atualizadas: Number((data as { updated?: number } | null)?.updated ?? 0) };
+}
+
+export async function adicionarNotaConversa(dados: {
+  conversaId: string;
+  texto: string;
+}): Promise<{ ok: true; notaId: string } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.conversaId)) return { ok: false, erro: 'Conversa inválida.' };
+  const limpo = dados.texto?.trim() ?? '';
+  if (!limpo) return { ok: false, erro: 'Escreva a nota antes de salvar.' };
+
+  const { data, error } = await contexto.supabase.rpc('add_my_conversation_note', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_id: dados.conversaId,
+    p_body_text: limpo,
+  });
+  if (error || !data) return { ok: false, erro: traduzirErroCrm(error?.message ?? '') };
+  atualizarTelas();
+  return { ok: true, notaId: String((data as { id?: string }).id ?? '') };
+}
+
+export async function salvarEtiquetaCrm(dados: {
+  etiquetaId?: string | null;
+  nome: string;
+  cor: string;
+}): Promise<{ ok: true; id: string } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (dados.etiquetaId && !ehIdentificador(dados.etiquetaId)) return { ok: false, erro: 'Etiqueta inválida.' };
+
+  const { data, error } = await contexto.supabase.rpc('save_my_crm_tag', {
+    p_workspace_id: contexto.workspaceId,
+    p_tag_id: dados.etiquetaId ?? null,
+    p_name: dados.nome ?? '',
+    p_color: dados.cor ?? '#64748b',
+  });
+  if (error || !data) return { ok: false, erro: traduzirErroCrm(error?.message ?? '') };
+  atualizarTelas();
+  return { ok: true, id: String((data as { id?: string }).id ?? '') };
+}
+
+export async function excluirEtiquetaCrm(dados: { etiquetaId: string }): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.etiquetaId)) return { ok: false, erro: 'Etiqueta inválida.' };
+
+  const { error } = await contexto.supabase.rpc('delete_my_crm_tag', {
+    p_workspace_id: contexto.workspaceId,
+    p_tag_id: dados.etiquetaId,
+  });
+  if (error) return { ok: false, erro: traduzirErroCrm(error.message) };
+  atualizarTelas();
+  return { ok: true };
+}
+
+export async function alternarEtiquetaContato(dados: {
+  contatoId: string;
+  etiquetaId: string;
+  marcar: boolean;
+}): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.contatoId) || !ehIdentificador(dados.etiquetaId)) return { ok: false, erro: 'Dados inválidos.' };
+
+  const { error } = await contexto.supabase.rpc('toggle_my_contact_tag', {
+    p_workspace_id: contexto.workspaceId,
+    p_contact_id: dados.contatoId,
+    p_tag_id: dados.etiquetaId,
+    p_attach: Boolean(dados.marcar),
+  });
+  if (error) return { ok: false, erro: traduzirErroCrm(error.message) };
+  atualizarTelas();
+  return { ok: true };
+}
+
+export async function salvarRespostaRapida(dados: {
+  respostaId?: string | null;
+  atalho: string;
+  titulo: string;
+  texto: string;
+}): Promise<{ ok: true; id: string } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (dados.respostaId && !ehIdentificador(dados.respostaId)) return { ok: false, erro: 'Resposta rápida inválida.' };
+
+  const { data, error } = await contexto.supabase.rpc('save_my_quick_reply', {
+    p_workspace_id: contexto.workspaceId,
+    p_reply_id: dados.respostaId ?? null,
+    p_shortcut: dados.atalho ?? '',
+    p_title: dados.titulo ?? '',
+    p_body_text: dados.texto ?? '',
+  });
+  if (error || !data) return { ok: false, erro: traduzirErroCrm(error?.message ?? '') };
+  atualizarTelas();
+  return { ok: true, id: String((data as { id?: string }).id ?? '') };
+}
+
+export async function excluirRespostaRapida(dados: { respostaId: string }): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.respostaId)) return { ok: false, erro: 'Resposta rápida inválida.' };
+
+  const { error } = await contexto.supabase.rpc('delete_my_quick_reply', {
+    p_workspace_id: contexto.workspaceId,
+    p_reply_id: dados.respostaId,
+  });
+  if (error) return { ok: false, erro: traduzirErroCrm(error.message) };
+  atualizarTelas();
+  return { ok: true };
+}
+
+export async function agendarMensagem(dados: {
+  conversaId: string;
+  texto: string;
+  paraQuandoIso: string;
+}): Promise<{ ok: true; id: string } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.conversaId)) return { ok: false, erro: 'Conversa inválida.' };
+  const texto = validarTexto(dados.texto);
+  if (!texto) return { ok: false, erro: 'Escreva a mensagem (até 4.096 letras).' };
+  const data = new Date(dados.paraQuandoIso);
+  if (Number.isNaN(data.getTime())) return { ok: false, erro: 'Escolha uma data e hora válidas.' };
+
+  const { data: gravado, error } = await contexto.supabase.rpc('schedule_my_message', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_id: dados.conversaId,
+    p_body_text: texto,
+    p_scheduled_for: data.toISOString(),
+  });
+  if (error || !gravado) return { ok: false, erro: traduzirErroCrm(error?.message ?? '') };
+  atualizarTelas();
+  return { ok: true, id: String((gravado as { id?: string }).id ?? '') };
+}
+
+export async function cancelarMensagemAgendada(dados: { agendamentoId: string }): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.agendamentoId)) return { ok: false, erro: 'Agendamento inválido.' };
+
+  const { error } = await contexto.supabase.rpc('cancel_my_scheduled_message', {
+    p_workspace_id: contexto.workspaceId,
+    p_scheduled_id: dados.agendamentoId,
+  });
+  if (error) return { ok: false, erro: traduzirErroCrm(error.message) };
+  atualizarTelas();
+  return { ok: true };
+}
+
+export async function apagarContatoEConversa(dados: { contatoId: string }): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.contatoId)) return { ok: false, erro: 'Contato inválido.' };
+
+  const { data, error } = await contexto.supabase.rpc('delete_my_contact_and_conversation', {
+    p_workspace_id: contexto.workspaceId,
+    p_contact_id: dados.contatoId,
+  });
+  if (error || !data) return { ok: false, erro: traduzirErroCrm(error?.message ?? '') };
+
+  const chaves = ((data as { object_keys?: unknown } | null)?.object_keys ?? []) as string[];
+  if (Array.isArray(chaves) && chaves.length > 0) {
+    const validas = chaves.filter((c) => typeof c === 'string' && c.startsWith(`${contexto.workspaceId}/`));
+    if (validas.length > 0) {
+      await criarClienteDeServico()?.storage.from(DEPOSITO).remove(validas);
+    }
+  }
+  atualizarTelas();
+  return { ok: true };
+}

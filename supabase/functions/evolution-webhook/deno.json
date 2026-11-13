@@ -6,6 +6,7 @@
     "@/lib/atendente/atendente": "../../../web/src/lib/atendente/atendente.ts",
     "@/lib/atendente/dossie": "../../../web/src/lib/atendente/dossie.ts",
     "@/lib/atendente/regras": "../../../web/src/lib/atendente/regras.ts",
+    "@/lib/evolution/agendados": "../../../web/src/lib/evolution/agendados.ts",
     "@/lib/evolution/aviso": "../../../web/src/lib/evolution/aviso.ts",
     "@/lib/evolution/cliente": "../../../web/src/lib/evolution/cliente.ts",
     "@/lib/evolution/processar-aviso": "../../../web/src/lib/evolution/processar-aviso.ts",

@@ -1,19 +1,19 @@
 {
   "_leiame": "Retrato do esquema do banco REAL (Supabase, projeto \"ienvia-001\" da organização \"ienvia\"), tirado com impressao-digital.sql. O teste esquema.test.ts compara este retrato com o banco montado a partir das migrações do Git. Ao aplicar uma migração nova no banco real, rode o SQL lá de novo e atualize este arquivo. Em 12/11/2026 o banco mudou de projeto (o anterior, \"Ienvia\", ficava numa organização que estourou a cota e foi pausado): o banco novo foi remontado a partir das mesmas migrações e o retrato saiu idêntico.",
   "projeto": "rhcabqlwazvjcjjdknsc",
-  "tirado_em": "2026-11-12",
-  "ultima_migracao": "20261113120000_phase2_studio_and_admin_dossier.sql",
+  "tirado_em": "2026-11-13",
+  "ultima_migracao": "20261114120000_phase3_crm.sql",
   "categorias": {
-    "colunas": { "itens": 356, "md5": "12144e374ce4e14acfe34f99ae793fb8" },
+    "colunas": { "itens": 405, "md5": "6cfc12f42b1bd587ef3760609d4fd3f4" },
     "deposito": { "itens": 4, "md5": "f697288d0636e569f349b9df5579a799" },
-    "funcoes": { "itens": 79, "md5": "ccc70636680f09afeb1e1734ee35f69d" },
-    "gatilhos": { "itens": 20, "md5": "8e3a9b786e6cc22467621ed07a537754" },
-    "indices": { "itens": 105, "md5": "8bba74205628651519a05931a23d7497" },
+    "funcoes": { "itens": 103, "md5": "6c394c2fb59c026e32d617f3609ec6f7" },
+    "gatilhos": { "itens": 22, "md5": "10fa2ba0ca501c2dc393eb0e00db8de6" },
+    "indices": { "itens": 121, "md5": "5bcce6995ee4a0f415f1d25deb11878e" },
     "permissoes_coluna": { "itens": 30, "md5": "cbd42aac11146b02f106664ca2d43ad5" },
-    "permissoes_funcao": { "itens": 237, "md5": "04332b11806387e81ffa8a66f2b254cc" },
-    "permissoes_tabela": { "itens": 251, "md5": "89e5713b6e91c5532e74a9f021a8a95d" },
-    "politicas": { "itens": 33, "md5": "4517604e9cc0b370df18502b62b8252e" },
-    "restricoes": { "itens": 234, "md5": "2fc2ee6d6d937d05bb9de2c381e2918e" },
-    "rls_ligado": { "itens": 32, "md5": "a1baa68b47ab75d82f8b7249bc4bb427" }
+    "permissoes_funcao": { "itens": 309, "md5": "6d2fce6abd260170960c96c17e2494a4" },
+    "permissoes_tabela": { "itens": 291, "md5": "576d72932e6a3cc0b1e9769c56f6e391" },
+    "politicas": { "itens": 38, "md5": "e881bda36b4d7f021bfb6f150cef32a2" },
+    "restricoes": { "itens": 274, "md5": "cc2203a103afbd254bdb8ddc93b247e4" },
+    "rls_ligado": { "itens": 37, "md5": "263debd0dd53159fbe811fa850b78dc2" }
   }
 }

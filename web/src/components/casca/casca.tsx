@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import { Icone } from '@/components/ui/icone';
 import { ATALHOS_CELULAR, buscarItemPorRota, rotaEstaAtiva, type GrupoMenu, type ItemMenu } from '@/lib/navegacao';
 import type { ResumoDaIa } from '@/lib/atendente/painel';
+import { BuscaGlobal } from './busca-global';
 import { ControleDaIa } from './controle-da-ia';
 import { MenuDaConta } from './menu-da-conta';
 
@@ -162,6 +163,7 @@ export function Casca({ menu, usuario, workspace, conexao, ia, children }: Props
           </div>
 
           <div className="topbar-right">
+            <BuscaGlobal />
             <ControleDaIa ia={ia} />
             <button
               type="button"

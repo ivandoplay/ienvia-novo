@@ -1,5 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { atenderSobras, atenderVez, orcamentoDoAtendente } from '@/lib/atendente/atendente';
+import { processarAgendamentosVencidos } from '@/lib/evolution/agendados';
 import { interpretarAviso } from '@/lib/evolution/aviso';
 import { trazerArquivoDaMensagem } from '@/lib/inbox/buscar-arquivo';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
@@ -16,12 +17,29 @@ const CORPO_MAXIMO = 4_000_000;
 
 const responder = (status: number, corpo: Record<string, unknown>) => Response.json(corpo, { status });
 
+function segredoCronConfere(recebido: string | null): boolean {
+  const esperado = process.env.CRON_SECRET?.trim();
+  if (!recebido || !esperado) return false;
+  const a = createHash('sha256').update(recebido.trim()).digest();
+  const b = createHash('sha256').update(esperado).digest();
+  return timingSafeEqual(a, b);
+}
+
 export interface OpcoesDoAviso {
   agendar: (tarefa: () => Promise<void>) => void;
 }
 
 export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoAviso): Promise<Response> {
   const chegouEm = Date.now();
+  const cabecalhoCron = pedido.headers.get('x-ienvia-cron');
+  if (cabecalhoCron) {
+    if (!segredoCronConfere(cabecalhoCron)) return responder(401, { ok: false, erro: 'não autorizado' });
+    const supabase = criarClienteDeServico();
+    if (!supabase) return responder(503, { ok: false, erro: 'painel sem configuração de serviço' });
+    const resumo = await processarAgendamentosVencidos(supabase, 25);
+    return responder(200, { ok: true, resultado: 'cron', ...resumo });
+  }
+
   const segredo = /^Bearer\s+(\S+)$/i.exec(pedido.headers.get('authorization') ?? '')?.[1];
   if (!segredo || segredo.length > 200) return responder(401, { ok: false, erro: 'não autorizado' });
 

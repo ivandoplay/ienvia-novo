@@ -19,6 +19,8 @@ export interface AmbienteDoPorteiro {
   DESTINO_RESERVA?: string;
   /** Tempo máximo por tentativa, em milissegundos (padrão: 12000). */
   TIMEOUT_MS?: string;
+  /** Segredo compartilhado com o destino para disparar envios agendados a cada minuto. */
+  CRON_SECRET?: string;
 }
 
 const CORPO_MAXIMO = 4_000_000;
@@ -175,9 +177,40 @@ export async function atenderNoPorteiro(
   });
 }
 
+export async function dispararAgendamentosNoPorteiro(
+  env: AmbienteDoPorteiro,
+  buscar: typeof fetch = fetch,
+): Promise<boolean> {
+  const segredo = env.CRON_SECRET?.trim();
+  const destinos = listarDestinos(env);
+  if (!segredo || destinos.length === 0) return false;
+
+  const timeoutMs = timeoutDasTentativas(env);
+  for (const destino of destinos) {
+    try {
+      const resposta = await buscar(destino.url, {
+        method: 'POST',
+        headers: {
+          'x-ienvia-cron': segredo,
+          'content-type': 'application/json',
+        },
+        body: '{}',
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!deveTentarProximo(resposta.status)) return resposta.ok;
+    } catch {
+      // tenta o próximo destino
+    }
+  }
+  return false;
+}
+
 const worker = {
   fetch(pedido: Request, env: AmbienteDoPorteiro): Promise<Response> {
     return atenderNoPorteiro(pedido, env);
+  },
+  scheduled(_evento: unknown, env: AmbienteDoPorteiro, ctx: { waitUntil: (promessa: Promise<unknown>) => void }): void {
+    ctx.waitUntil(dispararAgendamentosNoPorteiro(env));
   },
 };
 

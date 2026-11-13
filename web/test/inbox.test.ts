@@ -3,20 +3,29 @@ import { ETAPAS_DO_FUNIL, somarEtapas } from '@/lib/dados/visao-geral';
 import {
   CONVERSAS_POR_PAGINA,
   MENSAGENS_POR_VEZ,
+  atalhoDeHorario,
   autorDoEnvio,
   carimboParaNomeDeArquivo,
+  deInputDateTimeLocal,
   descreverEtapa,
+  descreverEtapaCrm,
   diaDaConversa,
   ehChaveDeEnvio,
   enderecoDaInbox,
+  formatarReais,
   horaDaMensagem,
   iniciaisDoContato,
   intervaloDeNovidades,
+  lerAbaDoCrm,
   lerBusca,
+  lerEtapaDoKanban,
+  lerFiltroDeNegocio,
   lerLimite,
   lerLimiteDeMensagens,
   lerVisao,
+  limparAtalhoRapido,
   nomeDoContato,
+  normalizarValorMonetario,
   numeroParaEnvio,
   proximoLimite,
   proximoLimiteDeMensagens,
@@ -260,3 +269,51 @@ describe('etapas', () => {
     expect(somarEtapas(funil, ['new'])).toBe(4);
   });
 });
+
+describe('CRM na Inbox', () => {
+  test('visão arquivadas mapeia para "archived" e helpers de aba/etapa/negócio têm fallbacks seguros', () => {
+    expect(visaoNoBanco(lerVisao('arquivadas'))).toBe('archived');
+    expect(lerAbaDoCrm('contatos')).toBe('contatos');
+    expect(lerAbaDoCrm('kanban')).toBe('kanban');
+    expect(lerAbaDoCrm('desconhecida')).toBe('conversas');
+
+    expect(lerEtapaDoKanban('proposta')).toBe('proposta');
+    expect(lerEtapaDoKanban('invalida')).toBeNull();
+    expect(descreverEtapaCrm('qualificando').texto).toBe('Qualificando');
+
+    expect(lerFiltroDeNegocio('won')).toBe('won');
+    expect(lerFiltroDeNegocio('with_value')).toBe('with_value');
+    expect(lerFiltroDeNegocio('qualquer')).toBeNull();
+  });
+
+  test('normalização monetária e formatação em reais lidam com pt-BR e inválidos', () => {
+    expect(normalizarValorMonetario('1.250,50')).toBe(1250.5);
+    expect(normalizarValorMonetario('299.9')).toBe(299.9);
+    expect(normalizarValorMonetario('')).toBe(0);
+    expect(normalizarValorMonetario('abc')).toBe(0);
+    expect(formatarReais(1250.5)).toContain('1.250,50');
+  });
+
+  test('atalho rápido, agendamento e serialização de URL do CRM', () => {
+    expect(limparAtalhoRapido('  //Pix Loja ')).toBe('pix-loja');
+    expect(limparAtalhoRapido('')).toBe('');
+    expect(deInputDateTimeLocal('')).toBeNull();
+    expect(deInputDateTimeLocal('2026-12-01T14:30')).toBeTruthy();
+    expect(atalhoDeHorario('1h')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(atalhoDeHorario('amanha')).toMatch(/T09:00$/);
+
+    const url = enderecoDaInbox({
+      aba: 'kanban',
+      etiquetaId: 'vip-1',
+      negocio: 'with_value',
+      etapaCrm: 'proposta',
+      visao: 'arquivadas',
+    });
+    expect(url).toContain('aba=kanban');
+    expect(url).toContain('etiqueta=vip-1');
+    expect(url).toContain('negocio=with_value');
+    expect(url).toContain('etapa=proposta');
+    expect(url).toContain('ver=arquivadas');
+  });
+});
+

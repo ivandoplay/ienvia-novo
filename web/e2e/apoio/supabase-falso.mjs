@@ -31,6 +31,7 @@ import {
   criarTabelas,
   previaDaMensagem,
 } from './dados.mjs';
+import { FUNCOES_DO_CRM, criarCrmDoBanco } from './crm-no-banco-falso.mjs';
 import { FUNCOES_DA_IA, criarIaDoBanco } from './ia-no-banco-falso.mjs';
 
 const PORTA = Number(process.env.PORTA_SUPABASE_FALSO ?? 54399);
@@ -437,37 +438,28 @@ function acoesDaInbox(res, usuario, nome, corpo) {
         unread: (conversa) => conversa.unread_count > 0 && ETAPAS_ABERTAS.includes(conversa.stage),
         waiting: (conversa) => ETAPAS_QUE_ESPERAM.includes(conversa.stage),
         resolved: (conversa) => conversa.stage === 'resolved',
+        archived: (conversa) => conversa.stage === 'archived',
       };
       const filtro = filtros[corpo.p_view ?? 'open'];
       if (!filtro) return erro(400, '22023', 'Unsupported inbox view');
       conversas = conversas.filter(filtro);
     }
 
-    conversas = [...conversas].sort((a, b) => String(b.activity_at).localeCompare(String(a.activity_at)) || String(b.id).localeCompare(String(a.id)));
+    conversas = [...conversas].sort(
+      (a, b) =>
+        Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned)) ||
+        String(b.activity_at).localeCompare(String(a.activity_at)) ||
+        String(b.id).localeCompare(String(a.id)),
+    );
     const limite = limitar(corpo.p_limit, 50, 200);
     return responder(res, 200, {
-      conversations: conversas.slice(0, limite).map((conversa) => {
-        const contato = contatoDe(conversa);
-        return {
-          id: conversa.id,
-          stage: conversa.stage,
-          unread_count: conversa.unread_count ?? 0,
-          last_message_at: conversa.last_message_at ?? null,
-          last_message_preview: conversa.last_message_preview ?? null,
-          activity_at: conversa.activity_at ?? conversa.created_at ?? null,
-          automation_paused: conversa.automation_paused ?? false,
-          instance_id: conversa.instance_id,
-          instance_name: chipDe(conversa).display_name ?? null,
-          contact_id: conversa.contact_id,
-          contact_name: contato.display_name ?? '',
-          contact_phone: contato.phone_e164 ?? null,
-        };
-      }),
+      conversations: conversas.slice(0, limite).map((conversa) => crmDoBanco.enriquecerConversaParaLista(conversa, contatoDe(conversa), chipDe(conversa))),
       has_more: conversas.length > limite,
       counts: {
         unread: doChip.filter((conversa) => conversa.unread_count > 0 && ETAPAS_ABERTAS.includes(conversa.stage)).length,
         waiting: doChip.filter((conversa) => ETAPAS_QUE_ESPERAM.includes(conversa.stage)).length,
       },
+      archived_count: doChip.filter((conversa) => conversa.stage === 'archived').length,
     });
   }
 
@@ -489,20 +481,21 @@ function acoesDaInbox(res, usuario, nome, corpo) {
       conversation: {
         id: conversa.id,
         stage: conversa.stage,
+        crm_stage: conversa.crm_stage ?? 'novo',
+        deal_value: Number(conversa.deal_value ?? 0),
+        deal_status: conversa.deal_status ?? 'open',
+        deal_lost_reason: conversa.deal_lost_reason ?? null,
+        is_pinned: Boolean(conversa.is_pinned),
+        follow_up_at: conversa.follow_up_at ?? null,
         unread_count: conversa.unread_count ?? 0,
         automation_paused: conversa.automation_paused ?? false,
         created_at: conversa.created_at,
         last_message_at: conversa.last_message_at ?? null,
-        contact: {
-          id: contato.id,
-          display_name: contato.display_name ?? '',
-          phone_e164: contato.phone_e164 ?? null,
-          erased: Boolean(contato.erased_at),
-          created_at: contato.created_at,
-        },
+        contact: crmDoBanco.enriquecerContatoNaConversa(conversa, contato),
         instance: { id: chip.id, display_name: chip.display_name, status: chip.status, engine: chip.engine },
         ai: iaDaConversa(conversa, chip),
       },
+      ...crmDoBanco.extrasDaConversa(conversa, usuario),
       messages: mensagens
         .slice(0, limite)
         .reverse()
@@ -1108,6 +1101,7 @@ function reiniciarInbox() {
   avisosRecebidos.clear();
   subidasQueVaoFalhar = 0;
   pausasDaIa.delete(WORKSPACE_INBOX);
+  crmDoBanco.limparWorkspace(WORKSPACE_INBOX);
   anotarMudanca(WORKSPACE_INBOX);
 }
 
@@ -1145,6 +1139,8 @@ function receberMensagem(conversaId, texto) {
 
 /** O Motor de IA e o Treinamento (as regras estão em ia-no-banco-falso.mjs). */
 const iaDoBanco = criarIaDoBanco({ tabelas, responder });
+/** O CRM da Inbox (as regras estão em crm-no-banco-falso.mjs). */
+const crmDoBanco = criarCrmDoBanco({ tabelas, participacoes: PARTICIPACOES, responder, anotarMudanca, deposito });
 
 async function rotasDeDados(req, res, url) {
   const recurso = url.pathname.replace('/rest/v1/', '');
@@ -1161,6 +1157,10 @@ async function rotasDeDados(req, res, url) {
 
   if (req.method === 'POST' && FUNCOES_DA_INBOX.includes(recurso.slice(4)) && recurso.startsWith('rpc/')) {
     return acoesDaInbox(res, usuario, recurso.slice(4), await lerCorpo(req));
+  }
+
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DO_CRM.includes(recurso.slice(4))) {
+    return crmDoBanco.acoesDoCrm(res, usuario, recurso.slice(4), await lerCorpo(req));
   }
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DA_IA.includes(recurso.slice(4))) {
