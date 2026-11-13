@@ -394,11 +394,14 @@ export function criarTabelas() {
   return {
     // Os chips da Loja usam o motor local, para a tela de Instâncias não tentar conferi-los na Evolution.
     instances: [
-      daLoja({ id: CHIP_LOJA_COMERCIAL, display_name: 'Comercial', purpose: 'both', engine: 'baileys', status: 'connected', connected_phone: '+5585999990001', is_enabled: true, provider_instance_name: null, created_at: '2026-01-01T00:00:00Z' }),
-      daLoja({ id: 'c0000000-0000-4000-8000-000000000002', display_name: 'Suporte', purpose: 'attendance', engine: 'baileys', status: 'connected', connected_phone: '+5585999990002', is_enabled: false, provider_instance_name: null, created_at: '2026-01-02T00:00:00Z' }),
-      daLoja({ id: 'c0000000-0000-4000-8000-000000000003', display_name: 'Promoções', purpose: 'campaigns', engine: 'baileys', status: 'disconnected', connected_phone: null, is_enabled: false, provider_instance_name: null, created_at: '2026-01-03T00:00:00Z' }),
+      daLoja({ id: CHIP_LOJA_COMERCIAL, display_name: 'Comercial', purpose: 'both', engine: 'baileys', status: 'connected', connected_phone: '+5585999990001', is_enabled: true, provider_instance_name: null, local_executor_id: null, pairing_qr: null, pairing_code: null, created_at: '2026-01-01T00:00:00Z' }),
+      daLoja({ id: 'c0000000-0000-4000-8000-000000000002', display_name: 'Suporte', purpose: 'attendance', engine: 'baileys', status: 'connected', connected_phone: '+5585999990002', is_enabled: false, provider_instance_name: null, local_executor_id: null, pairing_qr: null, pairing_code: null, created_at: '2026-01-02T00:00:00Z' }),
+      daLoja({ id: 'c0000000-0000-4000-8000-000000000003', display_name: 'Promoções', purpose: 'campaigns', engine: 'baileys', status: 'disconnected', connected_phone: null, is_enabled: false, provider_instance_name: null, local_executor_id: null, pairing_qr: null, pairing_code: null, created_at: '2026-01-03T00:00:00Z' }),
       ...inbox.instances,
     ],
+    local_executors: [],
+    local_executor_tokens: [],
+    local_motor_commands: [],
     conversations: [...loja.conversas, ...inbox.conversations],
     message_attachments: [...inbox.message_attachments],
     campaigns: [

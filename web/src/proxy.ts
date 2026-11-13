@@ -78,7 +78,8 @@ export const config = {
   //    ali é o banco; passar por aqui custaria uma ida a mais ao Supabase a cada pergunta);
   //  - os arquivos da Inbox (fotos, áudios...): uma conversa pede vários de uma vez, e quem confere
   //    a pessoa é o depósito, a cada arquivo (src/app/api/inbox/midia);
+  //  - a API do Motor local (/api/motor/*: cada aparelho se autentica com seu próprio token ou código único);
   //  - a sonda simples de saúde (/api/saude), usada por Render e monitoramento externo;
   //  - /_deposito/, que só existe em desenvolvimento (ver next.config.ts).
-  matcher: ['/((?!api/saude|api/cron/|api/webhooks/|api/inbox/versao|api/inbox/midia/|_deposito/|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)'],
+  matcher: ['/((?!api/saude|api/cron/|api/webhooks/|api/motor/|api/inbox/versao|api/inbox/midia/|_deposito/|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$).*)'],
 };

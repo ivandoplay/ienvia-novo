@@ -258,6 +258,127 @@ function acoesDosChips(res, usuario, nome, corpo) {
     chip.is_enabled = false;
     return responder(res, 200, { id: chip.id, provider_instance_name: chip.provider_instance_name });
   }
+  return null;
+}
+
+const FUNCOES_DO_MOTOR_LOCAL = new Set([
+  'create_my_local_executor_pairing',
+  'rename_my_local_executor',
+  'revoke_my_local_executor',
+  'create_my_local_instance',
+  'request_my_local_instance_action',
+]);
+
+function acoesDoMotorLocal(res, usuario, nome, corpo) {
+  const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
+  const workspaceId = corpo.p_workspace_id;
+  const ehDono = PARTICIPACOES.some(
+    (p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.role === 'owner' && p.status === 'active',
+  );
+  if (!ehDono) return erro(403, '42501', 'Workspace owner required');
+
+  if (nome === 'create_my_local_executor_pairing') {
+    const id = crypto.randomUUID();
+    const agora = new Date().toISOString();
+    const exp = new Date(Date.now() + 15 * 60_000).toISOString();
+    const exec = {
+      id,
+      workspace_id: workspaceId,
+      owner_user_id: usuario.id,
+      display_name: String(corpo.p_display_name ?? '').trim(),
+      status: 'pending_pair',
+      platform: 'unknown',
+      motor_version: null,
+      last_seen_at: null,
+      paired_at: null,
+      revoked_at: null,
+      created_at: agora,
+    };
+    tabelas.local_executors.push(exec);
+    tabelas.local_executor_tokens.push({
+      executor_id: id,
+      workspace_id: workspaceId,
+      pairing_code_sha256: corpo.p_code_sha256,
+      pairing_expires_at: exp,
+      token_sha256: null,
+    });
+    return responder(res, 200, { id, display_name: exec.display_name, status: exec.status, expires_at: exp });
+  }
+
+  if (nome === 'rename_my_local_executor') {
+    const exec = tabelas.local_executors.find((e) => e.workspace_id === workspaceId && e.id === corpo.p_executor_id && e.status !== 'revoked');
+    if (!exec) return erro(400, 'P0002', 'Executor not found');
+    exec.display_name = String(corpo.p_display_name ?? '').trim();
+    return responder(res, 200, { id: exec.id, display_name: exec.display_name });
+  }
+
+  if (nome === 'revoke_my_local_executor') {
+    const exec = tabelas.local_executors.find((e) => e.workspace_id === workspaceId && e.id === corpo.p_executor_id && e.status !== 'revoked');
+    if (!exec) return erro(400, 'P0002', 'Executor not found');
+    exec.status = 'revoked';
+    exec.revoked_at = new Date().toISOString();
+    tabelas.local_executor_tokens = tabelas.local_executor_tokens.filter((t) => t.executor_id !== exec.id);
+    for (const chip of tabelas.instances) {
+      if (chip.workspace_id === workspaceId && chip.local_executor_id === exec.id && chip.status !== 'revoked') {
+        chip.status = 'disconnected';
+        chip.pairing_qr = null;
+        chip.pairing_code = null;
+      }
+    }
+    return responder(res, 200, { id: exec.id, status: exec.status });
+  }
+
+  if (nome === 'create_my_local_instance') {
+    const limite = WORKSPACES.find((w) => w.id === workspaceId)?.max_instances ?? 1;
+    const emUso = tabelas.instances.filter((c) => c.workspace_id === workspaceId && c.status !== 'revoked').length;
+    if (emUso >= limite) return erro(400, 'P0001', 'instance_limit_reached');
+    const exec = tabelas.local_executors.find((e) => e.workspace_id === workspaceId && e.id === corpo.p_executor_id && e.status !== 'revoked');
+    if (!exec) return erro(400, 'P0002', 'Executor not found');
+    const novo = {
+      id: crypto.randomUUID(),
+      workspace_id: workspaceId,
+      display_name: String(corpo.p_display_name ?? '').trim(),
+      purpose: corpo.p_purpose,
+      engine: 'baileys',
+      status: 'disconnected',
+      connected_phone: null,
+      is_enabled: false,
+      provider_instance_name: null,
+      local_executor_id: exec.id,
+      pairing_qr: null,
+      pairing_code: null,
+      created_at: new Date().toISOString(),
+    };
+    tabelas.instances.push(novo);
+    return responder(res, 200, { id: novo.id, display_name: novo.display_name, engine: novo.engine, local_executor_id: novo.local_executor_id });
+  }
+
+  if (nome === 'request_my_local_instance_action') {
+    const chip = tabelas.instances.find((c) => c.workspace_id === workspaceId && c.id === corpo.p_instance_id && c.engine === 'baileys' && c.status !== 'revoked');
+    if (!chip) return erro(400, 'P0002', 'Instance not found');
+    const exec = tabelas.local_executors.find((e) => e.workspace_id === workspaceId && e.id === chip.local_executor_id && e.status !== 'revoked');
+    if (!exec) return erro(400, 'P0001', 'executor_revoked');
+    if (corpo.p_command_type === 'connect_qr' || corpo.p_command_type === 'connect_code') {
+      chip.status = 'connecting';
+      chip.pairing_qr = null;
+      chip.pairing_code = null;
+    } else if (corpo.p_command_type === 'disconnect') {
+      chip.status = 'disconnected';
+    }
+    const cmd = {
+      id: crypto.randomUUID(),
+      workspace_id: workspaceId,
+      executor_id: exec.id,
+      instance_id: chip.id,
+      command_type: corpo.p_command_type,
+      payload: corpo.p_payload ?? {},
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+    tabelas.local_motor_commands.push(cmd);
+    return responder(res, 200, { command_id: cmd.id, status: cmd.status });
+  }
+
   return erro(404, 'PGRST202', `Função não imitada: ${nome}`);
 }
 
@@ -303,7 +424,16 @@ const FUNCOES_DA_INBOX = [
   'transition_workspace_conversation',
 ];
 /** Funções que só o servidor do painel chama (com a chave do servidor). */
-const FUNCOES_DO_SERVIDOR = ['ingest_evolution_message', 'begin_media_download', 'complete_media_download'];
+const FUNCOES_DO_SERVIDOR = [
+  'ingest_evolution_message',
+  'begin_media_download',
+  'complete_media_download',
+  'pair_local_executor_by_code',
+  'authenticate_local_executor_heartbeat',
+  'claim_local_motor_commands',
+  'report_local_instance_state',
+  'complete_local_motor_command',
+];
 
 const MB = 1024 * 1024;
 const CAMINHO_DE_ENVIO = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/envios\/[a-zA-Z0-9_-]{16,80}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
@@ -771,6 +901,73 @@ function acoesDaInbox(res, usuario, nome, corpo) {
  * (As regras de verdade estão em supabase/migrations e são testadas em supabase/tests/midia.test.ts.)
  */
 function acoesDoServidor(res, nome, corpo) {
+  if (nome === 'pair_local_executor_by_code') {
+    const tok = tabelas.local_executor_tokens.find(
+      (t) => t.pairing_code_sha256 && t.pairing_code_sha256 === corpo.p_code_sha256,
+    );
+    if (!tok) return responder(res, 200, { result: 'invalid_or_expired' });
+    const exec = tabelas.local_executors.find((e) => e.id === tok.executor_id && e.status === 'pending_pair');
+    if (!exec) return responder(res, 200, { result: 'invalid_or_expired' });
+    const agora = new Date().toISOString();
+    exec.status = 'active';
+    exec.platform = corpo.p_platform || 'linux';
+    exec.motor_version = corpo.p_version || null;
+    exec.paired_at = agora;
+    exec.last_seen_at = agora;
+    tok.pairing_code_sha256 = null;
+    tok.token_sha256 = corpo.p_token_sha256;
+    return responder(res, 200, {
+      result: 'paired',
+      executor_id: exec.id,
+      workspace_id: exec.workspace_id,
+      display_name: exec.display_name,
+      platform: exec.platform,
+      motor_version: exec.motor_version,
+    });
+  }
+
+  if (nome === 'authenticate_local_executor_heartbeat') {
+    const tok = tabelas.local_executor_tokens.find((t) => t.token_sha256 && t.token_sha256 === corpo.p_token_sha256);
+    const exec = tok ? tabelas.local_executors.find((e) => e.id === tok.executor_id && e.status !== 'revoked') : null;
+    if (!exec) return responder(res, 200, { result: 'unauthorized' });
+    exec.status = 'active';
+    exec.last_seen_at = new Date().toISOString();
+    if (corpo.p_platform) exec.platform = corpo.p_platform;
+    if (corpo.p_version) exec.motor_version = corpo.p_version;
+    return responder(res, 200, { result: 'ok', executor_id: exec.id, workspace_id: exec.workspace_id });
+  }
+
+  if (nome === 'claim_local_motor_commands') {
+    const tok = tabelas.local_executor_tokens.find((t) => t.token_sha256 && t.token_sha256 === corpo.p_token_sha256);
+    const exec = tok ? tabelas.local_executors.find((e) => e.id === tok.executor_id && e.status !== 'revoked') : null;
+    if (!exec) return responder(res, 200, { result: 'unauthorized' });
+    const comandos = tabelas.local_motor_commands.filter((c) => c.executor_id === exec.id && c.status === 'pending');
+    for (const c of comandos) c.status = 'leased';
+    return responder(res, 200, { result: 'ok', commands: comandos });
+  }
+
+  if (nome === 'report_local_instance_state') {
+    const tok = tabelas.local_executor_tokens.find((t) => t.token_sha256 && t.token_sha256 === corpo.p_token_sha256);
+    const exec = tok ? tabelas.local_executors.find((e) => e.id === tok.executor_id && e.status !== 'revoked') : null;
+    if (!exec) return responder(res, 200, { result: 'unauthorized' });
+    const chip = tabelas.instances.find((c) => c.id === corpo.p_instance_id && c.local_executor_id === exec.id && c.status !== 'revoked');
+    if (!chip) return responder(res, 200, { result: 'instance_not_found' });
+    chip.status = corpo.p_status;
+    if (corpo.p_connected_phone !== undefined) chip.connected_phone = corpo.p_connected_phone;
+    if (corpo.p_pairing_qr !== undefined) chip.pairing_qr = corpo.p_pairing_qr;
+    if (corpo.p_pairing_code !== undefined) chip.pairing_code = corpo.p_pairing_code;
+    return responder(res, 200, { result: 'ok', status: chip.status });
+  }
+
+  if (nome === 'complete_local_motor_command') {
+    const tok = tabelas.local_executor_tokens.find((t) => t.token_sha256 && t.token_sha256 === corpo.p_token_sha256);
+    const exec = tok ? tabelas.local_executors.find((e) => e.id === tok.executor_id && e.status !== 'revoked') : null;
+    if (!exec) return responder(res, 200, { result: 'unauthorized' });
+    const cmd = tabelas.local_motor_commands.find((c) => c.id === corpo.p_command_id && c.executor_id === exec.id);
+    if (cmd) cmd.status = corpo.p_outcome === 'succeeded' || corpo.p_outcome === 'sent' ? 'succeeded' : 'failed';
+    return responder(res, 200, { result: 'ok' });
+  }
+
   if (nome === 'ingest_evolution_message') {
     const chip = tabelas.instances.find(
       (item) => item.provider_instance_name === corpo.p_instance_name && item.engine === 'evolution' && item.status !== 'revoked',
@@ -1172,7 +1369,12 @@ async function rotasDeDados(req, res, url) {
   }
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && recurso !== 'rpc/is_my_platform_master') {
-    return acoesDosChips(res, usuario, recurso.slice(4), await lerCorpo(req));
+    const corpo = await lerCorpo(req);
+    const fn = recurso.slice(4);
+    if (FUNCOES_DO_MOTOR_LOCAL.has(fn)) {
+      return acoesDoMotorLocal(res, usuario, fn, corpo);
+    }
+    return acoesDosChips(res, usuario, fn, corpo);
   }
 
   if (req.method === 'POST' && recurso === 'rpc/is_my_platform_master') {
@@ -1223,9 +1425,12 @@ const servidor = http.createServer(async (req, res) => {
   try {
     if (url.pathname === '/saude') return responder(res, 200, { ok: true });
     if (url.pathname === '/controle/reiniciar-chips') {
-      // Só para os testes: apaga os chips de uma empresa, para cada teste começar do zero.
+      // Só para os testes: apaga os chips e executores de uma empresa, para cada teste começar do zero.
       const workspace = url.searchParams.get('workspace');
       tabelas.instances = tabelas.instances.filter((chip) => chip.workspace_id !== workspace);
+      tabelas.local_executors = tabelas.local_executors.filter((e) => e.workspace_id !== workspace);
+      tabelas.local_executor_tokens = tabelas.local_executor_tokens.filter((t) => t.workspace_id !== workspace);
+      tabelas.local_motor_commands = tabelas.local_motor_commands.filter((c) => c.workspace_id !== workspace);
       return responder(res, 200, { ok: true });
     }
     if (url.pathname === '/controle/reiniciar-inbox') {

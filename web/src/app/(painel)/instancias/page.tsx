@@ -14,11 +14,15 @@ export default async function PaginaDeInstancias() {
   // Sem login ou sem workspace, a moldura do painel já mostrou a tela certa.
   if (!workspace) return null;
 
-  const [{ chips, falhou }, ia] = await Promise.all([listarChips(workspace.id), carregarResumoDaIa(workspace.id)]);
+  const [{ chips, executores, falhou }, ia] = await Promise.all([
+    listarChips(workspace.id),
+    carregarResumoDaIa(workspace.id),
+  ]);
 
   return (
     <PainelDeChips
       chips={chips}
+      executores={executores}
       limite={workspace.limiteDeChips}
       podeEditar={workspace.papel === 'owner'}
       evolutionConfigurada={lerConfigEvolution() !== null}

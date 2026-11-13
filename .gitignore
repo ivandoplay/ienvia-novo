@@ -26,7 +26,9 @@ Thumbs.db
 .idea/
 *.log
 
-# Vercel / Supabase local
+# Vercel / Supabase local / Motor runtime
 .vercel/
 supabase/.temp/
 supabase/.branches/
+motor/data/
+motor/.runtime/

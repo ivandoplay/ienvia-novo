@@ -587,6 +587,10 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
       }
       return fim(enviados > 0 ? { desfecho: 'respondeu', baloes: enviados, provedor: usado } : { desfecho: 'nada', motivo });
     }
+    if (resultado === 'queued_local') {
+      enviados += 1;
+      continue;
+    }
     if (resultado !== 'started') {
       // Este balão já tinha sido começado por outro pedido. Não dá para saber se saiu: nunca envia de novo.
       await fechar(vez, 'uncertain_send', { detalhe: 'part_already_started', recado: RECADO_DO_ENVIO_INCERTO });

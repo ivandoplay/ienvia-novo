@@ -93,6 +93,8 @@ interface InicioDoEnvio {
   message_id: string;
   status: string;
   already_exists: boolean;
+  engine?: 'evolution' | 'baileys';
+  command_id?: string;
   provider_instance_name?: string;
   recipient?: string;
   body_text?: string;
@@ -134,6 +136,12 @@ export async function enviarMensagem(dados: { conversaId: string; texto: string;
   // 2) Pedido repetido: devolve o que já existe. Nada é enviado de novo.
   if (mensagem.already_exists) {
     return { ok: true, mensagemId: mensagem.message_id, situacao: situacaoPeloBanco(mensagem.status) };
+  }
+
+  // 2b) Chip Baileys (Motor local): o envio já foi enfileirado atomicamente no banco para o aparelho local.
+  if (mensagem.engine === 'baileys') {
+    atualizarTelas();
+    return { ok: true, mensagemId: mensagem.message_id, situacao: 'enviando' };
   }
 
   // 3) Uma única chamada à Evolution.
@@ -329,6 +337,12 @@ export async function enviarArquivo(dados: {
   // 2) Pedido repetido: devolve o que já existe. Nada é enviado de novo.
   if (mensagem.already_exists) {
     return { ok: true, mensagemId: mensagem.message_id, situacao: situacaoPeloBanco(mensagem.status) };
+  }
+
+  // 2b) Chip Baileys (Motor local): o aparelho buscará o arquivo diretamente via /api/motor/midia.
+  if (mensagem.engine === 'baileys') {
+    atualizarTelas();
+    return { ok: true, mensagemId: mensagem.message_id, situacao: 'enviando' };
   }
 
   // 3) O servidor lê o arquivo no depósito (com a sessão da pessoa)...

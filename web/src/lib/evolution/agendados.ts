@@ -9,6 +9,7 @@ interface ItemAgendado {
   workspace_id: string;
   conversation_id: string;
   message_id: string;
+  engine?: 'evolution' | 'baileys';
   provider_instance_name: string | null;
   recipient: string | null;
   body_text: string;
@@ -35,6 +36,10 @@ export async function processarAgendamentosVencidos(
 
   for (const item of data as ItemAgendado[]) {
     resumo.processados += 1;
+    if (item.engine === 'baileys') {
+      resumo.enviados += 1;
+      continue;
+    }
     const numero = numeroParaEnvio(item.recipient);
     const instancia = item.provider_instance_name?.trim() || '';
     if (!numero || !instancia) {

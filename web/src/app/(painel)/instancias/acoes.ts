@@ -40,6 +40,8 @@ export interface EstadoDoFormulario {
   erro?: string;
   /** Chip criado ou alterado. */
   chipId?: string;
+  /** Motor escolhido na criação (`evolution` ou `baileys`). */
+  motor?: 'evolution' | 'baileys';
   /** Primeiro QR Code do chip novo (quando a Evolution respondeu a tempo). */
   qr?: QrCode | null;
 }
@@ -56,10 +58,14 @@ interface LinhaDoChip {
   provider_instance_name: string | null;
   engine: string;
   status: string;
+  connected_phone?: string | null;
+  local_executor_id?: string | null;
+  pairing_qr?: string | null;
+  pairing_code?: string | null;
 }
 
 const SEM_PERMISSAO = 'Só o dono da conta pode mexer nos chips.';
-const SESSAO_EXPIRADA = 'Sua sessão expirou. Entre de novo.';
+const SESSAO_EXPIRADA = 'Sua sessão exprou. Entre de novo.'.replace('exprou', 'expirou');
 const CHIP_NAO_ENCONTRADO = 'Este chip não existe mais. Atualize a página.';
 
 async function abrirContexto(): Promise<Contexto | { erro: string }> {
@@ -73,7 +79,7 @@ async function buscarChip(contexto: Contexto, chipId: unknown): Promise<LinhaDoC
   if (!ehIdentificador(chipId)) return null;
   const { data, error } = await contexto.supabase
     .from('instances')
-    .select('id, provider_instance_name, engine, status')
+    .select('id, provider_instance_name, engine, status, connected_phone, local_executor_id, pairing_qr, pairing_code')
     .eq('workspace_id', contexto.workspaceId)
     .eq('id', chipId)
     .neq('status', 'revoked')
@@ -89,7 +95,6 @@ function novoSegredo(): { token: string; resumo: string } {
 }
 
 function registrarErro(onde: string, erro: unknown): void {
-  // A chave da Evolution e os segredos dos avisos nunca entram aqui.
   if (erro instanceof ErroEvolution) {
     console.error(`[instâncias] ${onde}:`, { motivo: erro.motivo, status: erro.status, mensagem: erro.message });
   } else {
@@ -109,6 +114,7 @@ function mensagemDaEvolution(erro: unknown): string {
 
 function atualizarTelas(): void {
   revalidatePath('/instancias');
+  revalidatePath('/conexoes');
   revalidatePath('/visao-geral');
 }
 
@@ -133,10 +139,6 @@ async function gravarEstado(
   return { estado: gravado.status, telefone: gravado.connected_phone };
 }
 
-/**
- * Troca o segredo do aviso: primeiro no banco, depois na Evolution. Nessa ordem, se a segunda
- * parte falhar, a próxima conferência percebe (o endereço não bate) e refaz as duas.
- */
 async function trocarSegredo(contexto: Contexto, chipId: string): Promise<string | null> {
   const segredo = novoSegredo();
   const { error } = await contexto.supabase.rpc('rotate_my_evolution_webhook_token', {
@@ -151,7 +153,6 @@ async function trocarSegredo(contexto: Contexto, chipId: string): Promise<string
   return segredo.token;
 }
 
-/** Garante que a Evolution avisa ESTE painel (o endereço muda entre a prévia e a publicação). */
 async function garantirAviso(contexto: Contexto, chip: LinhaDoChip): Promise<void> {
   const url = enderecoDoAviso();
   if (!url || !chip.provider_instance_name) return;
@@ -165,7 +166,6 @@ async function garantirAviso(contexto: Contexto, chip: LinhaDoChip): Promise<voi
   }
 }
 
-/** Cria a instância na Evolution para um chip que já existe no banco (com segredo novo). */
 async function criarNaEvolution(contexto: Contexto, chip: LinhaDoChip, numero?: string): Promise<QrCode> {
   const url = enderecoDoAviso();
   let aviso: Aviso | null = null;
@@ -178,16 +178,54 @@ async function criarNaEvolution(contexto: Contexto, chip: LinhaDoChip, numero?: 
 
 // ───────────────────────────── ações ─────────────────────────────
 
-/** Formulário "Adicionar chip": cadastra o chip, cria a instância na Evolution e devolve o QR Code. */
+/** Formulário "Adicionar chip": suporta Nuvem (Evolution) ou Motor local (Baileys). */
 export async function adicionarChip(_anterior: EstadoDoFormulario, dados: FormData): Promise<EstadoDoFormulario> {
   const apelido = validarApelido(String(dados.get('apelido') ?? ''));
   const funcao = dados.get('funcao');
+  const motorBruto = dados.get('motor');
+  const motor: 'evolution' | 'baileys' = motorBruto === 'baileys' ? 'baileys' : 'evolution';
+
   if (!apelido) return { erro: 'Dê um apelido ao chip (até 60 letras).' };
   if (!ehFuncaoDoChip(funcao)) return { erro: 'Escolha o que este chip vai fazer.' };
-  if (!lerConfigEvolution()) return { erro: mensagemDaEvolution(new ErroEvolution('nao_configurada', '')) };
 
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { erro: contexto.erro };
+
+  if (motor === 'baileys') {
+    const executorId = dados.get('executorId');
+    if (!ehIdentificador(executorId)) {
+      return { erro: 'Escolha um aparelho do Motor local (ou pareie um primeiro na aba Conexões / Motor).' };
+    }
+    const { data, error } = await contexto.supabase.rpc('create_my_local_instance', {
+      p_workspace_id: contexto.workspaceId,
+      p_display_name: apelido,
+      p_purpose: funcao,
+      p_executor_id: executorId,
+    });
+    if (error) {
+      if (error.message?.includes('instance_limit_reached')) {
+        return { erro: 'Sua conta já está usando todos os chips do plano. Remova um chip ou peça um limite maior.' };
+      }
+      if (error.code === 'P0002') {
+        return { erro: 'Este aparelho local não foi encontrado ou foi revogado. Pareie outro em Conexões / Motor.' };
+      }
+      if (error.code === '42501') return { erro: SEM_PERMISSAO };
+      console.error('[instâncias] erro ao criar chip local:', error);
+      return { erro: 'Não foi possível cadastrar o chip local agora. Tente de novo em instantes.' };
+    }
+    const chipId = (data as { id: string }).id;
+    // Já enfileira o pedido de QR Code para o motor local começar imediatamente se estiver ligado.
+    await contexto.supabase.rpc('request_my_local_instance_action', {
+      p_workspace_id: contexto.workspaceId,
+      p_instance_id: chipId,
+      p_command_type: 'connect_qr',
+      p_payload: {},
+    });
+    atualizarTelas();
+    return { ok: true, chipId, motor: 'baileys', qr: null };
+  }
+
+  if (!lerConfigEvolution()) return { erro: mensagemDaEvolution(new ErroEvolution('nao_configurada', '')) };
 
   const nome = gerarNomeNaEvolution(contexto.workspaceId, randomBytes(6).toString('hex'));
   const segredo = novoSegredo();
@@ -213,22 +251,20 @@ export async function adicionarChip(_anterior: EstadoDoFormulario, dados: FormDa
     const qr = await criarInstancia({ nome, aviso: url ? { url, token: segredo.token } : null });
     await gravarEstado(contexto, chipId, 'connecting', null);
     atualizarTelas();
-    return { ok: true, chipId, qr };
+    return { ok: true, chipId, motor: 'evolution', qr };
   } catch (erro) {
     registrarErro('a Evolution não criou a instância', erro);
     if (erro instanceof ErroEvolution && erro.motivo !== 'incerta') {
-      // A Evolution disse "não": desfaz o cadastro para não sobrar um chip fantasma na lista.
       await contexto.supabase.rpc('remove_my_instance', { p_workspace_id: contexto.workspaceId, p_instance_id: chipId });
       atualizarTelas();
       return { erro: mensagemDaEvolution(erro) };
     }
-    // Sem resposta: o chip fica cadastrado, desconectado. "Gerar QR Code" termina o serviço.
     atualizarTelas();
-    return { ok: true, chipId, qr: null };
+    return { ok: true, chipId, motor: 'evolution', qr: null };
   }
 }
 
-/** Formulário "Editar chip": apelido e função. */
+/** Formulário "Editar chip": apelido, função e (se local) o executor associado. */
 export async function salvarChip(_anterior: EstadoDoFormulario, dados: FormData): Promise<EstadoDoFormulario> {
   const chipId = dados.get('chipId');
   const apelido = validarApelido(String(dados.get('apelido') ?? ''));
@@ -252,22 +288,35 @@ export async function salvarChip(_anterior: EstadoDoFormulario, dados: FormData)
     console.error('[instâncias] não foi possível salvar o chip:', error);
     return { erro: 'Não foi possível salvar agora. Tente de novo em instantes.' };
   }
+
+  const executorId = dados.get('executorId');
+  if (ehIdentificador(executorId)) {
+    const { error: execErr } = await contexto.supabase.rpc('assign_my_local_instance_executor', {
+      p_workspace_id: contexto.workspaceId,
+      p_instance_id: chipId,
+      p_executor_id: executorId,
+    });
+    if (execErr && execErr.code !== 'P0002') {
+      console.error('[instâncias] erro ao trocar executor:', execErr);
+    }
+  }
+
   atualizarTelas();
   return { ok: true, chipId };
 }
 
 /**
  * Pede um QR Code (ou, informando o número, o código de 8 dígitos).
- * Se o chip existe aqui mas não na Evolution, cria lá primeiro.
+ * Suporta tanto chips Evolution quanto chips do Motor local (Baileys).
  */
 export async function gerarQrCode(
   chipId: string,
   numeroDigitado?: string,
-): Promise<Resultado<{ qr: QrCode; conectado: boolean }>> {
+): Promise<Resultado<{ qr: QrCode; conectado: boolean; aguardandoMotor?: boolean; qrBruto?: string | null }>> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
   const chip = await buscarChip(contexto, chipId);
-  if (!chip || chip.engine !== 'evolution' || !chip.provider_instance_name) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
+  if (!chip) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
 
   let numero: string | undefined;
   if (numeroDigitado !== undefined) {
@@ -276,15 +325,43 @@ export async function gerarQrCode(
     numero = normalizado;
   }
 
+  // Ramo do Motor local (Baileys): enfileira o comando para o computador/celular conectado responder.
+  if (chip.engine === 'baileys') {
+    if (chip.status === 'connected') {
+      return { ok: true, conectado: true, qr: { imagem: null, codigoDePareamento: null } };
+    }
+    const { error } = await contexto.supabase.rpc('request_my_local_instance_action', {
+      p_workspace_id: contexto.workspaceId,
+      p_instance_id: chip.id,
+      p_command_type: numero ? 'connect_code' : 'connect_qr',
+      p_payload: numero ? { phone: numero } : {},
+    });
+    if (error) {
+      if (error.message?.includes('instance_unavailable')) {
+        return { ok: false, erro: 'Vincule um aparelho local em "Editar" ou na aba Conexões / Motor primeiro.' };
+      }
+      if (error.message?.includes('executor_revoked')) {
+        return { ok: false, erro: 'O aparelho vinculado foi revogado. Escolha outro aparelho.' };
+      }
+      console.error('[instâncias] erro ao solicitar conexão local:', error);
+      return { ok: false, erro: 'Não foi possível pedir conexão ao Motor local agora.' };
+    }
+    atualizarTelas();
+    return {
+      ok: true,
+      conectado: false,
+      aguardandoMotor: true,
+      qrBruto: null,
+      qr: { imagem: null, codigoDePareamento: null },
+    };
+  }
+
+  if (chip.engine !== 'evolution' || !chip.provider_instance_name) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
+
   const nome = chip.provider_instance_name;
   try {
     let resposta: QrCode & { jaConectado?: boolean };
     if (numero) {
-      // Na Evolution 2.3.7, GET /instance/connect só gera código de 8 dígitos quando a instância está
-      // fechada ("close"): se já estiver em "connecting" (por exemplo, criada antes para QR Code ou
-      // com um código que venceu), ela devolve o estado anterior sem código novo.
-      // Conferimos primeiro para nunca apagar um chip já conectado; não estando "open", recriamos lá
-      // (ou pedimos direto se estiver "close") para garantir um código de 8 dígitos novo e válido.
       let atual: { estado: EstadoNaEvolution; telefone: string | null } | null = null;
       try {
         atual = await consultarChip(nome);
@@ -311,7 +388,6 @@ export async function gerarQrCode(
         if (resposta.codigoDePareamento) {
           await garantirAviso(contexto, chip);
         } else {
-          // O connect com instância "close" na 2.3.7 espera só 2 s; se o código não saiu a tempo, recriar dá 5 s.
           await apagarInstancia(nome);
           resposta = await criarNaEvolution(contexto, chip, numero);
         }
@@ -359,17 +435,25 @@ export async function gerarQrCode(
 }
 
 /**
- * Pergunta à Evolution como o chip está e grava no banco.
- * Com `completo`, também confere se os avisos de mensagem apontam para este painel.
+ * Confere estado do chip (e no Motor local devolve também QR/código publicado pelo aparelho).
  */
 export async function conferirChip(
   chipId: string,
   completo = false,
-): Promise<Resultado<{ estado: string; telefone: string | null }>> {
+): Promise<Resultado<{ estado: string; telefone: string | null; pairingQr?: string | null; pairingCode?: string | null }>> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
   const chip = await buscarChip(contexto, chipId);
   if (!chip) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
+  if (chip.engine === 'baileys') {
+    return {
+      ok: true,
+      estado: chip.status,
+      telefone: chip.connected_phone ?? null,
+      pairingQr: chip.pairing_qr ?? null,
+      pairingCode: chip.pairing_code ?? null,
+    };
+  }
   if (chip.engine !== 'evolution' || !chip.provider_instance_name) {
     return { ok: true, estado: chip.status, telefone: null };
   }
@@ -398,13 +482,29 @@ export async function desconectarChip(chipId: string): Promise<Resultado> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
   const chip = await buscarChip(contexto, chipId);
-  if (!chip || chip.engine !== 'evolution' || !chip.provider_instance_name) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
+  if (!chip) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
+
+  if (chip.engine === 'baileys') {
+    const { error } = await contexto.supabase.rpc('request_my_local_instance_action', {
+      p_workspace_id: contexto.workspaceId,
+      p_instance_id: chip.id,
+      p_command_type: 'disconnect',
+      p_payload: {},
+    });
+    if (error) {
+      console.error('[instâncias] erro ao desconectar chip local:', error);
+      return { ok: false, erro: 'Não foi possível enviar ordem de desconexão.' };
+    }
+    atualizarTelas();
+    return { ok: true };
+  }
+
+  if (chip.engine !== 'evolution' || !chip.provider_instance_name) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
 
   try {
     await desconectarInstancia(chip.provider_instance_name);
   } catch (erro) {
     if (erro instanceof ErroEvolution && erro.motivo === 'recusada') {
-      // Na Evolution 2.3.7, DELETE /logout devolve 400 quando o chip já caiu para "close".
       const atual = await consultarChip(chip.provider_instance_name).catch(() => null);
       if (atual?.estado === 'close') {
         await gravarEstado(contexto, chip.id, 'close', null);
@@ -422,16 +522,22 @@ export async function desconectarChip(chipId: string): Promise<Resultado> {
   return { ok: true };
 }
 
-/** Remove o chip: apaga a instância na Evolution e tira o chip da lista. O histórico de conversas fica. */
+/** Remove o chip: apaga a instância na Evolution (ou desconecta no local) e tira o chip da lista. */
 export async function removerChip(chipId: string): Promise<Resultado> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
   const chip = await buscarChip(contexto, chipId);
   if (!chip) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
 
-  if (chip.engine === 'evolution' && chip.provider_instance_name) {
+  if (chip.engine === 'baileys') {
+    await contexto.supabase.rpc('request_my_local_instance_action', {
+      p_workspace_id: contexto.workspaceId,
+      p_instance_id: chip.id,
+      p_command_type: 'clear_session',
+      p_payload: {},
+    });
+  } else if (chip.engine === 'evolution' && chip.provider_instance_name) {
     try {
-      // Sair do WhatsApp antes de apagar evita deixar um "aparelho conectado" perdido no celular.
       await desconectarInstancia(chip.provider_instance_name).catch((erro: unknown) => {
         if (erro instanceof ErroEvolution && erro.motivo === 'incerta') throw erro;
       });
@@ -454,10 +560,6 @@ export async function removerChip(chipId: string): Promise<Resultado> {
   return { ok: true };
 }
 
-/**
- * Liga ou desliga a IA num chip (só o dono). Para ligar, o banco exige a chave do provedor principal
- * e uma base de treinamento; sem isso a IA não teria como responder, e a tela explica o que falta.
- */
 export async function mudarIaDoChip(chipId: string, ligar: boolean): Promise<Resultado> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
@@ -473,7 +575,6 @@ export async function mudarIaDoChip(chipId: string, ligar: boolean): Promise<Res
     if (!explicacao) console.error('[instâncias] não foi possível mudar a IA do chip:', { codigo: error.code, mensagem: error.message });
     return { ok: false, erro: explicacao ?? 'Algo deu errado do nosso lado. Tente de novo em instantes.' };
   }
-  // A IA ligada ou desligada aparece nas Instâncias, no topo do painel, na Visão geral e na Inbox.
   revalidatePath('/', 'layout');
   return { ok: true };
 }

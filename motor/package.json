@@ -1,0 +1,19 @@
+{
+  "name": "@ienvia/motor",
+  "version": "6.0.0",
+  "description": "Motor local do Ienvia — executa WhatsApp (Baileys) no PC ou Android/Termux com pareamento seguro e atualizações assinadas.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

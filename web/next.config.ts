@@ -39,6 +39,10 @@ const config: NextConfig = {
   transpilePackages: ['@ienvia/shared'],
   // A raiz do repositório (uma pasta acima) é a raiz do monorepo.
   outputFileTracingRoot: path.join(__dirname, '..'),
+  outputFileTracingIncludes: {
+    '/api/motor/pacote': ['../motor/package.json', '../motor/src/**/*', '../motor/scripts/**/*'],
+    '/api/motor/versao': ['../motor/package.json', '../motor/src/**/*', '../motor/scripts/**/*'],
+  },
   turbopack: { root: path.join(__dirname, '..') },
   allowedDevOrigins: origensDev,
   // Em desenvolvimento, o Next escreve no terminal cada ação do servidor COM os argumentos. Aqui os

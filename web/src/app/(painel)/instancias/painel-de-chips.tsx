@@ -3,11 +3,12 @@
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import { Interruptor } from '@/components/ui/interruptor';
 import type { ResumoDaIa } from '@/lib/atendente/painel';
-import type { Chip } from '@/lib/dados/instancias';
+import type { Chip, ExecutorResumo } from '@/lib/dados/instancias';
 import {
   FUNCOES_DO_CHIP,
   descreverEstado,
@@ -28,6 +29,7 @@ import {
 
 interface Props {
   chips: Chip[];
+  executores?: ExecutorResumo[];
   /** Quantos chips a conta pode ter. */
   limite: number;
   /** Só o dono da conta mexe nos chips. */
@@ -42,11 +44,13 @@ interface Props {
 /** O que está sendo mostrado para conectar um chip: a imagem do QR Code ou o código de 8 dígitos. */
 interface Conexao {
   chipId: string;
+  motor: Chip['motor'];
   imagem: string | null;
   codigo: string | null;
   /** Quantas vezes o QR Code já foi renovado sozinho. */
   renovacoes: number;
   expirou: boolean;
+  aguardandoMotor?: boolean;
 }
 
 interface Recado {
@@ -56,13 +60,30 @@ interface Recado {
 
 type Janela = { tipo: 'novo' } | { tipo: 'editar'; chip: Chip } | { tipo: 'remover'; chip: Chip } | null;
 
-/** De quanto em quanto tempo perguntamos se o chip já conectou. */
 const INTERVALO_DE_CONFERENCIA = 3_000;
-/** O WhatsApp troca o QR Code de tempos em tempos; renovamos antes de ele vencer. */
+const INTERVALO_LOCAL = 2_000;
 const VALIDADE_DO_QR = 35_000;
 const RENOVACOES_MAXIMAS = 5;
 
-export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada, temEnderecoPublico, falhouAoCarregar, ia }: Props) {
+async function qrParaDataUrl(bruto: string): Promise<string | null> {
+  if (bruto.startsWith('data:image/')) return bruto;
+  try {
+    return await QRCode.toDataURL(bruto, { width: 208, margin: 1 });
+  } catch {
+    return null;
+  }
+}
+
+export function PainelDeChips({
+  chips,
+  executores = [],
+  limite,
+  podeEditar,
+  evolutionConfigurada,
+  temEnderecoPublico,
+  falhouAoCarregar,
+  ia,
+}: Props) {
   const router = useRouter();
   const [janela, setJanela] = useState<Janela>(null);
   const [conexao, setConexao] = useState<Conexao | null>(null);
@@ -70,8 +91,12 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [, iniciar] = useTransition();
 
-  const podeAdicionar = podeEditar && evolutionConfigurada && chips.length < limite;
-  const idsDosChips = chips.map((chip) => chip.id).join(',');
+  const podeCriarAlgumChip = evolutionConfigurada || executores.length > 0;
+  const podeAdicionar = podeEditar && podeCriarAlgumChip && chips.length < limite;
+  const idsEvolution = chips
+    .filter((c) => c.motor === 'evolution')
+    .map((chip) => chip.id)
+    .join(',');
 
   const avisar = (chipId: string, recado: Recado | null) =>
     setRecados((atuais) => {
@@ -81,14 +106,14 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
       return proximos;
     });
 
-  // Ao abrir a tela, confere com a Evolution como cada chip está de verdade.
+  // Ao abrir a tela, confere com a Evolution como cada chip na nuvem está de verdade.
   const jaConferiu = useRef('');
   useEffect(() => {
-    if (!podeEditar || !evolutionConfigurada || !idsDosChips || jaConferiu.current === idsDosChips) return;
-    jaConferiu.current = idsDosChips;
+    if (!podeEditar || !evolutionConfigurada || !idsEvolution || jaConferiu.current === idsEvolution) return;
+    jaConferiu.current = idsEvolution;
     let cancelado = false;
     void (async () => {
-      for (const chipId of idsDosChips.split(',')) {
+      for (const chipId of idsEvolution.split(',')) {
         if (cancelado) return;
         await conferirChip(chipId, true).catch(() => undefined);
       }
@@ -96,47 +121,69 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
     return () => {
       cancelado = true;
     };
-  }, [idsDosChips, podeEditar, evolutionConfigurada]);
+  }, [idsEvolution, podeEditar, evolutionConfigurada]);
 
-  // Enquanto um QR Code (ou código) está na tela: pergunta se já conectou e renova o QR antes de vencer.
+  // Enquanto um QR Code (ou código) está na tela: pergunta se já conectou e recebe QR do motor local.
   useEffect(() => {
     if (!conexao || conexao.expirou) return;
-    const { chipId } = conexao;
+    const { chipId, motor } = conexao;
     let ativo = true;
 
     const conferencia = setInterval(() => {
       void conferirChip(chipId)
-        .then((resposta) => {
-          if (!ativo || !resposta.ok || resposta.estado !== 'connected') return;
-          setConexao(null);
-          avisar(chipId, { tipo: 'ok', texto: 'Chip conectado!' });
-          router.refresh();
-        })
-        .catch(() => undefined);
-    }, INTERVALO_DE_CONFERENCIA);
-
-    const renovacao = setTimeout(() => {
-      if (!conexao.imagem) return; // o código de 8 dígitos não é renovado sozinho
-      if (conexao.renovacoes >= RENOVACOES_MAXIMAS) {
-        setConexao({ ...conexao, expirou: true });
-        return;
-      }
-      void gerarQrCode(chipId)
-        .then((resposta) => {
-          if (!ativo) return;
-          if (resposta.ok && resposta.qr.imagem) {
-            setConexao({ ...conexao, imagem: resposta.qr.imagem, renovacoes: conexao.renovacoes + 1 });
-          } else {
-            setConexao({ ...conexao, expirou: true });
+        .then(async (resposta) => {
+          if (!ativo || !resposta.ok) return;
+          if (resposta.estado === 'connected') {
+            setConexao(null);
+            avisar(chipId, { tipo: 'ok', texto: 'Chip conectado!' });
+            router.refresh();
+            return;
+          }
+          if (motor === 'baileys') {
+            if (resposta.pairingCode) {
+              setConexao((atual) =>
+                atual && atual.chipId === chipId
+                  ? { ...atual, imagem: null, codigo: resposta.pairingCode ?? null, aguardandoMotor: false }
+                  : atual,
+              );
+            } else if (resposta.pairingQr) {
+              const url = await qrParaDataUrl(resposta.pairingQr);
+              if (ativo && url) {
+                setConexao((atual) =>
+                  atual && atual.chipId === chipId ? { ...atual, imagem: url, codigo: null, aguardandoMotor: false } : atual,
+                );
+              }
+            }
           }
         })
         .catch(() => undefined);
-    }, VALIDADE_DO_QR);
+    }, motor === 'baileys' ? INTERVALO_LOCAL : INTERVALO_DE_CONFERENCIA);
+
+    const renovacao =
+      motor === 'evolution'
+        ? setTimeout(() => {
+            if (!conexao.imagem) return;
+            if (conexao.renovacoes >= RENOVACOES_MAXIMAS) {
+              setConexao({ ...conexao, expirou: true });
+              return;
+            }
+            void gerarQrCode(chipId)
+              .then((resposta) => {
+                if (!ativo) return;
+                if (resposta.ok && resposta.qr.imagem) {
+                  setConexao({ ...conexao, imagem: resposta.qr.imagem, renovacoes: conexao.renovacoes + 1 });
+                } else {
+                  setConexao({ ...conexao, expirou: true });
+                }
+              })
+              .catch(() => undefined);
+          }, VALIDADE_DO_QR)
+        : null;
 
     return () => {
       ativo = false;
       clearInterval(conferencia);
-      clearTimeout(renovacao);
+      if (renovacao) clearTimeout(renovacao);
     };
   }, [conexao, router]);
 
@@ -158,10 +205,12 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
       } else {
         setConexao({
           chipId: chip.id,
+          motor: chip.motor,
           imagem: numero === undefined ? resposta.qr.imagem : null,
           codigo: numero === undefined ? null : resposta.qr.codigoDePareamento,
           renovacoes: 0,
           expirou: false,
+          aguardandoMotor: Boolean(resposta.aguardandoMotor),
         });
       }
     });
@@ -183,8 +232,25 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
   function aoCriar(estado: EstadoDoFormulario) {
     setJanela(null);
     if (!estado.chipId) return;
-    if (estado.qr?.imagem) {
-      setConexao({ chipId: estado.chipId, imagem: estado.qr.imagem, codigo: null, renovacoes: 0, expirou: false });
+    if (estado.motor === 'baileys') {
+      setConexao({
+        chipId: estado.chipId,
+        motor: 'baileys',
+        imagem: null,
+        codigo: null,
+        renovacoes: 0,
+        expirou: false,
+        aguardandoMotor: true,
+      });
+    } else if (estado.qr?.imagem) {
+      setConexao({
+        chipId: estado.chipId,
+        motor: 'evolution',
+        imagem: estado.qr.imagem,
+        codigo: null,
+        renovacoes: 0,
+        expirou: false,
+      });
     } else {
       avisar(estado.chipId, {
         tipo: 'ok',
@@ -201,6 +267,10 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
           <h1>Instâncias</h1>
           <p>Conecte, apelide e escolha o que cada chip faz — um por vez, sem mexer no outro.</p>
         </div>
+        <Link href="/conexoes" className="btn btn-secondary">
+          <Icone nome="conexoes" className="icon-15" />
+          Conexões / Motor
+        </Link>
       </div>
 
       <div className="instancias-avisos">
@@ -211,8 +281,10 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
         )}
         {!evolutionConfigurada && (
           <p className="aviso aviso--atencao">
-            A conexão com a Evolution ainda não foi configurada neste ambiente. Os chips aparecem, mas não dá para
-            conectar nem adicionar.
+            A conexão com a Evolution ainda não foi configurada neste ambiente.{' '}
+            {executores.length > 0
+              ? 'Você pode usar normalmente seus aparelhos do Motor local (Baileys).'
+              : 'Os chips na nuvem não conectam aqui — ou pareie um aparelho em Conexões / Motor.'}
           </p>
         )}
         {evolutionConfigurada && !temEnderecoPublico && (
@@ -240,7 +312,7 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
           </button>
         )}
       </div>
-      {podeEditar && evolutionConfigurada && chips.length >= limite && (
+      {podeEditar && podeCriarAlgumChip && chips.length >= limite && (
         <p className="instancias-limite">
           Sua conta já usa todos os chips do plano. Para conectar outro número, remova um chip ou peça um limite maior.
         </p>
@@ -251,40 +323,55 @@ export function PainelDeChips({ chips, limite, podeEditar, evolutionConfigurada,
           Nenhum chip por aqui ainda. Adicione o primeiro para começar a receber as conversas no painel.
         </div>
       ) : (
-        chips.map((chip) => (
-          <CartaoDoChip
-            key={chip.id}
-            chip={chip}
-            podeEditar={podeEditar && evolutionConfigurada}
-            conexao={conexao?.chipId === chip.id ? conexao : null}
-            recado={recados[chip.id] ?? null}
-            ocupado={ocupado}
-            aoPedirQr={() => pedirConexao(chip)}
-            aoPedirCodigo={(numero) => pedirConexao(chip, numero)}
-            aoFecharConexao={() => setConexao(null)}
-            aoDesconectar={() => {
-              if (conexao?.chipId === chip.id) setConexao(null);
-              executar(`desconectar:${chip.id}`, chip, () => desconectarChip(chip.id), 'Chip desconectado.');
-            }}
-            aoEditar={() => setJanela({ tipo: 'editar', chip })}
-            aoRemover={() => setJanela({ tipo: 'remover', chip })}
-            ia={ia}
-            aoMudarIa={(ligar) =>
-              executar(`ia:${chip.id}`, chip, () => mudarIaDoChip(chip.id, ligar), ligar ? 'IA ligada neste chip.' : 'IA desligada neste chip.')
-            }
-          />
-        ))
+        chips.map((chip) => {
+          const podeEditarChip = podeEditar && (chip.motor === 'evolution' ? evolutionConfigurada : true);
+          return (
+            <CartaoDoChip
+              key={chip.id}
+              chip={chip}
+              podeEditar={podeEditarChip}
+              conexao={conexao?.chipId === chip.id ? conexao : null}
+              recado={recados[chip.id] ?? null}
+              ocupado={ocupado}
+              aoPedirQr={() => pedirConexao(chip)}
+              aoPedirCodigo={(numero) => pedirConexao(chip, numero)}
+              aoFecharConexao={() => setConexao(null)}
+              aoDesconectar={() => {
+                if (conexao?.chipId === chip.id) setConexao(null);
+                executar(`desconectar:${chip.id}`, chip, () => desconectarChip(chip.id), 'Chip desconectado.');
+              }}
+              aoEditar={() => setJanela({ tipo: 'editar', chip })}
+              aoRemover={() => setJanela({ tipo: 'remover', chip })}
+              ia={ia}
+              aoMudarIa={(ligar) =>
+                executar(
+                  `ia:${chip.id}`,
+                  chip,
+                  () => mudarIaDoChip(chip.id, ligar),
+                  ligar ? 'IA ligada neste chip.' : 'IA desligada neste chip.',
+                )
+              }
+            />
+          );
+        })
       )}
 
       {janela?.tipo === 'novo' && (
         <Dialogo titulo="Adicionar chip" aoFechar={() => setJanela(null)}>
-          <FormularioDoChip aoConcluir={aoCriar} aoCancelar={() => setJanela(null)} />
+          <FormularioDoChip
+            executores={executores}
+            evolutionConfigurada={evolutionConfigurada}
+            aoConcluir={aoCriar}
+            aoCancelar={() => setJanela(null)}
+          />
         </Dialogo>
       )}
       {janela?.tipo === 'editar' && (
         <Dialogo titulo="Editar chip" aoFechar={() => setJanela(null)}>
           <FormularioDoChip
             chip={janela.chip}
+            executores={executores}
+            evolutionConfigurada={evolutionConfigurada}
             aoCancelar={() => setJanela(null)}
             aoConcluir={() => {
               setJanela(null);
@@ -368,11 +455,12 @@ function CartaoDoChip({
   const idTitulo = useId();
   const idNumero = useId();
   const [numero, setNumero] = useState('');
-  /** O que a pessoa acabou de pedir no liga/desliga da IA; vale só enquanto o pedido está a caminho. */
   const [iaPedida, setIaPedida] = useState<boolean | null>(null);
   const estado = descreverEstado(chip.estado);
   const conectado = chip.estado === 'connected';
   const naNuvem = chip.motor === 'evolution';
+  const noMotorLocal = chip.motor === 'baileys';
+  const podeConectar = podeEditar && (naNuvem || noMotorLocal);
   const trabalhando = ocupado !== null && ocupado.endsWith(`:${chip.id}`);
 
   function enviarNumero(evento: FormEvent<HTMLFormElement>) {
@@ -395,12 +483,21 @@ function CartaoDoChip({
               <Icone nome={naNuvem ? 'nuvem' : 'conexoes'} className="icon-15" />
               {naNuvem ? 'Nuvem (Evolution)' : 'Motor local'}
             </li>
+            {noMotorLocal && (
+              <li>
+                <span>
+                  {chip.executorNome
+                    ? `${chip.executorNome} (${chip.executorOnline ? 'online' : 'offline'})`
+                    : 'Sem aparelho vinculado'}
+                </span>
+              </li>
+            )}
           </ul>
         </div>
 
         {podeEditar && (
           <div className="chip-acoes">
-            {conectado && naNuvem && (
+            {conectado && (naNuvem || noMotorLocal) && (
               <button type="button" className="btn btn-secondary btn-sm" disabled={trabalhando} onClick={aoDesconectar}>
                 <Icone nome="desligar" className="icon-15" />
                 {ocupado === `desconectar:${chip.id}` ? 'Desconectando…' : 'Desconectar'}
@@ -419,12 +516,11 @@ function CartaoDoChip({
       </div>
 
       <div className="chip-ia">
-        {podeEditar && naNuvem ? (
+        {podeEditar && (naNuvem || noMotorLocal) ? (
           <>
             <Interruptor
               titulo="Atendente de IA neste chip"
               descricao={situacaoDaIaNoChip(chip, ia)}
-              // O botão muda na hora do clique; quando o pedido termina, vale o que o servidor respondeu.
               ligado={ocupado === `ia:${chip.id}` && iaPedida !== null ? iaPedida : chip.iaLigada}
               desativado={trabalhando}
               aoMudar={(ligar) => {
@@ -440,8 +536,7 @@ function CartaoDoChip({
           </>
         ) : (
           <p>
-            Atendente de IA: {chip.iaLigada ? 'ligado' : 'desligado'} neste chip.{' '}
-            {naNuvem ? 'Só o dono da conta liga e desliga.' : chip.iaLigada ? '' : 'A IA ainda não responde por chips do motor local.'}
+            Atendente de IA: {chip.iaLigada ? 'ligado' : 'desligado'} neste chip. Só o dono da conta liga e desliga.
           </p>
         )}
       </div>
@@ -452,12 +547,11 @@ function CartaoDoChip({
         </p>
       )}
 
-      {podeEditar && naNuvem && !conectado && (
+      {podeConectar && !conectado && (
         <div className="chip-conexao">
           {conexao ? (
             <div className="chip-qr">
               {conexao.imagem && !conexao.expirou && (
-                // O QR Code chega pronto da Evolution, como imagem embutida; não há o que otimizar.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={conexao.imagem} alt={`QR Code para conectar o chip ${chip.apelido}`} width={208} height={208} />
               )}
@@ -473,6 +567,11 @@ function CartaoDoChip({
                       <li>Escolha Conectar com número de telefone e digite o código acima.</li>
                     </ol>
                   </>
+                ) : conexao.aguardandoMotor && !conexao.imagem ? (
+                  <p className="chip-conexao-dica">
+                    Solicitação enviada ao aparelho <strong>{chip.executorNome ?? 'local'}</strong>. Deixe o Motor local rodando
+                    para o QR Code aparecer aqui em poucos segundos.
+                  </p>
                 ) : (
                   <ol>
                     <li>Abra o WhatsApp no celular deste chip.</li>
@@ -539,17 +638,25 @@ function CartaoDoChip({
   );
 }
 
-/** Formulário de apelido e função. Sem `chip`, cria um chip novo; com `chip`, edita. */
+/** Formulário de apelido, motor e função. Sem `chip`, cria um chip novo; com `chip`, edita. */
 function FormularioDoChip({
   chip,
+  executores,
+  evolutionConfigurada,
   aoConcluir,
   aoCancelar,
 }: {
   chip?: Chip;
+  executores: ExecutorResumo[];
+  evolutionConfigurada: boolean;
   aoConcluir: (estado: EstadoDoFormulario) => void;
   aoCancelar: () => void;
 }) {
   const idApelido = useId();
+  const idExecutor = useId();
+  const [motor, setMotor] = useState<'evolution' | 'baileys'>(
+    chip ? (chip.motor === 'baileys' ? 'baileys' : 'evolution') : evolutionConfigurada ? 'evolution' : 'baileys',
+  );
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, iniciar] = useTransition();
 
@@ -584,6 +691,70 @@ function FormularioDoChip({
         />
         <p className="campo-dica">É só para você reconhecer o chip. O cliente não vê.</p>
       </div>
+
+      {!chip && (
+        <fieldset className="opcoes">
+          <legend>Onde este chip vai rodar</legend>
+          <label className="opcao">
+            <input
+              type="radio"
+              name="motor"
+              value="evolution"
+              checked={motor === 'evolution'}
+              disabled={!evolutionConfigurada}
+              onChange={() => setMotor('evolution')}
+            />
+            <span>
+              <strong>Nuvem (Evolution)</strong>
+              <small>{evolutionConfigurada ? 'Roda direto nos servidores configurados do painel.' : 'Evolution não configurada neste ambiente.'}</small>
+            </span>
+          </label>
+          <label className="opcao">
+            <input
+              type="radio"
+              name="motor"
+              value="baileys"
+              checked={motor === 'baileys'}
+              onChange={() => setMotor('baileys')}
+            />
+            <span>
+              <strong>Motor local (Baileys)</strong>
+              <small>Roda grátis no seu próprio PC, VPS ou celular (Termux).</small>
+            </span>
+          </label>
+        </fieldset>
+      )}
+
+      {motor === 'baileys' && (
+        <div className="form-group">
+          <label className="form-label" htmlFor={idExecutor}>
+            Aparelho do Motor local
+          </label>
+          {executores.length > 0 ? (
+            <select
+              id={idExecutor}
+              name="executorId"
+              className="campo"
+              defaultValue={chip?.executorId ?? executores[0]?.id ?? ''}
+              required
+            >
+              {executores.map((exec) => (
+                <option key={exec.id} value={exec.id}>
+                  {exec.nome} ({exec.online ? 'online' : exec.status === 'pending_pair' ? 'aguardando pareamento' : 'offline'})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="aviso aviso--atencao">
+              Nenhum aparelho pareado ainda.{' '}
+              <Link href="/conexoes" style={{ textDecoration: 'underline', fontWeight: 700 }}>
+                Abra Conexões / Motor
+              </Link>{' '}
+              para gerar um código de pareamento.
+            </p>
+          )}
+        </div>
+      )}
 
       <fieldset className="opcoes">
         <legend>O que este chip faz</legend>
