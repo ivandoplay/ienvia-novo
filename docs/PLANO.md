@@ -112,8 +112,8 @@ Cada fase só começa quando a anterior está com os testes passando.
 | Fase | Nome | O que entrega | Situação |
 | --- | --- | --- | --- |
 | 0 | Fundação | Repositório novo, login, moldura do painel com o visual escolhido, Visão geral com números reais, testes. | **Pronta** |
-| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Pronta no código e no banco; falta conferir no ar.** Feitos e testados: Instâncias, recebimento das mensagens e a Inbox com texto e com **arquivos** (fotos, áudios, vídeos, documentos e figurinhas). A conferência final com os serviços de verdade está **travada por dois bloqueios de conta** (Vercel e Supabase): ver o começo da seção 6. |
-| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos) e **Motor de IA** (chaves do cliente, provedor, reserva). A IA responde, passa para você quando precisa, e você corrige uma resposta em 1 clique. Na Inbox: assumir uma conversa e devolver para a IA. Liga/desliga da IA em cada chip e o botão "Pausar tudo". | **Em andamento.** Prontos: as telas **Motor de IA** (Gemini, OpenRouter e NVIDIA) e **Treinamento**, o **atendente** (a IA responde no WhatsApp, passa a conversa para você, para quando uma pessoa responde; liga/desliga por chip, "Pausar tudo", assumir e devolver) e o **corrigir resposta em 1 clique** (ensinar a IA sem sair da conversa). Falta: as Mensagens prontas e as Skills; e conferir com um celular de verdade (depende de publicar). Detalhes abaixo. |
+| 1 | Conectar e conversar | **Instâncias**: conectar chip por QR/código (Evolution primeiro), apelido e função do chip. **Inbox**: lista de conversas, abrir conversa, enviar texto e mídia, ficha básica do contato, ver por chip (o antigo Histórico). Recebimento das mensagens. | **Pronta e conferida no ar (12/11/2026).** Publicada com Porteiro Cloudflare, Supabase Edge Function `evolution-webhook`, Inbox Realtime e conferida com chip conectado na Evolution v2.3.7. |
+| 2 | Atendente de IA | **Treinamento** (identidade, regras, FAQ, arquivos, **Mensagens prontas M01–M13, Estúdio de Skills e Objeções, Cérebro completo e pacote .zip**) e **Motor de IA** (chaves Gemini, OpenRouter e NVIDIA, ordem de uso, **Dossiê no WhatsApp do administrador**). A IA responde, passa para você quando precisa e você corrige/ensina em 1 clique. Na Inbox: assumir/devolver, liga/desliga por chip e "Pausar tudo". | **Pronta e conferida no ar (12/11/2026).** Pacote completo do Lizandro importado (`13` mensagens, `35` skills operacionais, `32` de humanização, `45` objeções, Cérebro Nível 3), 3 chaves ativas (`OpenRouter → NVIDIA → Gemini`), Edge Function validada com resposta real no WhatsApp (`3,1 s` / `5,4 s`). Resta apenas preencher o número do WhatsApp do administrador em *Motor de IA → Dossiê* (opcional) e seguir para a Fase 3. |
 | 3 | CRM completo | Etiquetas, Kanban, agenda de contatos, valor e ganho/perdido, notas, busca, respostas rápidas, agendar envio. **Histórico**. | |
 | 4 | Motor local | O motor que roda no PC ou no Termux, ligado à conta do cliente, com atualização automática assinada. Aba **Conexões / Motor**. | |
 | 5 | Campanhas e segurança | **Campanhas** com prévia, cadência segura, rodízio de chips, pausar/retomar. **Segurança**: anti-ban, fila segura, horário de atendimento, contatos ignorados, alerta no seu WhatsApp. | |
@@ -437,11 +437,11 @@ No sistema antigo isso ficava no Simulador. Agora fica onde o problema aparece: 
   caminho foi visto com a NVIDIA de verdade no atendente), mas a conversa completa, do celular à
   correção e de volta ao celular, só depois de publicar.
 
-O que falta na Fase 2:
+Fechamento da Fase 2 (12/11/2026):
 
-1. No Treinamento: Mensagens prontas (M01–M13), Estúdio de Skills, "Cérebro completo" e "Pacote Turbo".
-2. Publicar e conferir com um chip seu: uma mensagem real chegando, a IA respondendo e a resposta
-   aparecendo no celular.
+1. Estúdio completo no Treinamento: Mensagens prontas (`M01–M13`), Estúdio de Skills (`operacionais`, `humanização`, `objeções`), Cérebro completo (playbook, regras canônicas, pares bom/ruim, fatos do negócio, filtros de voz, personas) e importação/exportação `.zip` + extração por arquivos entregues na migração `20261113120000_phase2_studio_and_admin_dossier.sql`.
+2. Dossiê estruturado no WhatsApp do administrador implementado em `Motor de IA` e no atendente (`handoff`, `silent_handoff`, `uncertain_send`, `error`, `safety`), com envio pelo chip da conversa.
+3. Publicação em produção (Vercel `ienvia-novo-dusky.vercel.app`, Netlify reserva, Porteiro Cloudflare e Edge Function `evolution-webhook` com shim de `Buffer`), chave Gemini (`gemini-3.5-flash-lite`) validada e resposta real da IA conferida ponta a ponta em WhatsApp conectado.
 
 ### Diferenças pequenas em relação ao visual do branch
 
