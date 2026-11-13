@@ -1,17 +1,20 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { executarCampanhasEFilaSegura } from '@/lib/campanhas/executor';
 import { processarAgendamentosVencidos } from '@/lib/evolution/agendados';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function segredoConfere(recebido: string | null, esperado: string | undefined): boolean {
   if (!recebido || !esperado?.trim()) return false;
   const a = createHash('sha256').update(recebido.trim()).digest();
-  const b = createHash('sha256').update(esperado.trim()).digest();
+  const b = createHash('sha256').update(esperado).digest();
   return timingSafeEqual(a, b);
 }
 
 export async function POST(pedido: Request) {
+  const chegouEm = Date.now();
   const segredoRecebido =
     pedido.headers.get('x-ienvia-cron') ??
     /^Bearer\s+(\S+)$/i.exec(pedido.headers.get('authorization') ?? '')?.[1] ??
@@ -26,6 +29,9 @@ export async function POST(pedido: Request) {
     return Response.json({ ok: false, erro: 'painel sem configuração de serviço' }, { status: 503 });
   }
 
-  const resumo = await processarAgendamentosVencidos(supabase, 25);
-  return Response.json({ ok: true, ...resumo });
+  const [resumo, disparos] = await Promise.all([
+    processarAgendamentosVencidos(supabase, 25),
+    executarCampanhasEFilaSegura(supabase, chegouEm, 48_000),
+  ]);
+  return Response.json({ ok: true, ...resumo, disparos });
 }

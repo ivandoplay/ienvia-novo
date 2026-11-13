@@ -33,6 +33,10 @@ import {
 } from './dados.mjs';
 import { FUNCOES_DO_CRM, criarCrmDoBanco } from './crm-no-banco-falso.mjs';
 import { FUNCOES_DA_IA, criarIaDoBanco } from './ia-no-banco-falso.mjs';
+import {
+  FUNCOES_SEGURANCA_E_CAMPANHAS,
+  criarCampanhasESegurancaDoBanco,
+} from './campanhas-seguranca-no-banco-falso.mjs';
 
 const PORTA = Number(process.env.PORTA_SUPABASE_FALSO ?? 54399);
 const SEGREDO_JWT = 'segredo-so-para-testes';
@@ -123,6 +127,13 @@ function passaNoFiltro(linha, coluna, expressao) {
   if (expressao.startsWith('neq.')) return String(valor) !== expressao.slice(4);
   if (expressao.startsWith('gte.')) return String(valor) >= expressao.slice(4);
   if (expressao === 'is.null') return valor === null || valor === undefined;
+  if (expressao.startsWith('in.(') && expressao.endsWith(')')) {
+    const itens = expressao
+      .slice(4, -1)
+      .split(',')
+      .map((s) => s.trim().replace(/^"(.*)"$/, '$1'));
+    return itens.includes(String(valor));
+  }
   throw new Error(`Filtro não suportado pelo Supabase de mentira: ${coluna}=${expressao}`);
 }
 
@@ -433,10 +444,12 @@ const FUNCOES_DO_SERVIDOR = [
   'claim_local_motor_commands',
   'report_local_instance_state',
   'complete_local_motor_command',
+  'enqueue_workspace_admin_alert',
 ];
 
 const MB = 1024 * 1024;
 const CAMINHO_DE_ENVIO = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/envios\/[a-zA-Z0-9_-]{16,80}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
+const CAMINHO_DE_CAMPANHA = /^[0-9a-f-]{36}\/campanhas\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
 
 const fichaDoArquivo = (mensagemId) => tabelas.message_attachments.find((ficha) => ficha.message_id === mensagemId);
 /** A ficha do arquivo no formato que previaDaMensagem entende. */
@@ -1099,6 +1112,11 @@ function acoesDoServidor(res, nome, corpo) {
     });
   }
 
+  if (nome === 'enqueue_workspace_admin_alert') {
+    campanhasSegurancaDoBanco.registrarAlerta(corpo);
+    return responder(res, 200, { result: 'queued' });
+  }
+
   const ficha = tabelas.message_attachments.find((item) => item.workspace_id === corpo.p_workspace_id && item.message_id === corpo.p_message_id);
 
   if (nome === 'begin_media_download') {
@@ -1167,16 +1185,17 @@ function podeLerNoDeposito(req, caminho) {
   return Boolean(usuario && workspacesDoUsuario(usuario).includes(caminho.split('/')[0]));
 }
 
-/** Quem pode subir: o servidor do painel; ou a pessoa, só na pasta "envios" de uma conversa da própria empresa. */
+/** Quem pode subir: o servidor do painel; ou a pessoa, na pasta "envios" de uma conversa ou em "campanhas/<pasta>" da empresa. */
 function podeSubirNoDeposito(req, caminho) {
   if (ehOServidorDoPainel(req)) return true;
   const usuario = usuarioDaRequisicao(req);
-  const [workspaceId, conversaId] = caminho.split('/');
+  if (!usuario) return false;
+  const [workspaceId, segundo] = caminho.split('/');
+  if (!workspacesDoUsuario(usuario).includes(workspaceId)) return false;
+  if (CAMINHO_DE_CAMPANHA.test(caminho)) return true;
   return Boolean(
-    usuario &&
-      CAMINHO_DE_ENVIO.test(caminho) &&
-      workspacesDoUsuario(usuario).includes(workspaceId) &&
-      tabelas.conversations.some((conversa) => conversa.workspace_id === workspaceId && conversa.id === conversaId),
+    CAMINHO_DE_ENVIO.test(caminho) &&
+      tabelas.conversations.some((conversa) => conversa.workspace_id === workspaceId && conversa.id === segundo),
   );
 }
 
@@ -1258,10 +1277,15 @@ async function rotasDoDeposito(req, res, url) {
     return entregarArquivo(req, res, arquivo, url.searchParams.get('download'));
   }
 
-  // Apagar (só o servidor do painel).
+  // Apagar (servidor do painel ou mídia de campanha da própria empresa).
   if (resto === `object/${NOME_DO_DEPOSITO}` && req.method === 'DELETE') {
-    if (!ehOServidorDoPainel(req)) return erroDoDeposito(res, 403, 'Unauthorized', 'new row violates row-level security policy');
+    const usuario = usuarioDaRequisicao(req);
     const { prefixes: caminhos = [] } = await lerCorpo(req);
+    const permitido =
+      ehOServidorDoPainel(req) ||
+      (usuario &&
+        caminhos.every((item) => CAMINHO_DE_CAMPANHA.test(item) && workspacesDoUsuario(usuario).includes(item.split('/')[0])));
+    if (!permitido) return erroDoDeposito(res, 403, 'Unauthorized', 'new row violates row-level security policy');
     const apagados = caminhos.filter((item) => deposito.delete(item));
     return responder(res, 200, apagados.map((item) => ({ name: item, bucket_id: NOME_DO_DEPOSITO })), CORS);
   }
@@ -1338,6 +1362,13 @@ function receberMensagem(conversaId, texto) {
 const iaDoBanco = criarIaDoBanco({ tabelas, responder });
 /** O CRM da Inbox (as regras estão em crm-no-banco-falso.mjs). */
 const crmDoBanco = criarCrmDoBanco({ tabelas, participacoes: PARTICIPACOES, responder, anotarMudanca, deposito });
+/** A Fase 5: Campanhas, Fila Segura e Segurança (regras em campanhas-seguranca-no-banco-falso.mjs). */
+const campanhasSegurancaDoBanco = criarCampanhasESegurancaDoBanco({
+  tabelas,
+  participacoes: PARTICIPACOES,
+  responder,
+  deposito,
+});
 
 async function rotasDeDados(req, res, url) {
   const recurso = url.pathname.replace('/rest/v1/', '');
@@ -1362,6 +1393,10 @@ async function rotasDeDados(req, res, url) {
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DA_IA.includes(recurso.slice(4))) {
     return iaDoBanco.acoesDaIa(res, usuario, recurso.slice(4), await lerCorpo(req));
+  }
+
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_SEGURANCA_E_CAMPANHAS.includes(recurso.slice(4))) {
+    return campanhasSegurancaDoBanco.acoes(res, usuario, recurso.slice(4), await lerCorpo(req));
   }
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DO_ATENDENTE.includes(recurso.slice(4))) {
@@ -1417,6 +1452,12 @@ async function rotasDeDados(req, res, url) {
     res.writeHead(200, { 'content-range': faixa, 'content-type': 'application/json; charset=utf-8' });
     return res.end();
   }
+  const querUmObjeto = String(req.headers.accept ?? '').includes('vnd.pgrst.object');
+  if (querUmObjeto) {
+    return linhas.length === 1
+      ? responder(res, 200, linhas[0])
+      : responder(res, 406, { code: 'PGRST116', details: `The result contains ${linhas.length} rows`, message: 'JSON object requested, multiple (or no) rows returned' });
+  }
   return responder(res, 200, linhas, { 'content-range': faixa });
 }
 
@@ -1441,6 +1482,19 @@ const servidor = http.createServer(async (req, res) => {
       iaDoBanco.reiniciarIa();
       pausasDaIa.clear();
       return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/reiniciar-fase5') {
+      campanhasSegurancaDoBanco.reiniciarFase5();
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/simular-envio-incerto') {
+      const ws = url.searchParams.get('workspace') || WORKSPACE_INBOX;
+      const alvo = url.searchParams.get('alvo') || 'fila';
+      const ok = campanhasSegurancaDoBanco.simularEnvioIncerto(ws, alvo);
+      return responder(res, ok ? 200 : 404, { ok });
+    }
+    if (url.pathname === '/controle/alertas-admin') {
+      return responder(res, 200, campanhasSegurancaDoBanco.listarAlertas());
     }
     if (url.pathname === '/controle/ia-na-conversa') {
       // Só para os testes: deixa a IA de uma conversa num estado (como o atendente deixaria).

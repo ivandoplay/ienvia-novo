@@ -2,6 +2,7 @@ import 'server-only';
 
 import { Buffer } from 'node:buffer';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { enviarAlertaViaRpc } from '@/lib/atendente/alertas';
 import { montarDossieParaAdmin } from '@/lib/atendente/dossie';
 import {
   cortarRecado,
@@ -227,7 +228,7 @@ async function despacharDossieParaAdmin(params: {
 
   const instanceId = texto(dadosDaConversa.instance_id);
   const chip = texto(dadosDaConversa.provider_instance_name);
-  if (!instanceId || !chip) return;
+  if (!instanceId) return;
 
   const agora = ambiente.agora ?? Date.now;
   const sobra = ambiente.prazo - agora();
@@ -247,6 +248,20 @@ async function despacharDossieParaAdmin(params: {
     mensagens,
     incluirMensagens: motor.alertaAdminIncluirMensagens,
   });
+
+  if (!chip) {
+    await enviarAlertaViaRpc({
+      supabase: ambiente.supabase,
+      workspaceId,
+      kind: tipo,
+      bodyText: dossie,
+      preferredInstanceId: instanceId,
+      turnId: vezId,
+      conversationId: texto(dadosDaConversa.id) || null,
+      tempoLimiteMs: Math.max(Math.min(12_000, sobra - 500), 3_000),
+    });
+    return;
+  }
 
   try {
     const { data: deliveryId, error: erroInicio } = await ambiente.supabase.rpc('start_admin_alert_delivery', {
@@ -604,7 +619,14 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
 
     // O "digitando…" encolhe quando o tempo do pedido está no fim: melhor responder sem ele do que não responder.
     const sobra = ambiente.prazo - agora();
-    const digitando = motor.simularDigitando ? Math.max(Math.min(tempoDeDigitacao(balao, sorteio()), sobra - 8_000), 0) : 0;
+    const typingPacote = objeto(pacote.typing);
+    const limitesDigitacao =
+      numero(typingPacote.min_ms) > 0 && numero(typingPacote.max_ms) >= numero(typingPacote.min_ms)
+        ? { minMs: numero(typingPacote.min_ms), maxMs: numero(typingPacote.max_ms) }
+        : undefined;
+    const digitando = motor.simularDigitando
+      ? Math.max(Math.min(tempoDeDigitacao(balao, sorteio(), limitesDigitacao), sobra - 8_000), 0)
+      : 0;
     const envio: ResultadoDoEnvio =
       destino && chip
         ? await enviarTexto(chip, destino, balao, { digitandoMs: digitando, tempoLimite: Math.max(Math.min(25_000 + digitando, sobra - 1_500), 5_000) })

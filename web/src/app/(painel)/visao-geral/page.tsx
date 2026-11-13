@@ -98,6 +98,15 @@ export default async function PaginaVisaoGeral() {
       rotulo: 'Contatos',
       rodape: 'no seu CRM',
     },
+    {
+      rota: '/seguranca?secao=fila',
+      dica: 'Abordagem ativa anti-bloqueio em andamento',
+      icone: 'seguranca',
+      cor: 'campanha',
+      valor: numero(dados.naFilaSegura),
+      rotulo: 'Na fila segura',
+      rodape: dados.filaSeguraEmAndamento ? 'enviando em ritmo seguro' : dados.naFilaSegura ? 'aguardando retomada' : 'fila vazia',
+    },
   ];
 
   const funil = ETAPAS_DO_FUNIL.map((etapa, indice) => ({ ...etapa, quantidade: dados.funil[indice] ?? null }));

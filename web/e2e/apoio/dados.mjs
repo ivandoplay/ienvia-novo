@@ -402,6 +402,8 @@ export function criarTabelas() {
     local_executors: [],
     local_executor_tokens: [],
     local_motor_commands: [],
+    proactive_queue_state: [],
+    proactive_queue_items: [],
     conversations: [...loja.conversas, ...inbox.conversations],
     message_attachments: [...inbox.message_attachments],
     campaigns: [

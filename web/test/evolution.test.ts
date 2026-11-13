@@ -72,7 +72,7 @@ describe('criar e conectar', () => {
     }>;
     expect(instancia?.aviso.url).toBe(AVISO.url);
     expect(instancia?.aviso.headers).toEqual({ Authorization: 'Bearer segredo-do-aviso' });
-    expect(instancia?.aviso.events).toEqual(['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE']);
+    expect(instancia?.aviso.events).toEqual(['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE']);
   });
 
   test('nome repetido é reconhecido como "nome em uso"', async () => {
@@ -149,7 +149,7 @@ describe('aviso de mensagens', () => {
     expect(await consultarAviso('ienvia-teste-01')).toEqual({
       url: AVISO.url,
       ligado: true,
-      eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'],
+      eventos: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'],
     });
   });
 });
@@ -198,16 +198,21 @@ describe('aviso de mensagens em dia', () => {
   test('o aviso criado junto com o chip já está em dia', async () => {
     await criarInstancia({ nome: 'ienvia-teste-01', aviso: AVISO });
     const atual = await consultarAviso('ienvia-teste-01');
-    expect(atual).toEqual({ url: URL_DO_PAINEL, ligado: true, eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] });
+    expect(atual).toEqual({
+      url: URL_DO_PAINEL,
+      ligado: true,
+      eventos: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'],
+    });
     expect(avisoEstaEmDia(atual, URL_DO_PAINEL)).toBe(true);
   });
 
   test.each([
     ['não existe', null],
-    ['aponta para outro endereço', { url: 'https://outro.exemplo/api', ligado: true, eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] }],
-    ['está desligado', { url: URL_DO_PAINEL, ligado: false, eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] }],
+    ['aponta para outro endereço', { url: 'https://outro.exemplo/api', ligado: true, eventos: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] }],
+    ['está desligado', { url: URL_DO_PAINEL, ligado: false, eventos: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] }],
     // Chip criado antes de o painel pedir o aviso das mensagens enviadas.
-    ['não avisa as mensagens enviadas', { url: URL_DO_PAINEL, ligado: true, eventos: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'] }],
+    ['não avisa as mensagens enviadas', { url: URL_DO_PAINEL, ligado: true, eventos: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE'] }],
+    ['não avisa status de entrega/leitura', { url: URL_DO_PAINEL, ligado: true, eventos: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] }],
   ])('aviso que %s precisa ser refeito', (_caso, atual) => {
     expect(avisoEstaEmDia(atual, URL_DO_PAINEL)).toBe(false);
   });

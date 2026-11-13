@@ -25,7 +25,7 @@ export interface AmbienteDoPorteiro {
 
 const CORPO_MAXIMO = 4_000_000;
 const TIMEOUT_PADRAO_MS = 12_000;
-const EVENTOS_ACEITOS = new Set(['CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'SEND_MESSAGE']);
+const EVENTOS_ACEITOS = new Set(['CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE']);
 
 const responder = (status: number, corpo: Record<string, unknown>, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(corpo), {
@@ -77,11 +77,12 @@ function eventoAceito(corpo: unknown): boolean {
   if (typeof corpo !== 'object' || corpo === null || Array.isArray(corpo)) return false;
   const obj = corpo as Record<string, unknown>;
   if (typeof obj.instance !== 'string' || !obj.instance.trim()) return false;
-  if (typeof obj.data !== 'object' || obj.data === null || Array.isArray(obj.data)) return false;
   const evento = String(obj.event ?? '')
     .trim()
     .toUpperCase()
     .replace(/[.-]/g, '_');
+  if (typeof obj.data !== 'object' || obj.data === null) return false;
+  if (Array.isArray(obj.data) && evento !== 'MESSAGES_UPDATE') return false;
   return EVENTOS_ACEITOS.has(evento);
 }
 

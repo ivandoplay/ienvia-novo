@@ -69,16 +69,17 @@ describe('porteiro Cloudflare', () => {
     expect(buscar).not.toHaveBeenCalled();
   });
 
-  test('encaminha MESSAGES_UPSERT, SEND_MESSAGE e CONNECTION_UPDATE ao principal e devolve a resposta', async () => {
-    for (const evento of ['messages.upsert', 'SEND_MESSAGE', 'connection.update']) {
+  test('encaminha MESSAGES_UPSERT, MESSAGES_UPDATE, SEND_MESSAGE e CONNECTION_UPDATE ao principal e devolve a resposta', async () => {
+    for (const [evento, payload] of [
+      ['messages.upsert', MENSAGEM_VALIDA],
+      ['messages.update', { event: 'messages.update', instance: 'ienvia-chip-1', data: [{ keyId: 'MSG-1', status: 3 }] }],
+      ['SEND_MESSAGE', { ...MENSAGEM_VALIDA, event: 'SEND_MESSAGE' }],
+      ['connection.update', { ...MENSAGEM_VALIDA, event: 'connection.update' }],
+    ] as const) {
       const buscar = vi.fn<typeof fetch>().mockResolvedValueOnce(
         new Response(JSON.stringify({ ok: true, resultado: 'accepted' }), { status: 200 }),
       );
-      const res = await atenderNoPorteiro(
-        pedidoWebhook({ ...MENSAGEM_VALIDA, event: evento }),
-        ENV_PADRAO,
-        buscar,
-      );
+      const res = await atenderNoPorteiro(pedidoWebhook({ ...payload, event: evento }), ENV_PADRAO, buscar);
       expect(res.status).toBe(200);
       expect(res.headers.get('x-ienvia-destino')).toBe('principal');
       expect(buscar).toHaveBeenCalledTimes(1);

@@ -53,6 +53,8 @@ export interface NumerosDaVisaoGeral {
    */
   esperandoVoce: number | null;
   campanhasAtivas: number | null;
+  naFilaSegura: number | null;
+  filaSeguraEmAndamento: boolean;
   mensagensRecebidasHoje: number | null;
   respostasDaIaHoje: number | null;
   contatos: number | null;
@@ -104,10 +106,16 @@ export async function carregarVisaoGeral(workspaceId: string, agora: Date = new 
   const doWorkspace = (tabela: string) =>
     supabase.from(tabela).select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId);
 
-  const [instancias, funil, campanhasAtivas, mensagensRecebidasHoje, respostasDaIaHoje, contatos] = await Promise.all([
+  const [instancias, funil, campanhasAtivas, naFilaSegura, estadoFila, mensagensRecebidasHoje, respostasDaIaHoje, contatos] = await Promise.all([
     resumirInstancias(workspaceId),
     Promise.all(ETAPAS_DO_FUNIL.map(({ etapa }) => contar(doWorkspace('conversations').eq('stage', etapa)))),
     contar(doWorkspace('campaigns').eq('status', 'running')),
+    contar(doWorkspace('proactive_queue_items').in('status', ['pending', 'sending', 'awaiting_human_confirmation'])),
+    supabase
+      .from('proactive_queue_state')
+      .select('status')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle<{ status: string }>(),
     contar(doWorkspace('messages').eq('direction', 'inbound').gte('occurred_at', hoje)),
     contar(doWorkspace('messages').eq('actor_type', 'ai').gte('occurred_at', hoje)),
     contar(doWorkspace('contacts').is('erased_at', null)),
@@ -118,6 +126,8 @@ export async function carregarVisaoGeral(workspaceId: string, agora: Date = new 
     funil,
     esperandoVoce: somarEtapas(funil, ETAPAS_QUE_ESPERAM_ALGUEM),
     campanhasAtivas,
+    naFilaSegura,
+    filaSeguraEmAndamento: !estadoFila.error && estadoFila.data?.status === 'running',
     mensagensRecebidasHoje,
     respostasDaIaHoje,
     contatos,

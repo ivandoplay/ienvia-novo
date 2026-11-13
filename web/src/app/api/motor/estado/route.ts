@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { enviarAlertaViaRpc, textoAlertaDesconexao } from '@/lib/atendente/alertas';
 import { extrairTokenDoMotor, sha256Hex } from '@/lib/motor/autenticacao';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
 
@@ -42,8 +43,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: 'Falha ao atualizar estado do chip.' }, { status: 500 });
   }
 
-  const res = data as { result?: string } | null;
+  const res = data as {
+    result?: string;
+    id?: string;
+    workspace_id?: string;
+    display_name?: string;
+    alert_disconnected?: boolean;
+  } | null;
   if (res?.result === 'unauthorized') return NextResponse.json({ erro: 'Aparelho não autorizado.' }, { status: 401 });
   if (res?.result === 'instance_not_found') return NextResponse.json({ erro: 'Chip não encontrado neste aparelho.' }, { status: 404 });
+
+  if (res?.alert_disconnected && res.workspace_id) {
+    const wsId = res.workspace_id;
+    const chipNome = res.display_name ?? null;
+    const chipId = res.id ?? null;
+    after(async () => {
+      await enviarAlertaViaRpc({
+        supabase,
+        workspaceId: wsId,
+        kind: 'chip_disconnected',
+        bodyText: textoAlertaDesconexao(chipNome, 'Motor Local'),
+        preferredInstanceId: chipId,
+      });
+    });
+  }
+
   return NextResponse.json(res ?? { result: 'ok' });
 }

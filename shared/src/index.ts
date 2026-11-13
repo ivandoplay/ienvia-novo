@@ -3,5 +3,8 @@
  * Regra: aqui só entra código puro, sem acesso a rede, banco ou navegador.
  */
 export * from './auth/usuario';
+export * from './campanhas/importacao';
+export * from './campanhas/regras';
 export * from './motor/chave-publica';
 export * from './motor/regras';
+export * from './seguranca/regras';

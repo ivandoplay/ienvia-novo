@@ -24,6 +24,11 @@ export interface ArquivoDoAviso {
 export type AvisoDaEvolution =
   | { tipo: 'conexao'; instancia: string; estado: string; telefone: string | null }
   | {
+      tipo: 'status_mensagem';
+      instancia: string;
+      atualizacoes: Array<{ idNoWhatsApp: string; status: 'delivered' | 'read' }>;
+    }
+  | {
       tipo: 'mensagem';
       instancia: string;
       /** Identificador da mensagem no WhatsApp (serve para não gravar a mesma duas vezes). */
@@ -193,15 +198,47 @@ function quandoFoi(valor: unknown, agora: Date): string {
   return agora.toISOString();
 }
 
+function lerStatusDeAck(valor: unknown): 'delivered' | 'read' | null {
+  if (typeof valor === 'number') {
+    if (valor === 3) return 'delivered';
+    if (valor === 4 || valor === 5) return 'read';
+    return null;
+  }
+  if (typeof valor === 'string') {
+    const s = valor.trim().toUpperCase();
+    if (s === 'DELIVERY_ACK' || s === '3') return 'delivered';
+    if (s === 'READ' || s === 'PLAYED' || s === '4' || s === '5') return 'read';
+  }
+  return null;
+}
+
 export function interpretarAviso(corpo: unknown, agora: Date = new Date()): AvisoDaEvolution {
   if (!ehObjeto(corpo)) return { tipo: 'ignorado', motivo: 'corpo inválido' };
 
   const instancia = texto(corpo.instance);
   const dados = corpo.data;
   if (!instancia || instancia.length > 100) return { tipo: 'ignorado', motivo: 'sem nome da instância' };
-  if (!ehObjeto(dados)) return { tipo: 'ignorado', motivo: 'sem dados' };
 
   const evento = nomeDoEvento(corpo.event);
+
+  if (evento === 'MESSAGES_UPDATE') {
+    const lista = Array.isArray(dados) ? dados : ehObjeto(dados) ? [dados] : [];
+    const atualizacoes: Array<{ idNoWhatsApp: string; status: 'delivered' | 'read' }> = [];
+    for (const item of lista) {
+      if (!ehObjeto(item)) continue;
+      const chave = ehObjeto(item.key) ? item.key : null;
+      const id = texto(item.keyId) ?? (chave ? texto(chave.id) : null);
+      if (!id || id.length > 200) continue;
+      const upd = ehObjeto(item.update) ? item.update : null;
+      const status = lerStatusDeAck(item.status ?? upd?.status);
+      if (!status) continue;
+      atualizacoes.push({ idNoWhatsApp: id, status });
+    }
+    if (atualizacoes.length === 0) return { tipo: 'ignorado', motivo: 'atualização sem status aproveitável' };
+    return { tipo: 'status_mensagem', instancia, atualizacoes };
+  }
+
+  if (!ehObjeto(dados)) return { tipo: 'ignorado', motivo: 'sem dados' };
 
   if (evento === 'CONNECTION_UPDATE') {
     const estado = texto(dados.state);

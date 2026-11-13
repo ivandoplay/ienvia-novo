@@ -59,10 +59,11 @@ const DIGITANDO_NO_MAXIMO = 15_000;
 /**
  * O que a Evolution avisa ao painel:
  *   MESSAGES_UPSERT   — mensagem que chegou, ou que foi digitada direto no celular do chip;
+ *   MESSAGES_UPDATE   — confirmação de entrega/leitura no WhatsApp (campanhas e fila segura);
  *   SEND_MESSAGE      — mensagem que saiu pela Evolution (é o "eco" do que o painel enviou);
  *   CONNECTION_UPDATE — chip conectou ou caiu.
  */
-export const EVENTOS_DO_AVISO = ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] as const;
+export const EVENTOS_DO_AVISO = ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] as const;
 
 function extrairMensagem(dado: unknown): string {
   if (dado && typeof dado === 'object') {
@@ -312,6 +313,8 @@ export interface ArquivoParaEnviar {
   nome: string | null;
   /** Legenda (foto, vídeo e documento). Áudio não leva. */
   legenda: string | null;
+  /** Quando `tipo === 'audio'`: `true` (padrão) envia como recado de voz (PTT); `false` envia como arquivo de áudio normal. */
+  voz?: boolean;
 }
 
 /**
@@ -366,7 +369,7 @@ export async function enviarArquivo(
   const tempoLimite = opcoes.tempoLimite ?? TEMPO_LIMITE_DO_ENVIO_DE_ARQUIVO;
   const base64 = arquivo.dados.toString('base64');
 
-  if (arquivo.tipo === 'audio') {
+  if (arquivo.tipo === 'audio' && arquivo.voz !== false) {
     return enviar(`/message/sendWhatsAppAudio/${nomeNoCaminho(nome)}`, { number: numero, audio: base64 }, tempoLimite);
   }
   return enviar(
@@ -377,8 +380,9 @@ export async function enviarArquivo(
       media: base64,
       mimetype: arquivo.tipo === 'image' ? 'image/jpeg' : arquivo.conteudo,
       ...(arquivo.legenda ? { caption: arquivo.legenda } : {}),
-      // Foto e vídeo vão sem nome: a Evolution usa "image.jpg" / "video.mp4", que dão o tipo certo.
-      ...(arquivo.tipo === 'document' ? { fileName: nomeDoDocumentoParaEnvio(arquivo.nome, arquivo.conteudo) } : {}),
+      ...(arquivo.tipo === 'document' || arquivo.tipo === 'audio'
+        ? { fileName: nomeDoDocumentoParaEnvio(arquivo.nome, arquivo.conteudo) }
+        : {}),
     },
     tempoLimite,
   );

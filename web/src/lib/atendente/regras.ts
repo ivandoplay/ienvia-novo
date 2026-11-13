@@ -282,12 +282,18 @@ const DIGITANDO_NO_MAXIMO = 5_200;
 
 /**
  * Quanto tempo o "digitando…" fica aparecendo antes de um balão: proporcional ao tamanho do texto, entre
- * 1,8 e 5,2 segundos, com uma pequena variação para não ficar sempre igual. `sorteio` vai de 0 a 1.
+ * `minMs` (padrão 1,8s) e `maxMs` (padrão 5,2s), com uma pequena variação para não ficar sempre igual. `sorteio` vai de 0 a 1.
  */
-export function tempoDeDigitacao(textoDoBalao: string, sorteio: number = Math.random()): number {
-  const base = Math.min(DIGITANDO_NO_MAXIMO, Math.max(DIGITANDO_NO_MINIMO, textoDoBalao.length * 24));
+export function tempoDeDigitacao(
+  textoDoBalao: string,
+  sorteio: number = Math.random(),
+  limites?: { minMs?: number; maxMs?: number },
+): number {
+  const minMs = Math.max(500, Math.min(limites?.minMs ?? DIGITANDO_NO_MINIMO, 10_000));
+  const maxMs = Math.max(minMs, Math.min(limites?.maxMs ?? DIGITANDO_NO_MAXIMO, 15_000));
+  const base = Math.min(maxMs, Math.max(minMs, textoDoBalao.length * 24));
   const variacao = 0.85 + Math.min(Math.max(sorteio, 0), 1) * 0.3;
-  return Math.round(Math.min(DIGITANDO_NO_MAXIMO, Math.max(DIGITANDO_NO_MINIMO, base * variacao)));
+  return Math.round(Math.min(maxMs, Math.max(minMs, base * variacao)));
 }
 
 /** O recado que a IA deixa ao passar a conversa: quando ela segue o formato pedido, vem em três partes. */

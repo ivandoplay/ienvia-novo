@@ -14,6 +14,7 @@ test.describe('Visão geral', () => {
       /^2\s*Chips online\s*de 3 cadastrados$/,
       /^12\s*Mensagens recebidas\s*hoje · 9 respostas da IA$/,
       /^41\s*Contatos\s*no seu CRM$/,
+      /^3\s*Na fila segura\s*enviando em ritmo seguro$/,
     ]) {
       await expect(page.getByRole('link', { name: nome })).toBeVisible();
     }
@@ -60,11 +61,11 @@ test.describe('Visão geral', () => {
 test.describe('Navegação', () => {
   test('as abas ainda não refeitas avisam em que fase ficam prontas', async ({ page }) => {
     await entrar(page, 'dona');
-    await page.goto('/campanhas');
+    await page.goto('/catalogo');
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Campanhas' })).toBeVisible();
-    await expect(page.getByText('Em reconstrução · Fase 5 — Campanhas e segurança')).toBeVisible();
-    await expect(page).toHaveTitle('Campanhas · Ienvia');
+    await expect(page.getByRole('heading', { level: 1, name: 'Catálogo & PIX' })).toBeVisible();
+    await expect(page.getByText('Em reconstrução · Fase 6 — Catálogo, áudios e simulador')).toBeVisible();
+    await expect(page).toHaveTitle('Catálogo & PIX · Ienvia');
   });
 
   test('endereço que não existe mostra "Página não encontrada"', async ({ page }) => {

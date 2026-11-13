@@ -379,7 +379,7 @@ export class SupervisorDeSessoes {
         let payloadWa;
         if (att.kind === 'image') payloadWa = { image: buf, mimetype: att.content_type, caption };
         else if (att.kind === 'video') payloadWa = { video: buf, mimetype: att.content_type, caption };
-        else if (att.kind === 'audio') payloadWa = { audio: buf, mimetype: att.content_type || 'audio/ogg; codecs=opus', ptt: true };
+        else if (att.kind === 'audio') payloadWa = { audio: buf, mimetype: att.content_type || 'audio/ogg; codecs=opus', ptt: att.is_voice !== false };
         else payloadWa = { document: buf, mimetype: att.content_type, fileName: att.file_name || 'arquivo', caption };
 
         const enviado = await registro.sock.sendMessage(jid, payloadWa);

@@ -26,6 +26,9 @@ export default defineConfig({
         resolve: {
           alias: {
             '@': path.join(raiz, 'web', 'src'),
+            '@ienvia/shared/campanhas': path.join(raiz, 'shared', 'src', 'campanhas', 'regras.ts'),
+            '@ienvia/shared/campanhas-importacao': path.join(raiz, 'shared', 'src', 'campanhas', 'importacao.ts'),
+            '@ienvia/shared/seguranca': path.join(raiz, 'shared', 'src', 'seguranca', 'regras.ts'),
             '@ienvia/shared': path.join(raiz, 'shared', 'src', 'index.ts'),
             // "server-only" é uma trava do Next (impede o navegador de importar código do servidor);
             // nos testes, que rodam fora do Next, ela vira um arquivo vazio.
@@ -44,6 +47,9 @@ export default defineConfig({
         resolve: {
           alias: {
             '@': path.join(raiz, 'web', 'src'),
+            '@ienvia/shared/campanhas': path.join(raiz, 'shared', 'src', 'campanhas', 'regras.ts'),
+            '@ienvia/shared/campanhas-importacao': path.join(raiz, 'shared', 'src', 'campanhas', 'importacao.ts'),
+            '@ienvia/shared/seguranca': path.join(raiz, 'shared', 'src', 'seguranca', 'regras.ts'),
             '@ienvia/shared': path.join(raiz, 'shared', 'src', 'index.ts'),
             'server-only': path.join(raiz, 'web', 'test', 'apoio', 'vazio.ts'),
           },
