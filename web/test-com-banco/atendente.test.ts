@@ -15,6 +15,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { BancoDeTeste } from '../../supabase/tests/helpers/banco';
 import { ATENDENTE_A, CHIP_A, CONTATO_A, CONVERSA_A, DONA_A, LOJA_A, bancoComCenario } from '../../supabase/tests/helpers/cenario';
 import { CHAVE_GEMINI_DE_TESTE, CHAVE_NVIDIA_DE_TESTE, CHAVE_OPENROUTER_DE_TESTE } from '../e2e/apoio/chaves-de-ia.mjs';
+import { audioDeExemplo, fotoDeExemplo, pdfDeExemplo } from '../e2e/apoio/arquivos-de-exemplo.mjs';
 import { CHAVE_DE_TESTE as CHAVE_DA_EVOLUTION, criarEvolutionFalsa } from '../e2e/apoio/evolution-falsa.mjs';
 import { criarIaFalsa, type PedidoRecebido } from '../e2e/apoio/ia-falsa.mjs';
 
@@ -449,7 +450,7 @@ describe('a IA passa a conversa para uma pessoa', () => {
     });
   });
 
-  test('quando ela tenta enviar foto, áudio ou PIX (ainda não faz): o texto sai e uma pessoa é chamada', async () => {
+  test('quando ela tenta enviar recurso que não está cadastrado ou ativo: o texto sai e uma pessoa é chamada', async () => {
     await banco.comoServico(async () => {
       await preparar();
       roteiro = () => 'Vou te mandar a foto do cardápio! [[ENVIAR_ITEM:cardapio]]';
@@ -458,7 +459,7 @@ describe('a IA passa a conversa para uma pessoa', () => {
       expect((await enviadasPelaEvolution()).map((envio) => envio.texto)).toEqual(['Vou te mandar a foto do cardápio!']);
       const conversa = await conversaDe();
       expect(conversa).toMatchObject({ stage: 'waiting_human', ai_pause_reason: 'handoff' });
-      expect(conversa.ai_handoff_note).toBe('A IA quis enviar uma foto ou arquivo do catálogo, e isso ela ainda não faz.');
+      expect(conversa.ai_handoff_note).toBe('A IA quis enviar uma foto ou arquivo do catálogo, mas o recurso não está cadastrado ou ativo.');
     });
   });
 
@@ -798,6 +799,137 @@ describe('o que ficou para trás', () => {
       expect(await conversaDe()).toMatchObject({ stage: 'waiting_human', ai_pause_reason: 'error' });
       expect((await conversaDe()).ai_handoff_note).toMatch(/interrompida no meio de uma resposta/);
       expect((await enviadasPelaEvolution()).map((envio) => envio.numero)).toEqual(['5586900000077']);
+    });
+  });
+});
+
+describe('catálogo, áudios estratégicos e PIX automático', () => {
+  test('envia foto e PDF de item do catálogo via [[ENVIAR_ITEM:id]] sem acionar humano', async () => {
+    await banco.comoServico(async () => {
+      await preparar();
+      const fotoKey = `${LOJA_A}/catalogo/00000000-0000-4000-8000-000000000701/00000000-0000-4000-8000-000000000711/pizza.png`;
+      const pdfKey = `${LOJA_A}/catalogo/00000000-0000-4000-8000-000000000701/00000000-0000-4000-8000-000000000712/cardapio.pdf`;
+      const fotoBuf = fotoDeExemplo();
+      const pdfBuf = pdfDeExemplo();
+      deposito.set(fotoKey, { dados: fotoBuf, conteudo: 'image/png' });
+      deposito.set(pdfKey, { dados: pdfBuf, conteudo: 'application/pdf' });
+
+      await sql(`
+        insert into public.catalog_items (id, workspace_id, name, category, price, description, active, sort_order)
+        values ('00000000-0000-4000-8000-000000000701', '${LOJA_A}', 'Pizza Especial', 'Pizzas', '69,90', 'Borda recheada.', true, 0);
+        insert into public.catalog_item_files (id, item_id, workspace_id, object_key, file_name, content_type, byte_size, sort_order)
+        values
+          ('00000000-0000-4000-8000-000000000711', '00000000-0000-4000-8000-000000000701', '${LOJA_A}', '${fotoKey}', 'pizza.png', 'image/png', ${fotoBuf.length}, 0),
+          ('00000000-0000-4000-8000-000000000712', '00000000-0000-4000-8000-000000000701', '${LOJA_A}', '${pdfKey}', 'cardapio.pdf', 'application/pdf', ${pdfBuf.length}, 1);
+      `);
+
+      roteiro = (pedido) => {
+        expect(pedido.sistema).toContain('[[ENVIAR_ITEM:00000000-0000-4000-8000-000000000701]]');
+        return 'Aqui estão a foto e o cardápio completo! [[ENVIAR_ITEM:00000000-0000-4000-8000-000000000701]]';
+      };
+
+      await chegou('Manda foto e cardápio da pizza especial?');
+      await rodarOQueFicouParaDepois();
+
+      const envios = (await enviadasPelaEvolution()) as Array<{ texto?: string; tipo?: string; nome?: string | null; bytes?: number }>;
+      expect(envios.map((e) => e.texto ?? `${e.tipo}:${e.nome ?? ''}`)).toEqual([
+        'Aqui estão a foto e o cardápio completo!',
+        'image:',
+        'document:cardapio.pdf',
+      ]);
+      expect(await conversaDe()).toMatchObject({ stage: 'ai', automation_paused: false });
+      expect(await vezesDe(CONVERSA_A)).toMatchObject([{ status: 'answered' }]);
+    });
+  });
+
+  test('envia áudio estratégico PTT puro, bloqueia repetição na 2a vez e respeita Skill S06', async () => {
+    await banco.comoServico(async () => {
+      await preparar();
+      const audioId = '00000000-0000-4000-8000-000000000801';
+      const audioKey = `${LOJA_A}/audios/${audioId}/00000000-0000-4000-8000-000000000811/boas-vindas.ogg`;
+      const audioBuf = audioDeExemplo(2);
+      deposito.set(audioKey, { dados: audioBuf, conteudo: 'audio/ogg' });
+
+      await sql(`
+        insert into public.voice_library_items (id, workspace_id, name, transcription, when_to_use, linked_message_code, ai_enabled, object_key, file_name, content_type, byte_size, duration_sec)
+        values ('${audioId}', '${LOJA_A}', 'Boas-vindas', 'Oi! Fazemos entregas até meia-noite.', 'Horário de entrega', 'M01', true, '${audioKey}', 'boas-vindas.ogg', 'audio/ogg; codecs=opus', ${audioBuf.length}, 6);
+      `);
+
+      // Turno 1: IA decide enviar áudio puro (sem texto extra).
+      roteiro = (pedido) => {
+        expect(pedido.sistema).toContain(`[[ENVIAR_AUDIO:${audioId}]]`);
+        return `[[ENVIAR_AUDIO:${audioId}]]`;
+      };
+      await chegou('Vocês entregam até que horas?');
+      await rodarOQueFicouParaDepois();
+
+      const enviosT1 = (await enviadasPelaEvolution()) as Array<{ tipo?: string; bytes?: number }>;
+      expect(enviosT1).toHaveLength(1);
+      expect(enviosT1[0]).toMatchObject({ tipo: 'audio', bytes: audioBuf.length });
+      const msgsSentVoice = await ler<{ sent_voice_id: string | null }>('select sent_voice_id from public.messages where conversation_id = $1 and sent_voice_id is not null', [CONVERSA_A]);
+      expect(msgsSentVoice).toEqual([{ sent_voice_id: audioId }]);
+
+      // Turno 2: anti-repetição — o áudio já saiu nesta conversa, logo sai do prompt e se a IA insistir vai a transcrição em texto.
+      roteiro = (pedido) => {
+        expect(pedido.sistema).not.toContain(audioId);
+        return `[[ENVIAR_AUDIO:${audioId}]]`;
+      };
+      await chegou('Pode repetir o horário?');
+      await rodarOQueFicouParaDepois();
+
+      const enviosT2 = (await enviadasPelaEvolution()) as Array<{ texto?: string; tipo?: string }>;
+      expect(enviosT2).toHaveLength(2);
+      expect(enviosT2[1]?.texto).toBe('Oi! Fazemos entregas até meia-noite.');
+
+      // Turno 3: novo áudio disponível, mas cliente avisa que não pode ouvir áudio (Skill S06).
+      const audioId2 = '00000000-0000-4000-8000-000000000802';
+      const audioKey2 = `${LOJA_A}/audios/${audioId2}/00000000-0000-4000-8000-000000000812/pix.ogg`;
+      deposito.set(audioKey2, { dados: audioBuf, conteudo: 'audio/ogg' });
+      await sql(`
+        insert into public.voice_library_items (id, workspace_id, name, transcription, when_to_use, linked_message_code, ai_enabled, object_key, file_name, content_type, byte_size, duration_sec)
+        values ('${audioId2}', '${LOJA_A}', 'Como pagar', 'Aceitamos PIX e cartão.', 'Pagamento', 'M02', true, '${audioKey2}', 'pix.ogg', 'audio/ogg; codecs=opus', ${audioBuf.length}, 5);
+      `);
+
+      roteiro = (pedido) => {
+        expect(pedido.sistema).toContain('OBSERVAÇÃO SKILL S06');
+        expect(pedido.sistema).not.toContain(`[[ENVIAR_AUDIO:${audioId2}]]`);
+        return 'Aceitamos PIX e cartão na entrega!';
+      };
+      await chegou('Tô sem fone, não consigo ouvir áudio agora, como pago?');
+      await rodarOQueFicouParaDepois();
+
+      const enviosT3 = (await enviadasPelaEvolution()) as Array<{ texto?: string; tipo?: string }>;
+      expect(enviosT3).toHaveLength(3);
+      expect(enviosT3[2]?.texto).toBe('Aceitamos PIX e cartão na entrega!');
+    });
+  });
+
+  test('envia resumo, QR Code PNG e Copia e Cola EMV via [[ENVIAR_PIX:149.90]]', async () => {
+    await banco.comoServico(async () => {
+      await preparar();
+      await sql(`
+        insert into public.workspace_pix_settings (workspace_id, enabled, key_type, pix_key, receiver_name, bank_name, city, send_qr_image, include_copy_paste, instructions)
+        values ('${LOJA_A}', true, 'email', 'pix@pizzaria.com', 'Pizzaria do Ze', 'Nubank', 'Piracuruca', true, true, 'Mande o comprovante aqui.');
+      `);
+
+      roteiro = (pedido) => {
+        expect(pedido.sistema).toContain('PAGAMENTO PIX ATIVO');
+        return 'Fechado! Segue o PIX para concluir: [[ENVIAR_PIX:149.90]]';
+      };
+
+      await chegou('Vou querer, manda o PIX de 149,90');
+      await rodarOQueFicouParaDepois();
+
+      const envios = (await enviadasPelaEvolution()) as Array<{ texto?: string; tipo?: string; nome?: string; bytes?: number }>;
+      expect(envios).toHaveLength(4);
+      expect(envios[0]?.texto).toBe('Fechado! Segue o PIX para concluir:');
+      expect(envios[1]?.texto).toContain('*Tipo:* E-mail');
+      expect(envios[1]?.texto).toContain('*Chave:* pix@pizzaria.com');
+      expect(envios[1]?.texto).toContain('*Valor:* R$ 149,90');
+      expect(envios[2]).toMatchObject({ tipo: 'image' });
+      expect((envios[2]?.bytes ?? 0) > 200).toBe(true);
+      expect(envios[3]?.texto).toMatch(/^000201.+5406149\.90.+6304[0-9A-F]{4}$/);
+      expect(await conversaDe()).toMatchObject({ stage: 'ai', automation_paused: false });
     });
   });
 });

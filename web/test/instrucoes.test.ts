@@ -144,16 +144,101 @@ describe('instruções: o que a IA sabe', () => {
     expect(instrucoes({ tom: 'formal' })).toContain('Tom: Executivo, polido, elegante e respeitoso.');
   });
 
-  test('a IA é instruída a não inventar e a não prometer o que o painel ainda não faz', () => {
+  test('sem recursos cadastrados, a IA é instruída a não inventar e a não prometer o que não está configurado', () => {
     const texto = instrucoes();
     expect(texto).toContain('Não invente, não chute e não diga nem que tem nem que não tem.');
-    // O que está escrito, a IA responde direto; e toda promessa de "vou confirmar" tem de avisar uma pessoa.
-    expect(texto).toContain('se o preço está na tabela, diga o preço');
+    expect(texto).toContain('se o preço está na tabela ou no catálogo, diga o preço');
     expect(texto).toContain('a mensagem TEM de terminar com [[CHAMAR_HUMANO:...]]');
     expect(texto).toContain('Você NÃO envia fotos, catálogos, arquivos, áudios, links de pagamento nem chave PIX, mesmo que alguma regra acima diga para enviar.');
-    // Só os cinco comandos que o painel atende aparecem; os de catálogo, áudio e PIX ainda não existem.
     for (const comando of ['CHAMAR_HUMANO', 'PAUSA_SILENCIOSA', 'ENCERRAR_CONTATO', 'PARAR_CONTATO', 'SILENCIO_CORTESIA']) expect(texto).toContain(`[[${comando}`);
     expect(texto).not.toMatch(/ENVIAR_ITEM|ENVIAR_AUDIO|ENVIAR_PIX/);
+  });
+
+  test('com catálogo, PIX e biblioteca de áudios ativos, as instruções liberam comandos reais, anti-repetição e fallback S06', () => {
+    const recursos = {
+      pix: {
+        enabled: true,
+        keyType: 'email' as const,
+        key: 'pix@loja.com',
+        receiverName: 'Flor de Sal',
+        bankName: 'Inter',
+        city: 'Piracuruca',
+        sendQrImage: true,
+        includeCopyPaste: true,
+        instructions: 'Envie o comprovante.',
+        updatedAt: null,
+      },
+      catalogo: [
+        {
+          id: 'item-1',
+          name: 'Vestido Linho',
+          category: 'Moda',
+          price: '149,90',
+          description: 'Tecido leve',
+          paymentLink: 'https://loja.com/vestido',
+          active: true,
+          sortOrder: 0,
+          files: [{ id: 'f1', objectKey: 'ws/catalogo/item-1/f1/foto.jpg', fileName: 'foto.jpg', contentType: 'image/jpeg', byteSize: 5000, sortOrder: 0 }],
+          createdAt: null,
+          updatedAt: null,
+        },
+      ],
+      audios: [
+        {
+          id: 'aud-1',
+          name: 'Boas-vindas',
+          transcription: 'Oi! Aqui é a Lia da Flor de Sal, tudo bem?',
+          whenToUse: 'Saudação inicial',
+          linkedMessageCode: 'M01',
+          aiEnabled: true,
+          objectKey: 'ws/audios/aud-1/f1/oi.ogg',
+          fileName: 'oi.ogg',
+          contentType: 'audio/ogg; codecs=opus',
+          byteSize: 8000,
+          durationSec: 6,
+          waveform: [],
+          createdAt: null,
+          updatedAt: null,
+        },
+        {
+          id: 'aud-2',
+          name: 'Entrega',
+          transcription: 'Entregamos no mesmo dia em Piracuruca!',
+          whenToUse: 'Dúvida de entrega',
+          linkedMessageCode: 'M02',
+          aiEnabled: true,
+          objectKey: 'ws/audios/aud-2/f2/entrega.ogg',
+          fileName: 'entrega.ogg',
+          contentType: 'audio/ogg; codecs=opus',
+          byteSize: 9000,
+          durationSec: 8,
+          waveform: [],
+          createdAt: null,
+          updatedAt: null,
+        },
+      ],
+      audiosJaEnviados: ['aud-1'],
+    };
+
+    const comRecursos = montarInstrucoes(base(), { agora: AGORA, recursos, mensagemAtual: 'Quero pagar via PIX e saber da entrega' });
+    expect(comRecursos).toContain('=== CATÁLOGO DE PRODUTOS E SERVIÇOS ===');
+    expect(comRecursos).toContain('[[ENVIAR_ITEM:item-1]]');
+    expect(comRecursos).toContain('=== PAGAMENTO PIX ATIVO ===');
+    expect(comRecursos).toContain('[[ENVIAR_PIX]]');
+    expect(comRecursos).toContain('=== BIBLIOTECA DE ÁUDIOS ESTRATÉGICOS');
+    // Anti-repetição: aud-1 já foi enviado e não entra de novo; aud-2 entra.
+    expect(comRecursos).not.toContain('aud-1');
+    expect(comRecursos).toContain('aud-2');
+
+    // Skill S06: cliente avisou que não pode ouvir áudio -> esconde [[ENVIAR_AUDIO]] e fornece transcrições para texto.
+    const semAudio = montarInstrucoes(base(), {
+      agora: AGORA,
+      recursos,
+      mensagemAtual: 'Tô sem fone agora, não consigo ouvir áudio',
+    });
+    expect(semAudio).toContain('=== OBSERVAÇÃO SKILL S06 (CLIENTE PREFERE TEXTO — NÃO ENVIE ÁUDIO) ===');
+    expect(semAudio).not.toContain('[[ENVIAR_AUDIO:aud-2]]');
+    expect(semAudio).toContain('Entregamos no mesmo dia em Piracuruca!');
   });
 
   test('arquivos de consulta entram como dados em JSON, e um arquivo não consegue se passar por instrução', () => {
@@ -228,7 +313,17 @@ describe('instruções: o que a IA sabe', () => {
 });
 
 describe('ler a resposta da IA', () => {
-  const vazia = { chamarHumano: null, pausaSilenciosa: null, encerrarContato: null, pararContato: null, silencioDeCortesia: false, foraDoAlcance: [] };
+  const vazia = {
+    chamarHumano: null,
+    pausaSilenciosa: null,
+    encerrarContato: null,
+    pararContato: null,
+    silencioDeCortesia: false,
+    itensParaEnviar: [] as string[],
+    audiosParaEnviar: [] as string[],
+    enviarPix: false,
+    valorPix: null as number | null,
+  };
 
   test('resposta comum: o texto vai como veio', () => {
     expect(lerResposta('Sim, entregamos no centro! A taxa é de R$ 5,00.')).toEqual({ ...vazia, texto: 'Sim, entregamos no centro! A taxa é de R$ 5,00.' });
@@ -271,9 +366,23 @@ describe('ler a resposta da IA', () => {
     expect(lerResposta('Ok. [[ENCERRAR_CONTATO]] [[PARAR_CONTATO]]')).toMatchObject({ encerrarContato: 'Recusa cordial: encerrado sem insistir', pararContato: 'Pediu para não receber mais mensagens' });
   });
 
-  test('comandos que o painel ainda não atende saem do texto e ficam marcados (a IA prometeu algo que não vai chegar)', () => {
-    expect(lerResposta('Segue a foto do vestido! [[ENVIAR_ITEM:vestido-01]]')).toEqual({ ...vazia, texto: 'Segue a foto do vestido!', foraDoAlcance: ['ENVIAR_ITEM'] });
-    expect(lerResposta('Aqui o PIX: [[ENVIAR_PIX:149.90]] e o áudio [[enviar_audio:a1]] [[ENVIAR_PIX]]')).toMatchObject({ texto: 'Aqui o PIX:  e o áudio', foraDoAlcance: ['ENVIAR_PIX', 'ENVIAR_AUDIO'] });
+  test('comandos de catálogo, áudio e PIX saem do texto e estruturam os envios', () => {
+    expect(lerResposta('Segue a foto do vestido! [[ENVIAR_ITEM:vestido-01]] [[ENVIAR_ITEM:vestido-01]]')).toEqual({
+      ...vazia,
+      texto: 'Segue a foto do vestido!',
+      itensParaEnviar: ['vestido-01'],
+    });
+    expect(lerResposta('Aqui o PIX: [[ENVIAR_PIX:149.90]] e o áudio [[enviar_audio:a1]] [[ENVIAR_AUDIO:a2]]')).toMatchObject({
+      texto: 'Aqui o PIX:  e o áudio',
+      audiosParaEnviar: ['a1'],
+      enviarPix: true,
+      valorPix: 149.9,
+    });
+    expect(lerResposta('[[ENVIAR_PIX:R$ 1.250,50]]')).toMatchObject({
+      texto: '',
+      enviarPix: true,
+      valorPix: 1250.5,
+    });
   });
 
   test('nenhum código interno chega ao contato', () => {

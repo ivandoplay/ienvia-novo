@@ -137,12 +137,22 @@ const SEM_CHAVE_NO_GEMINI = {
  * (conversa = [{ de: 'cliente' | 'atendente', texto }]) e devolve o texto. O padrão repete a última
  * fala do cliente, para o teste reconhecer a resposta.
  */
-export function criarIaFalsa({ responder: decidir = respostaPadrao } = {}) {
+export function criarIaFalsa({ responder: responderOriginal = respostaPadrao } = {}) {
   /** Todo pedido de resposta recebido, na ordem (para o teste conferir o que o painel mandou). */
   const pedidos = [];
   /** Falha simulada: { tipo, vezes, provedor } — vale para os próximos `vezes` pedidos de resposta. */
   let falha = null;
+  let proximaResposta = null;
   const pendurados = new Set();
+
+  const decidir = (pedido) => {
+    if (proximaResposta !== null) {
+      const r = proximaResposta;
+      proximaResposta = null;
+      return r;
+    }
+    return responderOriginal(pedido);
+  };
 
   const responder = (res, status, corpo) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
@@ -203,6 +213,12 @@ export function criarIaFalsa({ responder: decidir = respostaPadrao } = {}) {
     if (caminho === '/controle/reiniciar' && req.method === 'POST') {
       pedidos.length = 0;
       falha = null;
+      proximaResposta = null;
+      return responder(res, 200, { ok: true });
+    }
+    if (caminho === '/controle/proxima-resposta' && req.method === 'POST') {
+      const corpo = await lerCorpo(req);
+      proximaResposta = typeof corpo?.texto === 'string' ? corpo.texto : null;
       return responder(res, 200, { ok: true });
     }
     if (caminho === '/controle/falha' && req.method === 'POST') {

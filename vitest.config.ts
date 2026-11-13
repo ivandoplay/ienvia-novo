@@ -28,7 +28,10 @@ export default defineConfig({
             '@': path.join(raiz, 'web', 'src'),
             '@ienvia/shared/campanhas': path.join(raiz, 'shared', 'src', 'campanhas', 'regras.ts'),
             '@ienvia/shared/campanhas-importacao': path.join(raiz, 'shared', 'src', 'campanhas', 'importacao.ts'),
+            '@ienvia/shared/recursos-pix': path.join(raiz, 'shared', 'src', 'recursos', 'pix.ts'),
+            '@ienvia/shared/recursos': path.join(raiz, 'shared', 'src', 'recursos', 'regras.ts'),
             '@ienvia/shared/seguranca': path.join(raiz, 'shared', 'src', 'seguranca', 'regras.ts'),
+            '@ienvia/shared/simulador': path.join(raiz, 'shared', 'src', 'simulador', 'regras.ts'),
             '@ienvia/shared': path.join(raiz, 'shared', 'src', 'index.ts'),
             // "server-only" é uma trava do Next (impede o navegador de importar código do servidor);
             // nos testes, que rodam fora do Next, ela vira um arquivo vazio.
@@ -49,7 +52,10 @@ export default defineConfig({
             '@': path.join(raiz, 'web', 'src'),
             '@ienvia/shared/campanhas': path.join(raiz, 'shared', 'src', 'campanhas', 'regras.ts'),
             '@ienvia/shared/campanhas-importacao': path.join(raiz, 'shared', 'src', 'campanhas', 'importacao.ts'),
+            '@ienvia/shared/recursos-pix': path.join(raiz, 'shared', 'src', 'recursos', 'pix.ts'),
+            '@ienvia/shared/recursos': path.join(raiz, 'shared', 'src', 'recursos', 'regras.ts'),
             '@ienvia/shared/seguranca': path.join(raiz, 'shared', 'src', 'seguranca', 'regras.ts'),
+            '@ienvia/shared/simulador': path.join(raiz, 'shared', 'src', 'simulador', 'regras.ts'),
             '@ienvia/shared': path.join(raiz, 'shared', 'src', 'index.ts'),
             'server-only': path.join(raiz, 'web', 'test', 'apoio', 'vazio.ts'),
           },

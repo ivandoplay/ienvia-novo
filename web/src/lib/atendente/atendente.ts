@@ -2,8 +2,15 @@ import 'server-only';
 
 import { Buffer } from 'node:buffer';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  detectarRecusaDeAudioDoCliente,
+  type AudioEstrategico,
+  type ItemDoCatalogo,
+} from '@ienvia/shared/recursos';
+import { formatarMensagemPix, type MensagemPixFormatada } from '@ienvia/shared/recursos-pix';
 import { enviarAlertaViaRpc } from '@/lib/atendente/alertas';
 import { montarDossieParaAdmin } from '@/lib/atendente/dossie';
+import { gerarPngQrPix } from '@/lib/atendente/qr-pix';
 import {
   cortarRecado,
   dividirResposta,
@@ -19,7 +26,7 @@ import {
   type ArquivoDoHistorico,
   type MensagemDoHistorico,
 } from '@/lib/atendente/regras';
-import { enviarTexto, type ResultadoDoEnvio } from '@/lib/evolution/cliente';
+import { enviarArquivo, enviarTexto, type ResultadoDoEnvio } from '@/lib/evolution/cliente';
 import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
 import { lerResposta, montarInstrucoes } from '@/lib/ia/instrucoes';
 import { ErroDeIa, gerarResposta, type AnexoParaIa, type RespostaDeIa } from '@/lib/ia/provedores';
@@ -38,8 +45,9 @@ import {
   type Provedor,
 } from '@/lib/ia/regras';
 import { lerBase } from '@/lib/ia/treinamento';
-import { DEPOSITO } from '@/lib/inbox/arquivos';
+import { DEPOSITO, tipoParaEnvio } from '@/lib/inbox/arquivos';
 import { numeroParaEnvio } from '@/lib/inbox/regras';
+import { mapearRecursosDoPacote } from '@/lib/recursos/mapeamento';
 
 /**
  * O atendente de IA: responde, no WhatsApp, uma mensagem que chegou.
@@ -398,7 +406,45 @@ function recadoDoEnvioQueNaoSaiu(motivo: Extract<ResultadoDoEnvio, { situacao: '
 
 const RECADO_DO_ENVIO_INCERTO = 'Confira no WhatsApp do chip e marque, na própria mensagem, se ela foi enviada ou não.';
 
-const NOME_DO_COMANDO: Record<string, string> = { ENVIAR_ITEM: 'uma foto ou arquivo do catálogo', ENVIAR_AUDIO: 'um áudio', ENVIAR_PIX: 'o PIX' };
+interface MidiaPlanejada {
+  objectKey: string;
+  kind: 'image' | 'audio' | 'document';
+  contentType: string;
+  byteSize: number;
+  fileName: string | null;
+  caption: string | null;
+  isVoice: boolean;
+  durationSec: number | null;
+  sentVoiceId: string | null;
+  /** Preenchido quando o buffer já está em memória (ex.: QR Code PIX gerado na hora). */
+  dadosEmMemoria?: Buffer;
+}
+
+function encontrarItemDoCatalogo(catalogo: readonly ItemDoCatalogo[], solicitado: string): ItemDoCatalogo | null {
+  const chave = solicitado.trim();
+  if (!chave) return null;
+  const exato = catalogo.find((item) => item.id === chave);
+  if (exato) return exato;
+  const menor = chave.toLowerCase();
+  return catalogo.find((item) => item.name.trim().toLowerCase() === menor) ?? null;
+}
+
+function encontrarAudioEstrategico(audios: readonly AudioEstrategico[], solicitado: string): AudioEstrategico | null {
+  const chave = solicitado.trim();
+  if (!chave) return null;
+  const exato = audios.find((a) => a.id === chave);
+  if (exato) return exato;
+  const menor = chave.toLowerCase();
+  return audios.find((a) => a.name.trim().toLowerCase() === menor) ?? null;
+}
+
+function limitarBaloesParaCaber(baloes: string[], maxSlots: number): string[] {
+  if (baloes.length <= maxSlots) return baloes;
+  if (maxSlots <= 1) return [baloes.join('\n\n').slice(0, 4096)];
+  const cabeca = baloes.slice(0, maxSlots - 1);
+  const cauda = baloes.slice(maxSlots - 1).join('\n\n').slice(0, 4096);
+  return [...cabeca, cauda];
+}
 
 /** Com a vez na mão: pede a resposta, envia e fecha. */
 async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json): Promise<Fim> {
@@ -480,15 +526,27 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     return fim({ desfecho: 'passou', motivo: 'arquivo_sem_leitura' });
   }
 
+  const recursos = mapearRecursosDoPacote(pacote.resources);
   const conversa = montarConversa(historico, entregue);
   const falasCliente = historico.filter((m) => m.recebida).map((m) => m.texto).filter(Boolean);
+  const mensagemAtual = pendentes.map((m) => m.texto).filter(Boolean).join(' ').trim() || falasCliente.at(-1) || '';
+  const historicoRecente = falasCliente.slice(-5);
+  const clienteRecusouAudio = detectarRecusaDeAudioDoCliente(mensagemAtual, historicoRecente);
+
   let instrucoes = montarInstrucoes(base, {
     agora: new Date(agora()),
     nomeDoContato: texto(dadosDaConversa.contact_name) || null,
-    mensagemAtual: pendentes.map((m) => m.texto).filter(Boolean).join(' ').trim() || falasCliente.at(-1) || '',
-    historicoRecente: falasCliente.slice(-5),
+    mensagemAtual,
+    historicoRecente,
     temAudio: Boolean(anexo && anexo.tipo.startsWith('audio/')),
     temFoto: Boolean(anexo && anexo.tipo.startsWith('image/')),
+    recursos: {
+      pix: recursos.pix,
+      catalogo: recursos.catalogo,
+      audios: recursos.audios,
+      audiosJaEnviados: recursos.audiosJaEnviados,
+      clienteRecusouAudio,
+    },
   });
   if (conversa.abertura) instrucoes = `${instrucoes}\n\n${instrucaoDaAbertura(conversa.abertura)}`;
 
@@ -568,46 +626,134 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     return fim({ desfecho: 'silencio' });
   }
 
-  // A IA usou um comando de enviar foto, áudio ou PIX, que o painel ainda não atende: o contato ficaria esperando.
-  const prometido = lida.foraDoAlcance.map((comando) => NOME_DO_COMANDO[comando] ?? comando).join(', ');
-  const recadoDoRepasse =
-    lida.foraDoAlcance.length > 0
-      ? `A IA quis enviar ${prometido}, e isso ela ainda não faz.${lida.chamarHumano ? ` ${lida.chamarHumano}` : ''}`
-      : lida.chamarHumano;
+  // Resolve itens do catálogo, áudios estratégicos (com anti-repetição e Skill S06) e PIX.
+  const catalogoAtivo = recursos.catalogo.filter((item) => item.active !== false);
+  const audiosAtivos = recursos.audios.filter((a) => a.aiEnabled !== false && Boolean(a.objectKey));
+  const audiosJaEnviadosSet = new Set(recursos.audiosJaEnviados);
 
-  const baloes = dividirResposta(lida.texto, motor.dividirMensagensLongas);
-  if (baloes === null) {
+  const midiasParaEnviar: MidiaPlanejada[] = [];
+  const chavesDeArquivoPlanejadas = new Set<string>();
+  const recursosFaltantes: string[] = [];
+
+  for (const itemSol of lida.itensParaEnviar) {
+    const item = encontrarItemDoCatalogo(catalogoAtivo, itemSol);
+    if (!item || item.files.length === 0) {
+      recursosFaltantes.push('uma foto ou arquivo do catálogo');
+      continue;
+    }
+    for (const arquivo of item.files) {
+      if (chavesDeArquivoPlanejadas.has(arquivo.objectKey)) continue;
+      chavesDeArquivoPlanejadas.add(arquivo.objectKey);
+      const tipoWhatsapp = tipoParaEnvio(arquivo.contentType);
+      const kind: MidiaPlanejada['kind'] = tipoWhatsapp === 'image' ? 'image' : 'document';
+      midiasParaEnviar.push({
+        objectKey: arquivo.objectKey,
+        kind,
+        contentType: arquivo.contentType,
+        byteSize: Math.max(1, arquivo.byteSize),
+        fileName: arquivo.fileName,
+        caption: null,
+        isVoice: false,
+        durationSec: null,
+        sentVoiceId: null,
+      });
+    }
+  }
+
+  let textoFallbackDeAudio = '';
+  for (const audioSol of lida.audiosParaEnviar) {
+    const audio = encontrarAudioEstrategico(audiosAtivos, audioSol);
+    if (!audio) {
+      recursosFaltantes.push('um áudio');
+      continue;
+    }
+    if (clienteRecusouAudio) {
+      // Skill S06: contato pediu texto — jamais envia áudio. Usa a transcrição como fallback se a IA não escreveu texto.
+      if (!lida.texto.trim() && audio.transcription.trim()) {
+        textoFallbackDeAudio = audio.transcription.trim();
+      }
+      continue;
+    }
+    if (audiosJaEnviadosSet.has(audio.id)) {
+      // Anti-repetição: áudio já enviado nesta conversa não volta como nota de voz duplicada.
+      if (!lida.texto.trim() && audio.transcription.trim()) {
+        textoFallbackDeAudio = audio.transcription.trim();
+      }
+      continue;
+    }
+    midiasParaEnviar.push({
+      objectKey: audio.objectKey,
+      kind: 'audio',
+      contentType: audio.contentType || 'audio/ogg; codecs=opus',
+      byteSize: Math.max(1, audio.byteSize),
+      fileName: audio.fileName || 'audio.ogg',
+      caption: null,
+      isVoice: true,
+      durationSec: audio.durationSec,
+      sentVoiceId: audio.id,
+    });
+  }
+
+  let pixInfo: MensagemPixFormatada | null = null;
+  if (lida.enviarPix) {
+    const pixAtivo = recursos.pix.enabled && Boolean(recursos.pix.key.trim());
+    pixInfo = pixAtivo ? formatarMensagemPix(recursos.pix, lida.valorPix) : null;
+    if (!pixInfo) {
+      recursosFaltantes.push('o PIX');
+    }
+  }
+
+  const textoPrincipal = (lida.texto.trim() ? lida.texto : textoFallbackDeAudio).trim();
+  const baloesIniciais = dividirResposta(textoPrincipal, motor.dividirMensagensLongas);
+  if (baloesIniciais === null) {
     return falhar(vez, 'reply_too_long', 'A IA escreveu uma resposta grande demais para o WhatsApp. Nada foi enviado.', contextoAlerta);
   }
 
+  const pixTextosExtras = (pixInfo ? (pixInfo.brcode ? 2 : 1) : 0);
+  const baloes = limitarBaloesParaCaber(baloesIniciais, Math.max(1, 5 - pixTextosExtras));
+
+  const recadoDoRepasse =
+    recursosFaltantes.length > 0
+      ? `A IA quis enviar ${Array.from(new Set(recursosFaltantes)).join(', ')}, mas o recurso não está cadastrado ou ativo.${lida.chamarHumano ? ` ${lida.chamarHumano}` : ''}`
+      : lida.chamarHumano;
+
   let enviados = 0;
-  for (const [indice, balao] of baloes.entries()) {
+  let parteTextoAtual = 0;
+  let parteMidiaAtual = 0;
+
+  const typingPacote = objeto(pacote.typing);
+  const limitesDigitacao =
+    numero(typingPacote.min_ms) > 0 && numero(typingPacote.max_ms) >= numero(typingPacote.min_ms)
+      ? { minMs: numero(typingPacote.min_ms), maxMs: numero(typingPacote.max_ms) }
+      : undefined;
+
+  async function enviarParteTexto(balao: string): Promise<Fim | null> {
+    parteTextoAtual += 1;
+    const indiceAtual = parteTextoAtual;
     const inicio = await chamar(ambiente.supabase, 'start_ai_message', {
       p_workspace_id: workspaceId,
       p_turn_id: vez.vezId,
-      p_part: indice + 1,
+      p_part: indiceAtual,
       p_body_text: balao,
     });
     const resultado = texto(inicio.result);
 
     if (resultado === 'aborted') {
-      // O banco já fechou a vez (uma pessoa respondeu ou assumiu, a IA foi pausada, ou o cliente escreveu de novo).
       const motivo = texto(inicio.reason) || 'aborted';
       const proxima = objeto(inicio.next);
-      if (indice === 0 && motivo === 'superseded' && texto(proxima.turn_id)) {
+      if (enviados === 0 && motivo === 'superseded' && texto(proxima.turn_id)) {
         return {
           tipo: 'trocar',
           proxima: { workspaceId, vezId: texto(proxima.turn_id), gatilhoId: texto(proxima.trigger_message_id) || null, esperaMs: Math.max(numero(proxima.wait_ms), 0) },
         };
       }
-      return fim(enviados > 0 ? { desfecho: 'respondeu', baloes: enviados, provedor: usado } : { desfecho: 'nada', motivo });
+      return fim(enviados > 0 ? { desfecho: 'respondeu', baloes: enviados, provedor: usado! } : { desfecho: 'nada', motivo });
     }
     if (resultado === 'queued_local') {
       enviados += 1;
-      continue;
+      return null;
     }
     if (resultado !== 'started') {
-      // Este balão já tinha sido começado por outro pedido. Não dá para saber se saiu: nunca envia de novo.
       await fechar(vez, 'uncertain_send', { detalhe: 'part_already_started', recado: RECADO_DO_ENVIO_INCERTO });
       await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'uncertain_send', detalhe: 'part_already_started', recado: RECADO_DO_ENVIO_INCERTO });
       return fim({ desfecho: 'passou', motivo: 'envio_incerto' });
@@ -617,13 +763,7 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     const destino = numeroParaEnvio(inicio.recipient);
     const chip = texto(inicio.provider_instance_name);
 
-    // O "digitando…" encolhe quando o tempo do pedido está no fim: melhor responder sem ele do que não responder.
     const sobra = ambiente.prazo - agora();
-    const typingPacote = objeto(pacote.typing);
-    const limitesDigitacao =
-      numero(typingPacote.min_ms) > 0 && numero(typingPacote.max_ms) >= numero(typingPacote.min_ms)
-        ? { minMs: numero(typingPacote.min_ms), maxMs: numero(typingPacote.max_ms) }
-        : undefined;
     const digitando = motor.simularDigitando
       ? Math.max(Math.min(tempoDeDigitacao(balao, sorteio(), limitesDigitacao), sobra - 8_000), 0)
       : 0;
@@ -645,15 +785,14 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
       try {
         await terminar();
       } catch (erro) {
-        // A mensagem fica "enviando"; se saiu, o aviso da Evolution confirma sozinho.
         console.error('[atendente] não foi possível gravar como o envio terminou:', { vez: vez.vezId, mensagem: mensagemId, erro: String(erro) });
       }
     }
 
     if (envio.situacao === 'incerta') {
       console.error('[atendente] envio sem confirmação:', { vez: vez.vezId, mensagem: mensagemId, detalhe: envio.detalhe });
-      await fechar(vez, 'uncertain_send', { detalhe: `uncertain_part_${indice + 1}`, recado: RECADO_DO_ENVIO_INCERTO });
-      await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'uncertain_send', detalhe: `uncertain_part_${indice + 1}`, recado: RECADO_DO_ENVIO_INCERTO });
+      await fechar(vez, 'uncertain_send', { detalhe: `uncertain_part_${indiceAtual}`, recado: RECADO_DO_ENVIO_INCERTO });
+      await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'uncertain_send', detalhe: `uncertain_part_${indiceAtual}`, recado: RECADO_DO_ENVIO_INCERTO });
       return fim({ desfecho: 'passou', motivo: 'envio_incerto' });
     }
     if (envio.situacao === 'nao_enviada') {
@@ -671,6 +810,168 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
       return fim({ desfecho: 'falhou', motivo: `nao_enviada:${envio.motivo}` });
     }
     enviados += 1;
+    return null;
+  }
+
+  async function enviarParteMidia(midia: MidiaPlanejada): Promise<Fim | null> {
+    parteMidiaAtual += 1;
+    const indiceMidia = parteMidiaAtual;
+    if (indiceMidia > 20) return null;
+
+    const permitirPrimeira = enviados === 0;
+    const inicio = await chamar(ambiente.supabase, 'start_ai_media_message', {
+      p_workspace_id: workspaceId,
+      p_turn_id: vez.vezId,
+      p_part: indiceMidia,
+      p_object_key: midia.objectKey,
+      p_kind: midia.kind,
+      p_content_type: midia.contentType,
+      p_byte_size: midia.byteSize,
+      p_file_name: midia.fileName,
+      p_caption: midia.caption,
+      p_is_voice: midia.isVoice,
+      p_duration_seconds: midia.durationSec,
+      p_sent_voice_id: midia.sentVoiceId,
+      p_allow_first_part: permitirPrimeira,
+    });
+    const resultado = texto(inicio.result);
+
+    if (resultado === 'aborted') {
+      const motivo = texto(inicio.reason) || 'aborted';
+      const proxima = objeto(inicio.next);
+      if (permitirPrimeira && motivo === 'superseded' && texto(proxima.turn_id)) {
+        return {
+          tipo: 'trocar',
+          proxima: { workspaceId, vezId: texto(proxima.turn_id), gatilhoId: texto(proxima.trigger_message_id) || null, esperaMs: Math.max(numero(proxima.wait_ms), 0) },
+        };
+      }
+      return fim(enviados > 0 ? { desfecho: 'respondeu', baloes: enviados, provedor: usado! } : { desfecho: 'nada', motivo });
+    }
+    if (resultado === 'queued_local') {
+      enviados += 1;
+      return null;
+    }
+    if (resultado !== 'started') {
+      await fechar(vez, 'uncertain_send', { detalhe: 'media_already_started', recado: RECADO_DO_ENVIO_INCERTO });
+      await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'uncertain_send', detalhe: 'media_already_started', recado: RECADO_DO_ENVIO_INCERTO });
+      return fim({ desfecho: 'passou', motivo: 'envio_incerto' });
+    }
+
+    const mensagemId = texto(inicio.message_id);
+    const destino = numeroParaEnvio(inicio.recipient);
+    const chip = texto(inicio.provider_instance_name);
+    const dados = midia.dadosEmMemoria ?? (await baixarArquivo(ambiente.supabase, midia.objectKey));
+    const sobra = ambiente.prazo - agora();
+
+    const envio: ResultadoDoEnvio =
+      !dados || dados.length === 0
+        ? { situacao: 'nao_enviada', motivo: 'nao_configurada' }
+        : destino && chip
+          ? await enviarArquivo(
+              chip,
+              destino,
+              {
+                tipo: midia.kind,
+                dados,
+                conteudo: midia.contentType,
+                nome: midia.fileName,
+                legenda: midia.caption,
+                voz: midia.isVoice,
+              },
+              { tempoLimite: Math.max(Math.min(40_000, sobra - 1_500), 8_000) },
+            )
+          : { situacao: 'nao_enviada', motivo: 'sem_whatsapp' };
+
+    const terminar = () =>
+      chamar(ambiente.supabase, 'finish_ai_message', {
+        p_workspace_id: workspaceId,
+        p_message_id: mensagemId,
+        p_outcome: envio.situacao === 'enviada' ? 'sent' : envio.situacao === 'nao_enviada' ? 'failed' : 'uncertain',
+        p_provider_message_id: envio.situacao === 'enviada' ? envio.idNoWhatsApp : null,
+      });
+    try {
+      await terminar();
+    } catch {
+      try {
+        await terminar();
+      } catch (erro) {
+        console.error('[atendente] não foi possível gravar como o envio da mídia terminou:', { vez: vez.vezId, mensagem: mensagemId, erro: String(erro) });
+      }
+    }
+
+    if (envio.situacao === 'incerta') {
+      await fechar(vez, 'uncertain_send', { detalhe: `uncertain_media_${indiceMidia}`, recado: RECADO_DO_ENVIO_INCERTO });
+      await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'uncertain_send', detalhe: `uncertain_media_${indiceMidia}`, recado: RECADO_DO_ENVIO_INCERTO });
+      return fim({ desfecho: 'passou', motivo: 'envio_incerto' });
+    }
+    if (envio.situacao === 'nao_enviada') {
+      const recadoNaoSaiu =
+        !dados || dados.length === 0
+          ? 'A IA tentou enviar um arquivo do painel, mas ele não pôde ser lido do depósito.'
+          : recadoDoEnvioQueNaoSaiu(envio.motivo);
+      await fechar(vez, 'failed', { detalhe: `not_sent_media:${envio.motivo}`, recado: recadoNaoSaiu });
+      await despacharDossieParaAdmin({
+        ...contextoAlerta,
+        ambiente,
+        workspaceId,
+        vezId: vez.vezId,
+        tipo: 'error',
+        detalhe: `not_sent_media:${envio.motivo}`,
+        recado: recadoNaoSaiu,
+      });
+      return fim({ desfecho: 'falhou', motivo: `nao_enviada_midia:${envio.motivo}` });
+    }
+    enviados += 1;
+    return null;
+  }
+
+  for (const balao of baloes) {
+    const parada = await enviarParteTexto(balao);
+    if (parada) return parada;
+  }
+
+  for (const midia of midiasParaEnviar) {
+    const parada = await enviarParteMidia(midia);
+    if (parada) return parada;
+  }
+
+  if (pixInfo) {
+    const paradaResumo = await enviarParteTexto(pixInfo.summaryText);
+    if (paradaResumo) return paradaResumo;
+
+    if (pixInfo.sendQrImage) {
+      try {
+        const pngBuffer = await gerarPngQrPix(pixInfo.qrBrcode);
+        const qrPath = `${workspaceId}/pix/${vez.vezId}/pix-qrcode.png`;
+        const { error: uploadErro } = await ambiente.supabase.storage
+          .from(DEPOSITO)
+          .upload(qrPath, pngBuffer, { contentType: 'image/png', upsert: true });
+        if (!uploadErro) {
+          const paradaQr = await enviarParteMidia({
+            objectKey: qrPath,
+            kind: 'image',
+            contentType: 'image/png',
+            byteSize: pngBuffer.length,
+            fileName: 'pix-qrcode.png',
+            caption: null,
+            isVoice: false,
+            durationSec: null,
+            sentVoiceId: null,
+            dadosEmMemoria: pngBuffer,
+          });
+          if (paradaQr) return paradaQr;
+        } else {
+          console.error('[atendente] não foi possível guardar QR Code PIX no depósito:', { vez: vez.vezId, erro: uploadErro.message });
+        }
+      } catch (erro) {
+        console.error('[atendente] falha ao gerar QR Code PIX:', { vez: vez.vezId, erro: erro instanceof Error ? erro.message : String(erro) });
+      }
+    }
+
+    if (pixInfo.brcode) {
+      const paradaCopiaCola = await enviarParteTexto(pixInfo.brcode);
+      if (paradaCopiaCola) return paradaCopiaCola;
+    }
   }
 
   // Tudo enviado (ou não havia texto para enviar). O que a IA pediu para fazer com a conversa?
@@ -683,14 +984,14 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     return fim({ desfecho: 'encerrou', motivo: 'recusa' });
   }
   if (recadoDoRepasse !== null) {
-    const detalheRepasse = lida.foraDoAlcance.length > 0 ? `unsupported:${lida.foraDoAlcance.join(',')}` : 'asked';
+    const detalheRepasse = recursosFaltantes.length > 0 ? 'unsupported:missing_resource' : 'asked';
     await fechar(vez, 'handoff', {
       detalhe: detalheRepasse,
       recado: recadoDoRepasse,
       trava: base.travaAteRetomar,
     });
     await despacharDossieParaAdmin({ ...contextoAlerta, ambiente, workspaceId, vezId: vez.vezId, tipo: 'handoff', detalhe: detalheRepasse, recado: recadoDoRepasse });
-    return fim({ desfecho: 'passou', motivo: lida.foraDoAlcance.length > 0 ? 'comando_fora_do_alcance' : 'a_ia_pediu' });
+    return fim({ desfecho: 'passou', motivo: recursosFaltantes.length > 0 ? 'recurso_indisponivel' : 'a_ia_pediu' });
   }
   if (enviados === 0) {
     return falhar(vez, 'empty_reply', `${provedorComArtigo(usado)} devolveu uma resposta sem texto.`, contextoAlerta);

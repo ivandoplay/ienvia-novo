@@ -9,6 +9,7 @@ import {
   lerVersaoDaInbox,
   listarChipsDaInbox,
 } from '@/lib/dados/inbox';
+import { carregarRecursosDaInbox } from '@/lib/dados/recursos';
 import { lerConfigEvolution, lerConfigSupabase } from '@/lib/env';
 import {
   lerAbaDoCrm,
@@ -64,9 +65,10 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
   const agora = new Date();
   const [versao, canalRealtime] = await Promise.all([lerVersaoDaInbox(workspace.id), lerCanalDaInbox(workspace.id)]);
 
-  const [chips, catalogos, lista, aberta, contatosDir, kanban] = await Promise.all([
+  const [chips, catalogos, recursos, lista, aberta, contatosDir, kanban] = await Promise.all([
     listarChipsDaInbox(workspace.id),
     carregarCatalogosDoCrm(workspace.id),
+    carregarRecursosDaInbox(workspace.id),
     aba === 'conversas'
       ? carregarInbox(workspace.id, filtros, agora)
       : Promise.resolve({ conversas: [], temMais: false, contagens: null, falhou: false }),
@@ -90,6 +92,7 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
       lista={lista}
       chips={chips}
       catalogos={catalogos}
+      recursos={recursos}
       contatosDir={contatosDir}
       kanban={kanban}
       conversaId={conversaId}

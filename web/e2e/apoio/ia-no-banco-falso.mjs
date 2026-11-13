@@ -558,5 +558,13 @@ export function criarIaDoBanco({ tabelas, responder }) {
     reiniciarIa() {
       estado = cenarioInicial();
     },
+    chavesDoWorkspace(workspaceId) {
+      const out = {};
+      for (const p of ['gemini', 'openrouter', 'nvidia']) {
+        const reg = estado.chaves.get(`${workspaceId}:${p}`);
+        if (reg?.ciphertext) out[p] = reg.ciphertext;
+      }
+      return out;
+    },
   };
 }

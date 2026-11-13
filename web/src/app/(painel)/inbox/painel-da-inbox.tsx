@@ -4,9 +4,11 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { formatarDuracaoAudio } from '@ienvia/shared/recursos';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import type { FaixaDaIa } from '@/lib/atendente/painel';
+import type { RecursosParaInbox } from '@/lib/dados/recursos';
 import type {
   ArquivoDaMensagem,
   CartaoDoKanban,
@@ -59,7 +61,10 @@ import {
   cancelarMensagemAgendada,
   decidirEnvio,
   enviarArquivo,
+  enviarAudioEstrategicoNaConversa,
+  enviarItemCatalogoNaConversa,
   enviarMensagem,
+  enviarPixNaConversa,
   mudarConversa,
   prepararEnvioDeArquivo,
   type ResultadoDoEnvio,
@@ -81,6 +86,7 @@ interface Props {
   lista: ListaDaInbox;
   chips: ChipDaInbox[];
   catalogos?: CatalogosDoCrm;
+  recursos?: RecursosParaInbox;
   contatosDir?: { contatos: ContatoDoDiretorio[]; total: number; falhou: boolean };
   kanban?: { cartoes: CartaoDoKanban[]; falhou: boolean };
   /** Conversa pedida no endereço (?c=...). */
@@ -440,6 +446,11 @@ export function PainelDaInbox({
   lista,
   chips,
   catalogos = { etiquetas: [], respostasRapidas: [], falhou: false },
+  recursos = {
+    pix: { enabled: false, keyType: 'aleatoria', key: '', receiverName: '', bankName: '', city: 'BRASIL', sendQrImage: true, includeCopyPaste: true, instructions: '', updatedAt: null },
+    catalogo: [],
+    audios: [],
+  },
   contatosDir = { contatos: [], total: 0, falhou: false },
   kanban = { cartoes: [], falhou: false },
   conversaId,
@@ -651,6 +662,7 @@ export function PainelDaInbox({
               evolutionConfigurada={evolutionConfigurada}
               etiquetasDoWorkspace={catalogos.etiquetas}
               respostasRapidas={catalogos.respostasRapidas}
+              recursos={recursos}
               aoAbrirEtiquetas={() => setModalCatalogos(true)}
               aoAtualizar={atualizarTela}
             />
@@ -1159,6 +1171,7 @@ interface PropsDaConversa {
   evolutionConfigurada: boolean;
   etiquetasDoWorkspace: EtiquetaDoCrm[];
   respostasRapidas: RespostaRapida[];
+  recursos: RecursosParaInbox;
   aoAbrirEtiquetas: () => void;
   aoAtualizar: () => void;
 }
@@ -1243,6 +1256,7 @@ function Conversa({
   evolutionConfigurada,
   etiquetasDoWorkspace,
   respostasRapidas,
+  recursos,
   aoAbrirEtiquetas,
   aoAtualizar,
 }: PropsDaConversa) {
@@ -1606,7 +1620,10 @@ function Conversa({
             conversaId={conversa.id}
             textoInicial={preenchimento?.texto ?? null}
             respostasRapidas={respostasRapidas}
+            recursos={recursos}
             aoEnviar={enviarDoCampo}
+            aoAvisar={(av) => aoAvisar(conversa.id, av)}
+            aoAtualizar={aoAtualizar}
             aoAgendar={(textoAtual) => setAgendarTexto(textoAtual)}
             aoGerenciarRespostas={aoAbrirEtiquetas}
           />
@@ -2067,14 +2084,20 @@ function CampoDeMensagem({
   conversaId,
   textoInicial,
   respostasRapidas,
+  recursos,
   aoEnviar,
+  aoAvisar,
+  aoAtualizar,
   aoAgendar,
   aoGerenciarRespostas,
 }: {
   conversaId: string;
   textoInicial: string | null;
   respostasRapidas: RespostaRapida[];
+  recursos: RecursosParaInbox;
   aoEnviar: (texto: string, anexo?: Anexo) => void;
+  aoAvisar: (aviso: Aviso | null) => void;
+  aoAtualizar: () => void;
   aoAgendar: (textoAtual: string) => void;
   aoGerenciarRespostas: () => void;
 }) {
@@ -2083,6 +2106,9 @@ function CampoDeMensagem({
   const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
   const [soltando, setSoltando] = useState(false);
   const [menuRapidasForcado, setMenuRapidasForcado] = useState(false);
+  const [menuRecurso, setMenuRecurso] = useState<'catalogo' | 'audios' | 'pix' | null>(null);
+  const [valorPix, setValorPix] = useState('');
+  const [enviandoRecurso, setEnviandoRecurso] = useState(false);
   const campo = useRef<HTMLTextAreaElement>(null);
   const seletor = useRef<HTMLInputElement>(null);
   /** O anexo que está no campo agora (para as medidas que chegam depois, e para a limpeza ao sair). */
@@ -2181,6 +2207,49 @@ function CampoDeMensagem({
       .filter((qr) => !termo || qr.atalho.toLowerCase().includes(termo) || qr.titulo.toLowerCase().includes(termo))
       .slice(0, 8);
   }, [mostrarMenuRapidas, filtroSlash, respostasRapidas]);
+
+  async function dispararItemCatalogo(itemId: string) {
+    if (enviandoRecurso) return;
+    setEnviandoRecurso(true);
+    aoAvisar(null);
+    const res = await pedir(() => enviarItemCatalogoNaConversa({ conversaId, itemId }));
+    setEnviandoRecurso(false);
+    if (!res.ok) {
+      aoAvisar({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setMenuRecurso(null);
+    aoAtualizar();
+  }
+
+  async function dispararAudio(voiceId: string) {
+    if (enviandoRecurso) return;
+    setEnviandoRecurso(true);
+    aoAvisar(null);
+    const res = await pedir(() => enviarAudioEstrategicoNaConversa({ conversaId, voiceId }));
+    setEnviandoRecurso(false);
+    if (!res.ok) {
+      aoAvisar({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setMenuRecurso(null);
+    aoAtualizar();
+  }
+
+  async function dispararPix() {
+    if (enviandoRecurso) return;
+    setEnviandoRecurso(true);
+    aoAvisar(null);
+    const res = await pedir(() => enviarPixNaConversa({ conversaId, valor: valorPix.trim() || null }));
+    setEnviandoRecurso(false);
+    if (!res.ok) {
+      aoAvisar({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setValorPix('');
+    setMenuRecurso(null);
+    aoAtualizar();
+  }
 
   function aplicarRespostaRapida(qr: RespostaRapida) {
     const atualizado = comandoBarra ? texto.slice(0, texto.length - comandoBarra[1]!.length - 1) + qr.texto : texto ? `${texto}\n${qr.texto}` : qr.texto;
@@ -2289,11 +2358,50 @@ function CampoDeMensagem({
         <button
           type="button"
           className={`btn btn-secondary btn-icon-only inbox-anexar${mostrarMenuRapidas ? ' crm-btn-aviso' : ''}`}
-          onClick={() => setMenuRapidasForcado((v) => !v)}
+          onClick={() => {
+            setMenuRecurso(null);
+            setMenuRapidasForcado((v) => !v);
+          }}
           title="Respostas rápidas (ou digite /)"
         >
           <Icone nome="raio" />
           <span className="so-leitor-de-tela">Respostas rápidas</span>
+        </button>
+        <button
+          type="button"
+          className={`btn btn-secondary btn-icon-only inbox-anexar${menuRecurso === 'catalogo' ? ' crm-btn-aviso' : ''}`}
+          onClick={() => {
+            setMenuRapidasForcado(false);
+            setMenuRecurso((v) => (v === 'catalogo' ? null : 'catalogo'));
+          }}
+          title="Enviar item do catálogo"
+        >
+          <Icone nome="catalogo" />
+          <span className="so-leitor-de-tela">Enviar do catálogo</span>
+        </button>
+        <button
+          type="button"
+          className={`btn btn-secondary btn-icon-only inbox-anexar${menuRecurso === 'audios' ? ' crm-btn-aviso' : ''}`}
+          onClick={() => {
+            setMenuRapidasForcado(false);
+            setMenuRecurso((v) => (v === 'audios' ? null : 'audios'));
+          }}
+          title="Enviar áudio estratégico"
+        >
+          <Icone nome="audios" />
+          <span className="so-leitor-de-tela">Enviar áudio estratégico</span>
+        </button>
+        <button
+          type="button"
+          className={`btn btn-secondary btn-icon-only inbox-anexar${menuRecurso === 'pix' ? ' crm-btn-aviso' : ''}`}
+          onClick={() => {
+            setMenuRapidasForcado(false);
+            setMenuRecurso((v) => (v === 'pix' ? null : 'pix'));
+          }}
+          title="Enviar cobrança PIX"
+        >
+          <Icone nome="qrCode" />
+          <span className="so-leitor-de-tela">Enviar PIX</span>
         </button>
         <label htmlFor={idCampo} className="so-leitor-de-tela">
           {anexo ? (semLegenda ? 'Mensagem (o áudio vai sem legenda)' : 'Legenda do arquivo') : 'Mensagem'}
@@ -2347,6 +2455,131 @@ function CampoDeMensagem({
           Enviar
         </button>
       </div>
+
+      {menuRecurso === 'catalogo' ? (
+        <div className="inbox-recurso-popover" role="region" aria-label="Catálogo para envio rápido">
+          <div className="inbox-recurso-topo">
+            <strong>Enviar do Catálogo</strong>
+            <button type="button" className="btn btn-secondary btn-sm btn-icon-only" onClick={() => setMenuRecurso(null)}>
+              <Icone nome="fechar" className="icon-15" />
+              <span className="so-leitor-de-tela">Fechar</span>
+            </button>
+          </div>
+          {recursos.catalogo.length === 0 ? (
+            <div className="inbox-rapidas-vazio">
+              <span>Nenhum item ativo no catálogo.</span>
+              <Link href="/catalogo" className="contato-copiar">
+                Abrir Catálogo
+              </Link>
+            </div>
+          ) : (
+            <div className="inbox-recurso-lista">
+              {recursos.catalogo.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="inbox-recurso-item"
+                  disabled={enviandoRecurso}
+                  onClick={() => void dispararItemCatalogo(item.id)}
+                >
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.price ? `R$ ${item.price} · ` : ''}
+                      {item.files.length} mídia(s)
+                    </span>
+                  </div>
+                  <span className="btn btn-secondary btn-sm">{enviandoRecurso ? '…' : 'Enviar'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {menuRecurso === 'audios' ? (
+        <div className="inbox-recurso-popover" role="region" aria-label="Áudios estratégicos para envio rápido">
+          <div className="inbox-recurso-topo">
+            <strong>Enviar Áudio Estratégico</strong>
+            <button type="button" className="btn btn-secondary btn-sm btn-icon-only" onClick={() => setMenuRecurso(null)}>
+              <Icone nome="fechar" className="icon-15" />
+              <span className="so-leitor-de-tela">Fechar</span>
+            </button>
+          </div>
+          {recursos.audios.length === 0 ? (
+            <div className="inbox-rapidas-vazio">
+              <span>Nenhum áudio cadastrado.</span>
+              <Link href="/audios" className="contato-copiar">
+                Abrir Biblioteca
+              </Link>
+            </div>
+          ) : (
+            <div className="inbox-recurso-lista">
+              {recursos.audios.map((aud) => (
+                <button
+                  key={aud.id}
+                  type="button"
+                  className="inbox-recurso-item"
+                  disabled={enviandoRecurso}
+                  onClick={() => void dispararAudio(aud.id)}
+                >
+                  <div>
+                    <strong>{aud.name}</strong>
+                    <span>
+                      {formatarDuracaoAudio(aud.durationSec)} · {aud.transcription.slice(0, 60) || 'Sem transcrição'}
+                    </span>
+                  </div>
+                  <span className="btn btn-secondary btn-sm">{enviandoRecurso ? '…' : 'Enviar'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {menuRecurso === 'pix' ? (
+        <div className="inbox-recurso-popover" role="region" aria-label="Envio rápido de cobrança PIX">
+          <div className="inbox-recurso-topo">
+            <strong>Enviar cobrança PIX</strong>
+            <button type="button" className="btn btn-secondary btn-sm btn-icon-only" onClick={() => setMenuRecurso(null)}>
+              <Icone nome="fechar" className="icon-15" />
+              <span className="so-leitor-de-tela">Fechar</span>
+            </button>
+          </div>
+          {!recursos.pix.enabled || !recursos.pix.key.trim() ? (
+            <div className="inbox-rapidas-vazio">
+              <span>PIX ainda não configurado ou desativado.</span>
+              <Link href="/catalogo#pix" className="contato-copiar">
+                Configurar PIX
+              </Link>
+            </div>
+          ) : (
+            <div className="inbox-pix-box">
+              <p className="field-hint" style={{ margin: 0 }}>
+                Chave ativa ({recursos.pix.keyType}): <code>{recursos.pix.key}</code>
+              </p>
+              <div className="inbox-pix-linha">
+                <input
+                  type="text"
+                  className="campo"
+                  placeholder="Valor opcional (ex.: 149,90)"
+                  value={valorPix}
+                  disabled={enviandoRecurso}
+                  onChange={(e) => setValorPix(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={enviandoRecurso}
+                  onClick={() => void dispararPix()}
+                >
+                  {enviandoRecurso ? 'Enviando…' : 'Enviar PIX'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {mostrarMenuRapidas ? (
         opcoesRapidas.length === 0 ? (

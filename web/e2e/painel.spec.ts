@@ -61,11 +61,11 @@ test.describe('Visão geral', () => {
 test.describe('Navegação', () => {
   test('as abas ainda não refeitas avisam em que fase ficam prontas', async ({ page }) => {
     await entrar(page, 'dona');
-    await page.goto('/catalogo');
+    await page.goto('/configuracoes');
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Catálogo & PIX' })).toBeVisible();
-    await expect(page.getByText('Em reconstrução · Fase 6 — Catálogo, áudios e simulador')).toBeVisible();
-    await expect(page).toHaveTitle('Catálogo & PIX · Ienvia');
+    await expect(page.getByRole('heading', { level: 1, name: 'Geral' })).toBeVisible();
+    await expect(page.getByText('Em reconstrução · Fase 7 — Contas, configurações e migração')).toBeVisible();
+    await expect(page).toHaveTitle('Geral · Ienvia');
   });
 
   test('endereço que não existe mostra "Página não encontrada"', async ({ page }) => {

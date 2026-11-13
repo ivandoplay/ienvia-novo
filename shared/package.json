@@ -10,7 +10,10 @@
     ".": "./src/index.ts",
     "./campanhas": "./src/campanhas/regras.ts",
     "./campanhas-importacao": "./src/campanhas/importacao.ts",
-    "./seguranca": "./src/seguranca/regras.ts"
+    "./recursos-pix": "./src/recursos/pix.ts",
+    "./recursos": "./src/recursos/regras.ts",
+    "./seguranca": "./src/seguranca/regras.ts",
+    "./simulador": "./src/simulador/regras.ts"
   },
   "scripts": {
     "check": "tsc --noEmit -p tsconfig.json"

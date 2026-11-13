@@ -42,7 +42,7 @@ test.describe('Acessibilidade', () => {
 
   test('aba em reconstrução', async ({ page }) => {
     await entrar(page, 'dona');
-    await page.goto('/campanhas');
+    await page.goto('/configuracoes');
     expect(await problemasGraves(page)).toEqual([]);
   });
 

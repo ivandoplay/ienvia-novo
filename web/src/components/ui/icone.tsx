@@ -396,6 +396,17 @@ const DESENHOS = {
       <polygon points="6 3 20 12 6 21 6 3" />
     </>
   ),
+  parar: (
+    <>
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+    </>
+  ),
+  copiar: (
+    <>
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type NomeIcone = keyof typeof DESENHOS;

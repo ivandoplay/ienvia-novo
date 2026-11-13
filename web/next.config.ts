@@ -51,6 +51,7 @@ const config: NextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins: emProducao ? [] : origensDev,
+      bodySizeLimit: '6mb',
     },
   },
   async headers() {

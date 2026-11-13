@@ -196,10 +196,14 @@ describe('caminhos no depósito', () => {
     expect(ehCaminhoDoEnvio({ toString: () => doEnvio }, EMPRESA, CONVERSA, CHAVE)).toBe(false);
   });
 
-  test('caminho de arquivo da Inbox: recebido (pasta da mensagem) ou enviado (pasta do envio)', () => {
+  test('caminho de arquivo da Inbox: recebido, enviado, recurso (catálogo/áudios/campanha) ou PIX', () => {
     expect(ehCaminhoDeArquivo(`${EMPRESA}/${CONVERSA}/${MENSAGEM}/foto`)).toBe(true);
     expect(ehCaminhoDeArquivo(`${EMPRESA}/${CONVERSA}/${MENSAGEM}/relat-rio-final.pdf`)).toBe(true);
     expect(ehCaminhoDeArquivo(doEnvio)).toBe(true);
+    expect(ehCaminhoDeArquivo(`${EMPRESA}/catalogo/${CONVERSA}/${MENSAGEM}/foto.jpg`)).toBe(true);
+    expect(ehCaminhoDeArquivo(`${EMPRESA}/audios/${CONVERSA}/${MENSAGEM}/abertura.ogg`)).toBe(true);
+    expect(ehCaminhoDeArquivo(`${EMPRESA}/campanhas/${CONVERSA}/${MENSAGEM}/banner.png`)).toBe(true);
+    expect(ehCaminhoDeArquivo(`${EMPRESA}/pix/${MENSAGEM}/pix-qr.png`)).toBe(true);
   });
 
   test.each([

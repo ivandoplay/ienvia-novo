@@ -169,7 +169,10 @@ const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const CHAVE = '[a-zA-Z0-9_-]{16,80}';
 const NOME = '[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}';
 const CAMINHO_DE_ENVIO = new RegExp(`^(${UUID})/(${UUID})/envios/(${CHAVE})/${NOME}$`);
-const CAMINHO_DE_ARQUIVO = new RegExp(`^${UUID}/${UUID}/(?:${UUID}|envios/${CHAVE})/${NOME}$`);
+const CAMINHO_DE_ARQUIVO = new RegExp(
+  `^${UUID}/(?:${UUID}/(?:${UUID}|envios/${CHAVE})|(?:campanhas|catalogo|audios)/${UUID}/${UUID}|pix/${UUID})/${NOME}$`,
+);
+const CAMINHO_DE_RECURSO = new RegExp(`^(${UUID})/(catalogo|audios)/(${UUID})/(${UUID})/${NOME}$`);
 
 /** Onde o navegador coloca o arquivo de um envio. */
 export function caminhoDoEnvio(workspaceId: string, conversaId: string, chave: string, nome: string): string {
@@ -183,9 +186,29 @@ export function ehCaminhoDoEnvio(caminho: unknown, workspaceId: string, conversa
   return Boolean(partes && partes[1] === workspaceId && partes[2] === conversaId && partes[3] === chave);
 }
 
-/** Um caminho com o formato de um arquivo da Inbox (recebido ou enviado). Quem pode ler é o depósito que decide. */
+/** Um caminho com o formato de um arquivo da Inbox (recebido, enviado, recurso do catálogo, áudio, campanha ou PIX). Quem pode ler é o depósito que decide. */
 export function ehCaminhoDeArquivo(caminho: unknown): caminho is string {
   return typeof caminho === 'string' && caminho.length <= 400 && CAMINHO_DE_ARQUIVO.test(caminho);
+}
+
+/** Caminho de arquivo salvo no Catálogo ou na Biblioteca de Áudios. */
+export function ehCaminhoDeRecurso(caminho: unknown): caminho is string {
+  return typeof caminho === 'string' && caminho.length <= 400 && CAMINHO_DE_RECURSO.test(caminho);
+}
+
+export function caminhoDoRecurso(
+  workspaceId: string,
+  pasta: 'catalogo' | 'audios',
+  recursoId: string,
+  arquivoId: string,
+  nome: string,
+): string {
+  return `${workspaceId}/${pasta}/${recursoId}/${arquivoId}/${nome}`;
+}
+
+export function enderecoDoRecurso(caminho: string, baixarComo?: string | null): string {
+  const base = `/api/recursos/midia/${caminho}`;
+  return baixarComo ? `${base}?baixar=${encodeURIComponent(baixarComo)}` : base;
 }
 
 /** Endereço, dentro do painel, que mostra (ou baixa) um arquivo. Confere a sessão a cada pedido. */

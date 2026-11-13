@@ -1,16 +1,31 @@
 /**
  * As instruções que a IA recebe a cada conversa (o "cérebro"), montadas a partir de uma base de treinamento,
- * e a leitura dos comandos que ela escreve no fim da resposta.
+ * recursos do workspace (Catálogo, PIX, Biblioteca de Áudios) e a leitura dos comandos que ela escreve.
  *
- * Não depende de banco nem de rede. A tela de Treinamento mostra exatamente o texto que sai daqui
- * ("Ver instruções geradas"), e o atendente usa o mesmo texto: o que o dono vê é o que a IA recebe.
+ * Não depende de banco nem de rede. A tela de Treinamento e o Simulador mostram o texto exato que sai daqui,
+ * e o atendente usa o mesmo texto no WhatsApp.
  */
+import {
+  detectarRecusaDeAudioDoCliente,
+  formatarDuracaoAudio,
+  type AudioEstrategico,
+  type ItemDoCatalogo,
+} from '@ienvia/shared/recursos';
+import { interpretarValorPix, ROTULOS_CHAVE_PIX, type ConfiguracaoPix } from '@ienvia/shared/recursos-pix';
 import { TONS, type BaseDeTreinamento } from '@/lib/ia/treinamento';
 import {
   ESTUDIO_VAZIO,
   selecionarContextoDoTurno,
   type DadosDoEstudio,
 } from '@/lib/ia/estudio';
+
+export interface RecursosParaInstrucoes {
+  pix?: ConfiguracaoPix | null;
+  catalogo?: readonly ItemDoCatalogo[];
+  audios?: readonly AudioEstrategico[];
+  audiosJaEnviados?: readonly string[];
+  clienteRecusouAudio?: boolean;
+}
 
 export interface ContextoDaConversa {
   /** O momento da conversa. */
@@ -19,12 +34,14 @@ export interface ContextoDaConversa {
   fuso?: string;
   /** O nome que o contato usa no WhatsApp. Vem de fora: é limpo antes de entrar nas instruções. */
   nomeDoContato?: string | null;
-  /** Mensagem atual do contato neste turno (para o seletor inteligente do Cérebro/Skills). */
+  /** Mensagem atual do contato neste turno (para o seletor inteligente do Cérebro/Skills e S06). */
   mensagemAtual?: string;
   /** Mensagens recentes da conversa para dar contexto ao seletor inteligente. */
   historicoRecente?: readonly string[];
   temAudio?: boolean;
   temFoto?: boolean;
+  /** Catálogo, PIX e Áudios Estratégicos ativos para este atendimento. */
+  recursos?: RecursosParaInstrucoes;
 }
 
 type DadosDaBase = Pick<
@@ -96,6 +113,20 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
   const tom = TONS.find((item) => item.valor === base.tom) ?? TONS[0]!;
   const blocos: string[] = [];
 
+  const recursos = contexto.recursos;
+  const catalogoAtivo = (recursos?.catalogo ?? []).filter((item) => item.active !== false);
+  const temMidiaCatalogo = catalogoAtivo.some((item) => item.files.length > 0);
+  const pix = recursos?.pix ?? null;
+  const pixAtivo = Boolean(pix?.enabled && pix.key.trim());
+  const audiosJaEnviados = new Set(recursos?.audiosJaEnviados ?? []);
+  const audiosAtivos = (recursos?.audios ?? []).filter(
+    (audio) => audio.aiEnabled !== false && Boolean(audio.objectKey) && Boolean(audio.transcription.trim()),
+  );
+  const clienteRecusouAudio = Boolean(
+    recursos?.clienteRecusouAudio || detectarRecusaDeAudioDoCliente(contexto.mensagemAtual ?? '', contexto.historicoRecente ?? []),
+  );
+  const audiosElegiveis = clienteRecusouAudio ? [] : audiosAtivos.filter((audio) => !audiosJaEnviados.has(audio.id));
+
   // ----- quem a IA é nesta conversa -----
   const cabecalho: string[] = [];
   if (sozinho) {
@@ -152,7 +183,7 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
   blocos.push(
     [
       '=== O QUE VOCÊ SABE E O QUE NÃO SABE ===',
-      '- O que está escrito nestas instruções (o negócio, as regras, as condições, as perguntas frequentes e os arquivos de consulta) você responde direto, sem comando nenhum. Exemplo: se o preço está na tabela, diga o preço.',
+      '- O que está escrito nestas instruções (o negócio, as regras, as condições, o catálogo, as perguntas frequentes e os arquivos de consulta) você responde direto, sem comando nenhum. Exemplo: se o preço está na tabela ou no catálogo, diga o preço.',
       '- O que NÃO está escrito aqui você não sabe: preço, prazo, estoque, agenda, endereço, condição, ou se existe um produto ou serviço que não aparece aqui. Não invente, não chute e não diga nem que tem nem que não tem. Diga, em uma frase curta, que vai confirmar, e termine com [[CHAMAR_HUMANO:...]].',
       '- Sempre que você disser que vai confirmar, verificar ou chamar alguém, a mensagem TEM de terminar com [[CHAMAR_HUMANO:...]]. Sem o comando ninguém é avisado, e o contato fica esperando à toa.',
     ].join('\n'),
@@ -162,6 +193,34 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
       base.condicoes.trim() || (sozinho ? 'Valores e condições são combinados diretamente comigo, caso a caso.' : 'Não informadas. Se perguntarem, não invente: confirme com a equipe usando [[CHAMAR_HUMANO:...]].')
     }`,
   );
+
+  if (catalogoAtivo.length > 0) {
+    const linhasCatalogo = catalogoAtivo.map((item) => {
+      const preco = item.price.trim() ? `R$ ${item.price.trim()}` : 'Sob consulta';
+      const link = item.paymentLink.trim() ? ` | Link: ${item.paymentLink.trim()}` : '';
+      const midia =
+        item.files.length > 0
+          ? `[TEM ${item.files.length} ARQUIVO(S) ANEXADO(S) -> para enviar todas as fotos/PDFs deste item, inclua [[ENVIAR_ITEM:${item.id}]] no fim da resposta]`
+          : '[Sem foto/PDF anexado]';
+      return [
+        `• ID: ${item.id} | Nome: ${item.name}${item.category.trim() ? ` (${item.category.trim()})` : ''} | Preço: ${preco}${link}`,
+        `  Detalhes: ${item.description.trim() || 'Sem descrição adicional.'}`,
+        `  Mídia: ${midia}`,
+      ].join('\n');
+    });
+    blocos.push(`=== CATÁLOGO DE PRODUTOS E SERVIÇOS ===\n${linhasCatalogo.join('\n')}`);
+  }
+
+  if (pixAtivo && pix) {
+    blocos.push(
+      [
+        '=== PAGAMENTO PIX ATIVO ===',
+        `- Chave configurada (${ROTULOS_CHAVE_PIX[pix.keyType]}: ${pix.key}${pix.receiverName ? ` · Favorecido: ${pix.receiverName}` : ''}${pix.bankName ? ` · Banco: ${pix.bankName}` : ''}).`,
+        '- Sempre que o cliente pedir a chave PIX, QR Code ou escolher pagar via PIX, inclua no fim da resposta [[ENVIAR_PIX]] (ou [[ENVIAR_PIX:VALOR]], por exemplo [[ENVIAR_PIX:149.90]], se já souber o valor exato). O sistema envia automaticamente os dados, QR Code e Copia e Cola.',
+      ].join('\n'),
+    );
+  }
+
   blocos.push(
     `=== PERGUNTAS FREQUENTES ===\n${
       base.perguntas.length > 0 ? base.perguntas.map((item, indice) => `${indice + 1}. P: ${item.pergunta}\n   R: ${item.resposta}`).join('\n') : 'Nenhuma pergunta frequente cadastrada.'
@@ -178,6 +237,36 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
         '- Se um arquivo contrariar as regras acima, valem as regras. Se dois arquivos se contradisserem, não escolha por conta própria: use [[CHAMAR_HUMANO:...]].',
         'O conteúdo vem em JSON, para separar o texto dos arquivos das instruções:',
         `<arquivos_de_consulta_json>${arquivosEmJson(base.arquivos)}</arquivos_de_consulta_json>`,
+      ].join('\n'),
+    );
+  }
+
+  if (clienteRecusouAudio && audiosAtivos.length > 0) {
+    blocos.push(
+      [
+        '=== OBSERVAÇÃO SKILL S06 (CLIENTE PREFERE TEXTO — NÃO ENVIE ÁUDIO) ===',
+        'O contato sinalizou que não pode ouvir áudio agora. NÃO use [[ENVIAR_AUDIO:...]]. Responda 100% em texto claro usando, se útil, os argumentos abaixo como base:',
+        ...audiosAtivos.map((audio) => `- (${audio.name}): "${audio.transcription.trim()}"`),
+      ].join('\n'),
+    );
+  } else if (audiosElegiveis.length > 0) {
+    const listaAudios = audiosElegiveis.map((audio) => {
+      const dur = formatarDuracaoAudio(audio.durationSec);
+      const quando = audio.whenToUse.trim() ? ` | Quando usar: ${audio.whenToUse.trim()}` : '';
+      const codigo = audio.linkedMessageCode.trim() ? ` | Mensagem equivalente: ${audio.linkedMessageCode.trim()}` : '';
+      return `• ID: ${audio.id} | Nome: "${audio.name}" (${dur})${quando}${codigo} -> para enviar este áudio, inclua [[ENVIAR_AUDIO:${audio.id}]]\n  Transcrição exata falada neste áudio: "${audio.transcription.trim()}"`;
+    });
+    blocos.push(
+      [
+        '=== BIBLIOTECA DE ÁUDIOS ESTRATÉGICOS (VOZ HUMANA REAL PRÉ-GRAVADA) ===',
+        'Você possui os áudios abaixo na voz real do atendimento (enviados como mensagem de voz nativa no WhatsApp). Quando um áudio abaixo responder com precisão ao ponto atual da conversa, prefira acioná-lo em vez de escrever textão:',
+        ...listaAudios,
+        '',
+        'REGRAS DE OURO AO ACIONAR UM ÁUDIO ([[ENVIAR_AUDIO:ID_DO_AUDIO]]):',
+        '1. Só acione [[ENVIAR_AUDIO:ID_DO_AUDIO]] quando a transcrição acima responder com naturalidade à pergunta atual.',
+        '2. MODO PURO (o áudio já responde 100% da pergunta): NÃO repita por escrito o que o áudio fala! Retorne APENAS [[ENVIAR_AUDIO:ID_DO_AUDIO]] ou 1 frase curta de abertura.',
+        '3. MODO HÍBRIDO (há um detalhe extra que NÃO está na transcrição): responda em 1 frase curta só esse detalhe extra e termine com [[ENVIAR_AUDIO:ID_DO_AUDIO]].',
+        '4. Envie NO MÁXIM0 1 áudio por resposta e NUNCA invente IDs fora da lista acima.',
       ].join('\n'),
     );
   }
@@ -286,8 +375,6 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
   }
 
   // ----- se perguntarem se é um robô -----
-  // Fica DEPOIS de tudo o que o dono escreveu (regras, perguntas frequentes, instruções extras) e diz que vale
-  // por cima: nenhum texto do treinamento faz a IA afirmar que é uma pessoa.
   if (base.perguntaSobreRobo === 'disclose') {
     const quem = sozinho ? `a assistente virtual que ajuda ${negocio || atendente || 'o profissional'} a responder as mensagens` : `a assistente virtual de ${negocio || 'nossa empresa'}`;
     blocos.push(
@@ -308,31 +395,66 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
     );
   }
 
-  // ----- o que a IA não faz (vale por cima de qualquer regra escrita acima) -----
-  blocos.push(
-    [
-      '=== O QUE VOCÊ NÃO FAZ ===',
-      '- Você só escreve texto. Você NÃO envia fotos, catálogos, arquivos, áudios, links de pagamento nem chave PIX, mesmo que alguma regra acima diga para enviar.',
-      '- Se o contato pedir algo assim, mandar um comprovante ou quiser fechar um pedido: reconheça em uma frase curta e termine com [[CHAMAR_HUMANO:...]]. Não pergunte se ele quer que você chame alguém: chame.',
-    ].join('\n'),
-  );
+  // ----- o que a IA não faz -----
+  const temAlgumRecursoAtivo = temMidiaCatalogo || audiosElegiveis.length > 0 || pixAtivo;
+  if (!temAlgumRecursoAtivo) {
+    blocos.push(
+      [
+        '=== O QUE VOCÊ NÃO FAZ ===',
+        '- Você só escreve texto. Você NÃO envia fotos, catálogos, arquivos, áudios, links de pagamento nem chave PIX, mesmo que alguma regra acima diga para enviar.',
+        '- Se o contato pedir algo assim, mandar um comprovante ou quiser fechar um pedido: reconheça em uma frase curta e termine com [[CHAMAR_HUMANO:...]]. Não pergunte se ele quer que você chame alguém: chame.',
+      ].join('\n'),
+    );
+  } else {
+    const naoFaz: string[] = ['=== O QUE VOCÊ NÃO FAZ ==='];
+    if (!temMidiaCatalogo) {
+      naoFaz.push('- Você NÃO envia fotos, catálogos ou PDFs por conta própria (nenhum item do catálogo tem arquivo anexado).');
+    }
+    if (audiosElegiveis.length === 0) {
+      naoFaz.push(
+        clienteRecusouAudio
+          ? '- Você NÃO envia áudios neste turno porque o contato preferiu texto.'
+          : '- Você NÃO envia áudios por conta própria (não há áudio disponível para este turno).',
+      );
+    }
+    if (!pixAtivo) {
+      naoFaz.push('- Você NÃO envia chave PIX nem QR Code automático (o PIX automático não está ativado).');
+    }
+    naoFaz.push('- Nunca invente um ID de item ou de áudio que não esteja listado nestas instruções.');
+    naoFaz.push('- Quando o contato mandar um comprovante de pagamento ou quiser confirmar um pedido com humano, reconheça em uma frase curta e termine com [[CHAMAR_HUMANO:...]].');
+    blocos.push(naoFaz.join('\n'));
+  }
 
   // ----- os comandos que o sistema entende -----
-  blocos.push(
-    [
-      '=== COMANDOS DE CONTROLE (MUITO IMPORTANTE) ===',
-      'O sistema lê e retira os comandos abaixo antes de entregar a mensagem no WhatsApp. Use no fim da resposta, e SOMENTE quando a situação pedir:',
-      '',
-      '1. [[CHAMAR_HUMANO:Cenário: <quem é o contato> | Gatilho: <o que ele pediu ou perguntou> | Próxima jogada: <como a pessoa pode continuar>]] -> passa a conversa para uma pessoa. Use quando:',
-      '   - o contato perguntar algo que NÃO está escrito nestas instruções (valor, prazo, condição, produto ou serviço). Se está escrito, responda direto, sem este comando;',
-      `   - o contato quiser contratar, fechar pedido, combinar dia e horário, enviar comprovante${sozinho ? '' : ' ou pedir para falar com o responsável'}.`,
-      `   Antes do comando, escreva só um reconhecimento curto e natural${sozinho ? ', em primeira pessoa (pedindo um minutinho para olhar com calma, sem dizer que vai passar para outra pessoa)' : ''}.`,
-      '2. [[PAUSA_SILENCIOSA:Motivo]] -> se NÃO der para entender a mensagem com segurança (frase solta, referência a algo que não está na conversa, mídia que você não conseguiu ler), responda SOMENTE com este comando, sem nenhuma palavra fora dele. Nunca escreva "não entendi, pode repetir?": o sistema fica em silêncio com o contato e avisa o responsável.',
-      '3. [[ENCERRAR_CONTATO:Motivo]] -> no fim de UMA despedida cordial, quando a pessoa recusar a proposta ("não tenho interesse", "no momento não"). Não insista nem faça nova pergunta comercial.',
-      '4. [[PARAR_CONTATO:Motivo]] -> no fim de uma resposta respeitosa, quando a pessoa pedir para parar ("me remove", "pare de mandar mensagem"). Diga apenas que não enviará mais mensagens comerciais por aqui; não prometa nada além disso.',
-      '5. [[SILENCIO_CORTESIA]] -> responda SOMENTE com este comando quando a pessoa mandar só um "ok, obrigado" final, sem pergunta e sem necessidade de nova fala.',
-    ].join('\n'),
+  const comandos: string[] = [
+    '=== COMANDOS DE CONTROLE (MUITO IMPORTANTE) ===',
+    'O sistema lê e retira os comandos abaixo antes de entregar a mensagem no WhatsApp. Use no fim da resposta, e SOMENTE quando a situação pedir:',
+    '',
+  ];
+  let idxCmd = 1;
+  if (temMidiaCatalogo) {
+    comandos.push(`${idxCmd}. [[ENVIAR_ITEM:ID_DO_ITEM]] -> envia todas as fotos e PDFs anexados ao item correspondente do catálogo.`);
+    idxCmd += 1;
+  }
+  if (audiosElegiveis.length > 0) {
+    comandos.push(`${idxCmd}. [[ENVIAR_AUDIO:ID_DO_AUDIO]] -> envia o áudio pré-gravado da Biblioteca de Áudios como mensagem de voz (máx. 1 por resposta; pode ir sozinho sem texto).`);
+    idxCmd += 1;
+  }
+  if (pixAtivo) {
+    comandos.push(`${idxCmd}. [[ENVIAR_PIX]] ou [[ENVIAR_PIX:149.90]] -> envia os dados, imagem do QR Code PIX e código Copia e Cola.`);
+    idxCmd += 1;
+  }
+  comandos.push(
+    `${idxCmd}. [[CHAMAR_HUMANO:Cenário: <quem é o contato> | Gatilho: <o que ele pediu ou perguntou> | Próxima jogada: <como a pessoa pode continuar>]] -> passa a conversa para uma pessoa. Use quando:`,
+    '   - o contato perguntar algo que NÃO está escrito nestas instruções (valor, prazo, condição, produto ou serviço). Se está escrito, responda direto, sem este comando;',
+    `   - o contato quiser contratar, fechar pedido, combinar dia e horário, enviar comprovante${sozinho ? '' : ' ou pedir para falar com o responsável'}.`,
+    `   Antes do comando, escreva só um reconhecimento curto e natural${sozinho ? ', em primeira pessoa (pedindo um minutinho para olhar com calma, sem dizer que vai passar para outra pessoa)' : ''}.`,
+    `${idxCmd + 1}. [[PAUSA_SILENCIOSA:Motivo]] -> se NÃO der para entender a mensagem com segurança (frase solta, referência a algo que não está na conversa, mídia que você não conseguiu ler), responda SOMENTE com este comando, sem nenhuma palavra fora dele. Nunca escreva "não entendi, pode repetir?": o sistema fica em silêncio com o contato e avisa o responsável.`,
+    `${idxCmd + 2}. [[ENCERRAR_CONTATO:Motivo]] -> no fim de UMA despedida cordial, quando a pessoa recusar a proposta ("não tenho interesse", "no momento não"). Não insista nem faça nova pergunta comercial.`,
+    `${idxCmd + 3}. [[PARAR_CONTATO:Motivo]] -> no fim de uma resposta respeitosa, quando a pessoa pedir para parar ("me remove", "pare de mandar mensagem"). Diga apenas que não enviará mais mensagens comerciais por aqui; não prometa nada além disso.`,
+    `${idxCmd + 4}. [[SILENCIO_CORTESIA]] -> responda SOMENTE com este comando quando a pessoa mandar só um "ok, obrigado" final, sem pergunta e sem necessidade de nova fala.`,
   );
+  blocos.push(comandos.join('\n'));
 
   return blocos.join('\n\n');
 }
@@ -342,7 +464,7 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
 // ---------------------------------------------------------------------------------------------
 
 export interface RespostaLida {
-  /** O texto que pode ir para o contato, já sem os comandos. Vazio quando o certo é ficar em silêncio. */
+  /** O texto que pode ir para o contato, já sem os comandos. Vazio quando o certo é ficar em silêncio ou usar áudio puro. */
   texto: string;
   /** Passar para uma pessoa, com o motivo que a IA escreveu. */
   chamarHumano: string | null;
@@ -354,11 +476,14 @@ export interface RespostaLida {
   pararContato: string | null;
   /** Um "ok, obrigado" final: não há o que responder. */
   silencioDeCortesia: boolean;
-  /**
-   * Comandos que a IA usou mas o painel ainda não atende (enviar item do catálogo, áudio ou PIX).
-   * Quem chama decide o que fazer; o certo é passar para uma pessoa, porque a IA prometeu algo que não vai chegar.
-   */
-  foraDoAlcance: string[];
+  /** IDs dos itens do catálogo solicitados via [[ENVIAR_ITEM:ID]]. */
+  itensParaEnviar: string[];
+  /** ID do áudio solicitado via [[ENVIAR_AUDIO:ID]] (máx. 1 por resposta). */
+  audiosParaEnviar: string[];
+  /** `true` quando a IA acionou [[ENVIAR_PIX]] ou [[ENVIAR_PIX:VALOR]]. */
+  enviarPix: boolean;
+  /** Valor numérico opcional extraído de [[ENVIAR_PIX:VALOR]]. */
+  valorPix: number | null;
 }
 
 const limparMotivo = (motivo: string | undefined, padrao: string) => (motivo ?? '').replace(/\s+/g, ' ').trim().slice(0, 500) || padrao;
@@ -370,11 +495,35 @@ const limparMotivo = (motivo: string | undefined, padrao: string) => (motivo ?? 
  */
 export function lerResposta(bruto: string): RespostaLida {
   let texto = String(bruto ?? '');
-  const lida: RespostaLida = { texto: '', chamarHumano: null, pausaSilenciosa: null, encerrarContato: null, pararContato: null, silencioDeCortesia: false, foraDoAlcance: [] };
+  const lida: RespostaLida = {
+    texto: '',
+    chamarHumano: null,
+    pausaSilenciosa: null,
+    encerrarContato: null,
+    pararContato: null,
+    silencioDeCortesia: false,
+    itensParaEnviar: [],
+    audiosParaEnviar: [],
+    enviarPix: false,
+    valorPix: null,
+  };
 
-  texto = texto.replace(/\[{1,2}\s*(ENVIAR_ITEM|ENVIAR_AUDIO|ENVIAR_PIX)(?:\s*:\s*[^\]]*?)?\s*\]{1,2}/gi, (_, comando: string) => {
-    const nome = comando.toUpperCase();
-    if (!lida.foraDoAlcance.includes(nome)) lida.foraDoAlcance.push(nome);
+  texto = texto.replace(/\[{1,2}\s*ENVIAR_ITEM(?:\s*:\s*([^\]]*?))?\s*\]{1,2}/gi, (_, id?: string) => {
+    const limpo = (id ?? '').trim();
+    if (limpo && !lida.itensParaEnviar.includes(limpo)) lida.itensParaEnviar.push(limpo);
+    return '';
+  });
+  texto = texto.replace(/\[{1,2}\s*ENVIAR_AUDIO(?:\s*:\s*([^\]]*?))?\s*\]{1,2}/gi, (_, id?: string) => {
+    const limpo = (id ?? '').trim();
+    if (limpo && lida.audiosParaEnviar.length < 1 && !lida.audiosParaEnviar.includes(limpo)) {
+      lida.audiosParaEnviar.push(limpo);
+    }
+    return '';
+  });
+  texto = texto.replace(/\[{1,2}\s*ENVIAR_PIX(?:\s*:\s*([^\]]*?))?\s*\]{1,2}/gi, (_, valor?: string) => {
+    lida.enviarPix = true;
+    const interpretado = interpretarValorPix(valor);
+    if (interpretado !== null) lida.valorPix = interpretado;
     return '';
   });
   texto = texto.replace(/\[{1,2}\s*(?:CHAMAR_HUMANO|PASSAR_HUMANO)(?:\s*:\s*([^\]]*?))?\s*\]{1,2}/gi, (_, motivo?: string) => {

@@ -1,6 +1,9 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
+import { formatarMensagemPix, lerConfiguracaoPix } from '@ienvia/shared/recursos-pix';
+import { gerarPngQrPix } from '@/lib/atendente/qr-pix';
 import { enviarArquivo as enviarArquivoPelaEvolution, enviarTexto, type ResultadoDoEnvio as RespostaDaEvolution } from '@/lib/evolution/cliente';
 import {
   DEPOSITO,
@@ -11,8 +14,10 @@ import {
   ehTipoDeEnvio,
   limiteDoTipo,
   tamanhoLegivel,
+  tipoParaEnvio,
   type TipoDeEnvio,
 } from '@/lib/inbox/arquivos';
+import { mapearAudiosEstrategicos, mapearCatalogo } from '@/lib/recursos/mapeamento';
 import { trazerArquivoDaMensagem } from '@/lib/inbox/buscar-arquivo';
 import { conferirEnsino, descreverEnsino, explicarRecusaDoEnsino, lerResultadoDoEnsino } from '@/lib/ia/ensino';
 import { ehChaveDeEnvio, numeroParaEnvio, validarTexto, type SituacaoDoEnvio } from '@/lib/inbox/regras';
@@ -848,11 +853,238 @@ export async function apagarContatoEConversa(dados: { contatoId: string }): Prom
 
   const chaves = ((data as { object_keys?: unknown } | null)?.object_keys ?? []) as string[];
   if (Array.isArray(chaves) && chaves.length > 0) {
-    const validas = chaves.filter((c) => typeof c === 'string' && c.startsWith(`${contexto.workspaceId}/`));
+    const validas = chaves.filter(
+      (c) =>
+        typeof c === 'string' &&
+        c.startsWith(`${contexto.workspaceId}/`) &&
+        !c.startsWith(`${contexto.workspaceId}/catalogo/`) &&
+        !c.startsWith(`${contexto.workspaceId}/audios/`) &&
+        !c.startsWith(`${contexto.workspaceId}/campanhas/`),
+    );
     if (validas.length > 0) {
       await criarClienteDeServico()?.storage.from(DEPOSITO).remove(validas);
     }
   }
   atualizarTelas();
+  return { ok: true };
+}
+
+async function enviarRecursoDoWorkspaceNaConversa(
+  contexto: Contexto,
+  dados: {
+    conversaId: string;
+    chave: string;
+    caminho: string;
+    tipo: 'image' | 'audio' | 'document';
+    nome: string | null;
+    legenda: string | null;
+    duracao?: number | null;
+    voz?: boolean;
+    sentVoiceId?: string | null;
+    dadosEmMemoria?: Buffer;
+    conteudoEmMemoria?: string;
+  },
+): Promise<ResultadoDoEnvio> {
+  const { supabase, workspaceId } = contexto;
+  const inicio = await supabase.rpc('start_my_workspace_resource_message', {
+    p_workspace_id: workspaceId,
+    p_conversation_id: dados.conversaId,
+    p_idempotency_key: dados.chave,
+    p_object_key: dados.caminho,
+    p_kind: dados.tipo,
+    p_file_name: dados.nome,
+    p_caption: dados.legenda,
+    p_duration_seconds: inteiro(dados.duracao ?? null),
+    p_is_voice: dados.tipo === 'audio' ? dados.voz !== false : false,
+    p_sent_voice_id: dados.sentVoiceId ?? null,
+  });
+
+  if (inicio.error || !inicio.data) {
+    const mensagem = inicio.error?.message ?? '';
+    return { ok: false, erro: motivoDaRecusaDoArquivo(mensagem, dados.tipo) };
+  }
+
+  const mensagem = inicio.data as InicioDoEnvioDeArquivo;
+  if (mensagem.already_exists) {
+    return { ok: true, mensagemId: mensagem.message_id, situacao: situacaoPeloBanco(mensagem.status) };
+  }
+  if (mensagem.engine === 'baileys') {
+    atualizarTelas();
+    return { ok: true, mensagemId: mensagem.message_id, situacao: 'enviando' };
+  }
+
+  let bytes = dados.dadosEmMemoria ?? null;
+  if (!bytes) {
+    const lido = await comLimiteDeTempo(supabase.storage.from(DEPOSITO).download(dados.caminho), TEMPO_LIMITE_PARA_LER_O_ARQUIVO);
+    bytes = lido && !lido.error && lido.data ? Buffer.from(await lido.data.arrayBuffer()) : null;
+  }
+
+  const numero = numeroParaEnvio(mensagem.recipient);
+  if (!bytes || bytes.length === 0) {
+    return terminarEnvio(
+      contexto,
+      mensagem.message_id,
+      { situacao: 'nao_enviada', motivo: 'nao_configurada' },
+      'Não foi possível ler o arquivo no depósito para envio.',
+    );
+  }
+
+  const resposta: RespostaDaEvolution =
+    numero && mensagem.provider_instance_name
+      ? await enviarArquivoPelaEvolution(mensagem.provider_instance_name, numero, {
+          tipo: dados.tipo,
+          dados: bytes,
+          conteudo: dados.conteudoEmMemoria ?? mensagem.content_type ?? 'application/octet-stream',
+          nome: mensagem.file_name ?? dados.nome,
+          legenda: mensagem.caption ?? dados.legenda,
+          voz: dados.voz,
+        })
+      : { situacao: 'nao_enviada', motivo: 'sem_whatsapp' };
+
+  return terminarEnvio(contexto, mensagem.message_id, resposta);
+}
+
+export async function enviarPixNaConversa(dados: {
+  conversaId: string;
+  valor?: string | null;
+}): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.conversaId)) return { ok: false, erro: 'Conversa inválida.' };
+
+  const { data: pixData, error: pixErr } = await contexto.supabase.rpc('read_my_pix_settings', {
+    p_workspace_id: contexto.workspaceId,
+  });
+  if (pixErr) return { ok: false, erro: 'Não foi possível ler a configuração do PIX.' };
+  const pix = lerConfiguracaoPix(pixData);
+  const formatado = formatarMensagemPix(pix, dados.valor ?? null);
+  if (!formatado) return { ok: false, erro: 'Configure e ative uma chave PIX em Catálogo & PIX antes de enviar.' };
+
+  const baseChave = `pix_${randomUUID().replace(/-/g, '')}`;
+  const resResumo = await enviarMensagem({
+    conversaId: dados.conversaId,
+    chave: `${baseChave}_sum`,
+    texto: formatado.summaryText,
+  });
+  if (!resResumo.ok) return { ok: false, erro: resResumo.erro };
+
+  if (formatado.sendQrImage) {
+    try {
+      const pngBuffer = await gerarPngQrPix(formatado.qrBrcode);
+      const qrChave = `${baseChave}_qr`;
+      const caminhoQr = caminhoDoEnvio(contexto.workspaceId, dados.conversaId, qrChave, 'pix-qrcode.png');
+      const { error: upErr } = await contexto.supabase.storage
+        .from(DEPOSITO)
+        .upload(caminhoQr, pngBuffer, { contentType: 'image/png', upsert: true });
+      if (!upErr) {
+        const resQr = await enviarRecursoDoWorkspaceNaConversa(contexto, {
+          conversaId: dados.conversaId,
+          chave: qrChave,
+          caminho: caminhoQr,
+          tipo: 'image',
+          nome: 'pix-qrcode.png',
+          legenda: null,
+          dadosEmMemoria: pngBuffer,
+          conteudoEmMemoria: 'image/png',
+        });
+        if (!resQr.ok) return { ok: false, erro: resQr.erro };
+      }
+    } catch {
+      // Segue para enviar ao menos o Copia e Cola
+    }
+  }
+
+  if (formatado.brcode) {
+    const resBrc = await enviarMensagem({
+      conversaId: dados.conversaId,
+      chave: `${baseChave}_brc`,
+      texto: formatado.brcode,
+    });
+    if (!resBrc.ok) return { ok: false, erro: resBrc.erro };
+  }
+
+  return { ok: true };
+}
+
+export async function enviarAudioEstrategicoNaConversa(dados: {
+  conversaId: string;
+  voiceId: string;
+}): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.conversaId) || !ehIdentificador(dados.voiceId)) {
+    return { ok: false, erro: 'Áudio ou conversa inválida.' };
+  }
+
+  const { data: audiosData, error } = await contexto.supabase.rpc('list_my_voice_library', {
+    p_workspace_id: contexto.workspaceId,
+  });
+  if (error) return { ok: false, erro: 'Não foi possível carregar a biblioteca de áudios.' };
+  const audio = mapearAudiosEstrategicos(audiosData).find((a) => a.id === dados.voiceId);
+  if (!audio) return { ok: false, erro: 'Áudio não encontrado na biblioteca.' };
+
+  const res = await enviarRecursoDoWorkspaceNaConversa(contexto, {
+    conversaId: dados.conversaId,
+    chave: `aud_${randomUUID().replace(/-/g, '')}`,
+    caminho: audio.objectKey,
+    tipo: 'audio',
+    nome: audio.fileName,
+    legenda: null,
+    duracao: audio.durationSec,
+    voz: true,
+    sentVoiceId: audio.id,
+  });
+  if (!res.ok) return { ok: false, erro: res.erro };
+  if (res.aviso) return { ok: false, erro: res.aviso };
+  return { ok: true };
+}
+
+export async function enviarItemCatalogoNaConversa(dados: {
+  conversaId: string;
+  itemId: string;
+}): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados.conversaId) || !ehIdentificador(dados.itemId)) {
+    return { ok: false, erro: 'Item do catálogo ou conversa inválida.' };
+  }
+
+  const { data: catData, error } = await contexto.supabase.rpc('list_my_catalog_items', {
+    p_workspace_id: contexto.workspaceId,
+  });
+  if (error) return { ok: false, erro: 'Não foi possível carregar o catálogo.' };
+  const item = mapearCatalogo(catData).find((i) => i.id === dados.itemId);
+  if (!item) return { ok: false, erro: 'Item não encontrado no catálogo.' };
+
+  const baseChave = `cat_${randomUUID().replace(/-/g, '')}`;
+  const linhas = [
+    `*${item.name}*`,
+    item.price.trim() ? `*Preço:* R$ ${item.price.trim()}` : '',
+    item.description.trim() || '',
+    item.paymentLink.trim() ? `*Link:* ${item.paymentLink.trim()}` : '',
+  ].filter(Boolean);
+
+  const resTexto = await enviarMensagem({
+    conversaId: dados.conversaId,
+    chave: `${baseChave}_txt`,
+    texto: linhas.join('\n').slice(0, 4096),
+  });
+  if (!resTexto.ok) return { ok: false, erro: resTexto.erro };
+
+  for (const [idx, arq] of item.files.entries()) {
+    const tipoWa = tipoParaEnvio(arq.contentType);
+    const kind = tipoWa === 'image' ? 'image' : 'document';
+    const resArq = await enviarRecursoDoWorkspaceNaConversa(contexto, {
+      conversaId: dados.conversaId,
+      chave: `${baseChave}_f${idx}`,
+      caminho: arq.objectKey,
+      tipo: kind,
+      nome: arq.fileName,
+      legenda: null,
+      voz: false,
+    });
+    if (!resArq.ok) return { ok: false, erro: resArq.erro };
+  }
+
   return { ok: true };
 }

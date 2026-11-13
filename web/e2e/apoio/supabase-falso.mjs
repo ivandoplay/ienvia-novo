@@ -37,6 +37,10 @@ import {
   FUNCOES_SEGURANCA_E_CAMPANHAS,
   criarCampanhasESegurancaDoBanco,
 } from './campanhas-seguranca-no-banco-falso.mjs';
+import {
+  FUNCOES_RECURSOS_E_SIMULADOR,
+  criarRecursosESimuladorDoBanco,
+} from './recursos-simulador-no-banco-falso.mjs';
 
 const PORTA = Number(process.env.PORTA_SUPABASE_FALSO ?? 54399);
 const SEGREDO_JWT = 'segredo-so-para-testes';
@@ -431,6 +435,7 @@ const FUNCOES_DA_INBOX = [
   'read_my_inbox_channel',
   'start_my_text_message',
   'start_my_media_message',
+  'start_my_workspace_resource_message',
   'finish_my_text_message',
   'transition_workspace_conversation',
 ];
@@ -445,11 +450,14 @@ const FUNCOES_DO_SERVIDOR = [
   'report_local_instance_state',
   'complete_local_motor_command',
   'enqueue_workspace_admin_alert',
+  'read_workspace_ai_keys_for_simulator',
 ];
 
 const MB = 1024 * 1024;
 const CAMINHO_DE_ENVIO = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/envios\/[a-zA-Z0-9_-]{16,80}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
 const CAMINHO_DE_CAMPANHA = /^[0-9a-f-]{36}\/campanhas\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
+const CAMINHO_DE_CATALOGO = /^[0-9a-f-]{36}\/catalogo\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
+const CAMINHO_DE_AUDIO = /^[0-9a-f-]{36}\/audios\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
 
 const fichaDoArquivo = (mensagemId) => tabelas.message_attachments.find((ficha) => ficha.message_id === mensagemId);
 /** A ficha do arquivo no formato que previaDaMensagem entende. */
@@ -728,9 +736,10 @@ function acoesDaInbox(res, usuario, nome, corpo) {
     });
   }
 
-  if (nome === 'start_my_media_message') {
+  if (nome === 'start_my_media_message' || nome === 'start_my_workspace_resource_message') {
+    const ehRecurso = nome === 'start_my_workspace_resource_message';
     const legenda = String(corpo.p_caption ?? '').trim() || null;
-    if (typeof corpo.p_idempotency_key !== 'string' || !/^[a-zA-Z0-9_-]{16,80}$/.test(corpo.p_idempotency_key)) {
+    if (typeof corpo.p_idempotency_key !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(corpo.p_idempotency_key)) {
       return erro(400, '22023', 'Invalid idempotency key');
     }
     if (!['image', 'audio', 'video', 'document'].includes(corpo.p_kind)) return erro(400, '22023', 'Invalid media kind');
@@ -753,7 +762,15 @@ function acoesDaInbox(res, usuario, nome, corpo) {
     }
 
     const caminho = String(corpo.p_object_key ?? '');
-    if (!CAMINHO_DE_ENVIO.test(caminho) || !caminho.startsWith(`${workspaceId}/${conversa.id}/envios/${corpo.p_idempotency_key}/`)) {
+    if (
+      ehRecurso
+        ? !(
+            (CAMINHO_DE_ENVIO.test(caminho) && caminho.startsWith(`${workspaceId}/${conversa.id}/envios/`)) ||
+            CAMINHO_DE_CATALOGO.test(caminho) ||
+            CAMINHO_DE_AUDIO.test(caminho)
+          ) || !caminho.startsWith(`${workspaceId}/`)
+        : !CAMINHO_DE_ENVIO.test(caminho) || !caminho.startsWith(`${workspaceId}/${conversa.id}/envios/${corpo.p_idempotency_key}/`)
+    ) {
       return erro(400, '22023', 'Invalid media path');
     }
     const guardado = deposito.get(caminho);
@@ -1117,6 +1134,10 @@ function acoesDoServidor(res, nome, corpo) {
     return responder(res, 200, { result: 'queued' });
   }
 
+  if (nome === 'read_workspace_ai_keys_for_simulator') {
+    return responder(res, 200, iaDoBanco.chavesDoWorkspace(String(corpo?.p_workspace_id ?? '')));
+  }
+
   const ficha = tabelas.message_attachments.find((item) => item.workspace_id === corpo.p_workspace_id && item.message_id === corpo.p_message_id);
 
   if (nome === 'begin_media_download') {
@@ -1192,7 +1213,7 @@ function podeSubirNoDeposito(req, caminho) {
   if (!usuario) return false;
   const [workspaceId, segundo] = caminho.split('/');
   if (!workspacesDoUsuario(usuario).includes(workspaceId)) return false;
-  if (CAMINHO_DE_CAMPANHA.test(caminho)) return true;
+  if (CAMINHO_DE_CAMPANHA.test(caminho) || CAMINHO_DE_CATALOGO.test(caminho) || CAMINHO_DE_AUDIO.test(caminho)) return true;
   return Boolean(
     CAMINHO_DE_ENVIO.test(caminho) &&
       tabelas.conversations.some((conversa) => conversa.workspace_id === workspaceId && conversa.id === segundo),
@@ -1284,7 +1305,11 @@ async function rotasDoDeposito(req, res, url) {
     const permitido =
       ehOServidorDoPainel(req) ||
       (usuario &&
-        caminhos.every((item) => CAMINHO_DE_CAMPANHA.test(item) && workspacesDoUsuario(usuario).includes(item.split('/')[0])));
+        caminhos.every(
+          (item) =>
+            (CAMINHO_DE_CAMPANHA.test(item) || CAMINHO_DE_CATALOGO.test(item) || CAMINHO_DE_AUDIO.test(item)) &&
+            workspacesDoUsuario(usuario).includes(item.split('/')[0]),
+        ));
     if (!permitido) return erroDoDeposito(res, 403, 'Unauthorized', 'new row violates row-level security policy');
     const apagados = caminhos.filter((item) => deposito.delete(item));
     return responder(res, 200, apagados.map((item) => ({ name: item, bucket_id: NOME_DO_DEPOSITO })), CORS);
@@ -1369,6 +1394,12 @@ const campanhasSegurancaDoBanco = criarCampanhasESegurancaDoBanco({
   responder,
   deposito,
 });
+/** A Fase 6: Catálogo, PIX, Áudios Estratégicos e Simulador. */
+const recursosSimuladorDoBanco = criarRecursosESimuladorDoBanco({
+  participacoes: PARTICIPACOES,
+  responder,
+  deposito,
+});
 
 async function rotasDeDados(req, res, url) {
   const recurso = url.pathname.replace('/rest/v1/', '');
@@ -1397,6 +1428,10 @@ async function rotasDeDados(req, res, url) {
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_SEGURANCA_E_CAMPANHAS.includes(recurso.slice(4))) {
     return campanhasSegurancaDoBanco.acoes(res, usuario, recurso.slice(4), await lerCorpo(req));
+  }
+
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_RECURSOS_E_SIMULADOR.includes(recurso.slice(4))) {
+    return recursosSimuladorDoBanco.acoes(res, usuario, recurso.slice(4), await lerCorpo(req));
   }
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DO_ATENDENTE.includes(recurso.slice(4))) {
@@ -1485,6 +1520,10 @@ const servidor = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/controle/reiniciar-fase5') {
       campanhasSegurancaDoBanco.reiniciarFase5();
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/reiniciar-fase6') {
+      recursosSimuladorDoBanco.reiniciarFase6();
       return responder(res, 200, { ok: true });
     }
     if (url.pathname === '/controle/simular-envio-incerto') {
