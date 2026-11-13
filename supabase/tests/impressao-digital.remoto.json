@@ -1,8 +1,4 @@
 {
-  "_leiame": "Retrato do esquema do banco REAL (Supabase, projeto \"ienvia-001\" da organização \"ienvia\"), tirado com impressao-digital.sql. O teste esquema.test.ts compara este retrato com o banco montado a partir das migrações do Git. Ao aplicar uma migração nova no banco real, rode o SQL lá de novo e atualize este arquivo. Em 12/11/2026 o banco mudou de projeto (o anterior, \"Ienvia\", ficava numa organização que estourou a cota e foi pausado): o banco novo foi remontado a partir das mesmas migrações e o retrato saiu idêntico.",
-  "projeto": "rhcabqlwazvjcjjdknsc",
-  "tirado_em": "2026-11-13",
-  "ultima_migracao": "20261118120000_phase7_accounts_settings_support.sql",
   "categorias": {
     "colunas": {
       "itens": 608,
@@ -13,24 +9,24 @@
       "md5": "f697288d0636e569f349b9df5579a799"
     },
     "funcoes": {
-      "itens": 189,
-      "md5": "40beb0b14e5284a08a33230d77e5260f"
+      "itens": 190,
+      "md5": "a572791c2cd947b838c51e7ed52517f2"
     },
     "gatilhos": {
       "itens": 26,
       "md5": "3ba71bc02204a45ff8002650af0c3e5f"
     },
     "indices": {
-      "itens": 172,
-      "md5": "5d4948154c057988ff1cd22194664951"
+      "itens": 173,
+      "md5": "165a6b6d4b89ffd6834dfbd704931642"
     },
     "permissoes_coluna": {
       "itens": 32,
       "md5": "4f92ec1b1838543f578ff7a458d9cf17"
     },
     "permissoes_funcao": {
-      "itens": 567,
-      "md5": "28cc64fcaf8c92277195bc1980425d3a"
+      "itens": 570,
+      "md5": "19bd27d439673b3c3bf4b24b414acbf1"
     },
     "permissoes_tabela": {
       "itens": 410,

@@ -6,6 +6,8 @@ export interface ResumoLimpezaRetencao {
   encontrados: number;
   apagados: number;
   falhasNoDeposito: number;
+  /** Avisos de webhook apagados por idade (tabela `webhook_events`). */
+  avisosPodados: number;
 }
 
 interface AnexoVencido {
@@ -31,12 +33,14 @@ export async function executarLimpezaDeRetencao(
 
   if (error) {
     console.error('[retenção] falha ao reservar anexos expirados:', error.message);
-    return { encontrados: 0, apagados: 0, falhasNoDeposito: 0 };
+    const avisosPodados = await podarAvisosDeWebhook(supabase);
+    return { encontrados: 0, apagados: 0, falhasNoDeposito: 0, avisosPodados };
   }
 
   const pendentes = Array.isArray(data) ? (data as AnexoVencido[]) : [];
   if (pendentes.length === 0) {
-    return { encontrados: 0, apagados: 0, falhasNoDeposito: 0 };
+    const avisosPodados = await podarAvisosDeWebhook(supabase);
+    return { encontrados: 0, apagados: 0, falhasNoDeposito: 0, avisosPodados };
   }
 
   const idsConcluidos: string[] = [];
@@ -78,9 +82,33 @@ export async function executarLimpezaDeRetencao(
     }
   }
 
+  const avisosPodados = await podarAvisosDeWebhook(supabase);
+
   return {
     encontrados: pendentes.length,
     apagados,
     falhasNoDeposito: idsParaLiberar.length,
+    avisosPodados,
   };
+}
+
+/** Quantos dias de avisos de webhook guardar. O padrão da função no banco é 14. */
+const DIAS_DE_AVISO = 14;
+
+/**
+ * Apaga os avisos de webhook mais antigos que a janela de retenção.
+ * Sem isso a tabela `webhook_events` só cresce: são ~45 linhas por dia hoje e
+ * centenas por dia com vários chips. Uma falha aqui nunca interrompe a limpeza de anexos.
+ */
+async function podarAvisosDeWebhook(supabase: SupabaseClient): Promise<number> {
+  const { data, error } = await supabase.rpc('prune_webhook_events', { p_dias: DIAS_DE_AVISO });
+
+  if (error) {
+    console.error('[retenção] falha ao podar avisos de webhook:', error.message);
+    return 0;
+  }
+
+  const apagados = Number(data) || 0;
+  if (apagados > 0) console.log(`[retenção] ${apagados} avisos de webhook com mais de ${DIAS_DE_AVISO} dias apagados`);
+  return apagados;
 }

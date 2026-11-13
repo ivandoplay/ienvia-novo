@@ -29,7 +29,7 @@ describe('executarLimpezaDeRetencao', () => {
     } as never;
 
     const res = await executarLimpezaDeRetencao(supabaseFalso, 20);
-    expect(res).toEqual({ encontrados: 2, apagados: 2, falhasNoDeposito: 0 });
+    expect(res).toEqual({ encontrados: 2, apagados: 2, falhasNoDeposito: 0, avisosPodados: 0 });
     expect(remove).toHaveBeenCalledWith(['ws-1/conv-1/msg-1/foto.jpg', 'ws-1/conv-1/msg-2/doc.pdf']);
     expect(rpc).toHaveBeenCalledWith('complete_expired_message_attachments_cleanup', {
       p_ids: ['anexo-1', 'anexo-2'],
@@ -65,8 +65,42 @@ describe('executarLimpezaDeRetencao', () => {
     } as never;
 
     const res = await executarLimpezaDeRetencao(supabaseFalso, 20);
-    expect(res).toEqual({ encontrados: 2, apagados: 1, falhasNoDeposito: 1 });
+    expect(res).toEqual({ encontrados: 2, apagados: 1, falhasNoDeposito: 1, avisosPodados: 1 });
     expect(rpc).toHaveBeenCalledWith('release_expired_message_attachments', { p_ids: ['a-falha'] });
     expect(rpc).toHaveBeenCalledWith('complete_expired_message_attachments_cleanup', { p_ids: ['a-ok'] });
+  });
+
+  test('poda avisos de webhook antigos mesmo quando não há anexo vencido', async () => {
+    const rpc = vi.fn(async (nome: string) => {
+      if (nome === 'claim_expired_message_attachments') return { data: [], error: null };
+      if (nome === 'prune_webhook_events') return { data: 37, error: null };
+      return { data: null, error: null };
+    });
+
+    const supabaseFalso = { rpc, storage: { from: () => ({ remove: vi.fn() }) } } as never;
+    const res = await executarLimpezaDeRetencao(supabaseFalso, 20);
+
+    expect(res).toEqual({ encontrados: 0, apagados: 0, falhasNoDeposito: 0, avisosPodados: 37 });
+    expect(rpc).toHaveBeenCalledWith('prune_webhook_events', { p_dias: 14 });
+  });
+
+  test('falha na poda de avisos não derruba a limpeza de anexos', async () => {
+    const rpc = vi.fn(async (nome: string) => {
+      if (nome === 'claim_expired_message_attachments') {
+        return { data: [{ id: 'a1', workspace_id: 'ws', object_key: 'k1' }], error: null };
+      }
+      if (nome === 'complete_expired_message_attachments_cleanup') return { data: { deleted: 1 }, error: null };
+      if (nome === 'prune_webhook_events') return { data: null, error: { message: 'função ainda não existe' } };
+      return { data: null, error: null };
+    });
+
+    const supabaseFalso = {
+      rpc,
+      storage: { from: () => ({ remove: vi.fn(async () => ({ data: [], error: null })) }) },
+    } as never;
+
+    const res = await executarLimpezaDeRetencao(supabaseFalso, 20);
+    expect(res.apagados).toBe(1);
+    expect(res.avisosPodados).toBe(0);
   });
 });
