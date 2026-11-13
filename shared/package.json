@@ -10,6 +10,7 @@
     ".": "./src/index.ts",
     "./campanhas": "./src/campanhas/regras.ts",
     "./campanhas-importacao": "./src/campanhas/importacao.ts",
+    "./contas": "./src/contas/regras.ts",
     "./recursos-pix": "./src/recursos/pix.ts",
     "./recursos": "./src/recursos/regras.ts",
     "./seguranca": "./src/seguranca/regras.ts",

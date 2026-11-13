@@ -71,13 +71,68 @@ export const USUARIOS = [
     nome: 'Caio Colega',
     master: false,
   },
+  {
+    // Participa de duas empresas (dona na Loja e operadora na Outra Empresa), para testar troca de workspace.
+    id: 'b0000000-0000-4000-8000-000000000009',
+    email: 'multi@zapia.local',
+    nome: 'Marina Multi',
+    master: false,
+  },
 ];
 
 export const WORKSPACES = [
-  { id: WORKSPACE_LOJA, name: 'Loja da Maria', status: 'active', max_instances: 3 },
-  { id: WORKSPACE_OUTRA, name: 'Outra Empresa', status: 'active', max_instances: 1 },
-  { id: WORKSPACE_CHIPS, name: 'Empresa dos Chips', status: 'active', max_instances: LIMITE_DE_CHIPS },
-  { id: WORKSPACE_INBOX, name: 'Empresa da Inbox', status: 'active', max_instances: 2 },
+  {
+    id: WORKSPACE_LOJA,
+    name: 'Loja da Maria',
+    status: 'active',
+    max_instances: 3,
+    brand_name: 'Ienvia',
+    brand_subtitle: 'Atendente Universal',
+    plan_label: 'Crescimento',
+    admin_notes: '',
+    created_at: '2026-01-01T00:00:00Z',
+    closed_at: null,
+    last_support_at: null,
+  },
+  {
+    id: WORKSPACE_OUTRA,
+    name: 'Outra Empresa',
+    status: 'active',
+    max_instances: 1,
+    brand_name: 'Ienvia',
+    brand_subtitle: 'Atendente Universal',
+    plan_label: 'Inicial',
+    admin_notes: '',
+    created_at: '2026-01-02T00:00:00Z',
+    closed_at: null,
+    last_support_at: null,
+  },
+  {
+    id: WORKSPACE_CHIPS,
+    name: 'Empresa dos Chips',
+    status: 'active',
+    max_instances: LIMITE_DE_CHIPS,
+    brand_name: 'Ienvia',
+    brand_subtitle: 'Atendente Universal',
+    plan_label: 'Inicial',
+    admin_notes: '',
+    created_at: '2026-01-03T00:00:00Z',
+    closed_at: null,
+    last_support_at: null,
+  },
+  {
+    id: WORKSPACE_INBOX,
+    name: 'Empresa da Inbox',
+    status: 'active',
+    max_instances: 2,
+    brand_name: 'Ienvia',
+    brand_subtitle: 'Atendente Universal',
+    plan_label: 'Crescimento',
+    admin_notes: '',
+    created_at: '2026-01-05T00:00:00Z',
+    closed_at: null,
+    last_support_at: null,
+  },
 ];
 
 /** Quem participa de qual workspace. O "novato" não participa de nenhum. */
@@ -88,6 +143,8 @@ export const PARTICIPACOES = [
   { user_id: USUARIOS[5].id, workspace_id: WORKSPACE_LOJA, role: 'operator', status: 'active', created_at: '2026-01-04T00:00:00Z' },
   { user_id: USUARIOS[6].id, workspace_id: WORKSPACE_INBOX, role: 'owner', status: 'active', created_at: '2026-01-05T00:00:00Z' },
   { user_id: USUARIOS[7].id, workspace_id: WORKSPACE_INBOX, role: 'operator', status: 'active', created_at: '2026-01-06T00:00:00Z' },
+  { user_id: USUARIOS[8].id, workspace_id: WORKSPACE_LOJA, role: 'owner', status: 'active', created_at: '2026-01-07T00:00:00Z' },
+  { user_id: USUARIOS[8].id, workspace_id: WORKSPACE_OUTRA, role: 'operator', status: 'active', created_at: '2026-01-08T00:00:00Z' },
 ];
 
 /**
@@ -300,6 +357,8 @@ export function criarInbox() {
             height: anexo.altura ?? null,
             is_voice: anexo.voz === true,
             storage_status: status,
+            deletion_status: 'active',
+            retention_delete_after: '2099-01-01T00:00:00Z',
           }),
         );
         if (status === 'stored' && anexo.dados) arquivos.push({ caminho, dados: anexo.dados, conteudo: anexo.conteudo });

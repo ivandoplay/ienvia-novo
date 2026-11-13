@@ -1,0 +1,334 @@
+/* ==========================================================================
+   Fase 7: Configurações gerais (/configuracoes) e Clientes SaaS (/contas)
+   ========================================================================== */
+
+.f7-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.f7-grid--wide {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
+.f7-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.f7-span-2 {
+  grid-column: 1 / -1;
+}
+
+.f7-input,
+.f7-select,
+.f7-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.f7-textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.f7-input:focus,
+.f7-select:focus,
+.f7-textarea:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.f7-hint {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.f7-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.f7-alert {
+  padding: 10px 13px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.f7-alert--ok {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--text-main);
+}
+
+.f7-alert--erro {
+  background: var(--danger-soft);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: var(--danger-text);
+}
+
+.f7-brand-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-sidebar);
+}
+
+.f7-brand-preview-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #10b981, #047857);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.f7-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.f7-stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.f7-stat-chip strong {
+  color: var(--text-main);
+}
+
+/* ---------- Clientes SaaS ---------- */
+
+.contas-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.contas-kpi {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+
+.contas-kpi-val {
+  color: var(--text-main);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.contas-kpi-lbl {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.contas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.contas-filtros {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conta-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+
+.conta-card--desativada {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+}
+
+.conta-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.conta-identidade {
+  min-width: 0;
+}
+
+.conta-titulo-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conta-nome {
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+.conta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+}
+
+.conta-pill--ativa {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+.conta-pill--desativada {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.conta-sub {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.conta-notas {
+  margin-top: 8px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.conta-acoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conta-editor {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.auditoria-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auditoria-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card-subtle);
+  font-size: 13px;
+}
+
+.auditoria-item-titulo {
+  color: var(--text-main);
+  font-weight: 650;
+}
+
+.auditoria-item-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ws-troca-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ws-troca-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card-subtle);
+}
+
+@media (max-width: 900px) {
+  .f7-grid,
+  .f7-grid--wide,
+  .f7-form-grid,
+  .contas-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .f7-span-2 {
+    grid-column: auto;
+  }
+}

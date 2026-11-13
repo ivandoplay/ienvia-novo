@@ -59,12 +59,15 @@ test.describe('Visão geral', () => {
 });
 
 test.describe('Navegação', () => {
-  test('as abas ainda não refeitas avisam em que fase ficam prontas', async ({ page }) => {
+  test('a aba Geral carrega as configurações do workspace e do usuário', async ({ page }) => {
     await entrar(page, 'dona');
     await page.goto('/configuracoes');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Geral' })).toBeVisible();
-    await expect(page.getByText('Em reconstrução · Fase 7 — Contas, configurações e migração')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Marca e nome do sistema' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Trocar senha de acesso' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Exportar meus dados' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Guarda e limpeza automática (LGPD)' })).toBeVisible();
     await expect(page).toHaveTitle('Geral · Ienvia');
   });
 

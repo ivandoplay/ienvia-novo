@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { executarCampanhasEFilaSegura } from '@/lib/campanhas/executor';
+import { executarLimpezaDeRetencao } from '@/lib/dados/retencao';
 import { processarAgendamentosVencidos } from '@/lib/evolution/agendados';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
 
@@ -29,9 +30,10 @@ export async function POST(pedido: Request) {
     return Response.json({ ok: false, erro: 'painel sem configuração de serviço' }, { status: 503 });
   }
 
-  const [resumo, disparos] = await Promise.all([
+  const [resumo, disparos, retencao] = await Promise.all([
     processarAgendamentosVencidos(supabase, 25),
     executarCampanhasEFilaSegura(supabase, chegouEm, 48_000),
+    executarLimpezaDeRetencao(supabase, 30),
   ]);
-  return Response.json({ ok: true, ...resumo, disparos });
+  return Response.json({ ok: true, ...resumo, disparos, retencao });
 }

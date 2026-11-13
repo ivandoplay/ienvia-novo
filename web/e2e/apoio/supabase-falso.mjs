@@ -41,12 +41,25 @@ import {
   FUNCOES_RECURSOS_E_SIMULADOR,
   criarRecursosESimuladorDoBanco,
 } from './recursos-simulador-no-banco-falso.mjs';
+import {
+  FUNCOES_CONTAS_E_SUPORTE,
+  FUNCOES_SERVIDOR_FASE7,
+  criarContasESuporteDoBanco,
+} from './contas-suporte-no-banco-falso.mjs';
 
 const PORTA = Number(process.env.PORTA_SUPABASE_FALSO ?? 54399);
 const SEGREDO_JWT = 'segredo-so-para-testes';
 const UMA_HORA = 3600;
 
 const tabelas = criarTabelas();
+const contasESuporteDoBanco = criarContasESuporteDoBanco({
+  usuarios: USUARIOS,
+  workspaces: WORKSPACES,
+  participacoes: PARTICIPACOES,
+  tabelas,
+  senhaPadrao: SENHA_DE_TESTE,
+  responder,
+});
 
 /** O depósito de arquivos: caminho → { dados, conteudo }. Começa com os arquivos das conversas de exemplo. */
 const deposito = new Map(criarInbox().arquivos.map((arquivo) => [arquivo.caminho, { dados: arquivo.dados, conteudo: arquivo.conteudo }]));
@@ -121,15 +134,19 @@ function usuarioDaRequisicao(req) {
 const ehOServidorDoPainel = (req) => tokenDaRequisicao(req) === CHAVE_DE_SERVICO_DE_TESTE;
 
 function workspacesDoUsuario(usuario) {
-  return PARTICIPACOES.filter((p) => p.user_id === usuario.id && p.status === 'active').map((p) => p.workspace_id);
+  const diretos = PARTICIPACOES.filter((p) => p.user_id === usuario.id && p.status === 'active').map((p) => p.workspace_id);
+  return [...new Set([...diretos, ...contasESuporteDoBanco.workspacesEmSuporte(usuario.id)])];
 }
 
-/** Entende os filtros simples do PostgREST: eq, gte e is.null. */
+/** Entende os filtros simples do PostgREST: eq, neq, gte, gt, lte, lt, is.null e in. */
 function passaNoFiltro(linha, coluna, expressao) {
   const valor = linha[coluna];
   if (expressao.startsWith('eq.')) return String(valor) === expressao.slice(3);
   if (expressao.startsWith('neq.')) return String(valor) !== expressao.slice(4);
-  if (expressao.startsWith('gte.')) return String(valor) >= expressao.slice(4);
+  if (expressao.startsWith('gte.')) return valor != null && String(valor) >= expressao.slice(4);
+  if (expressao.startsWith('gt.')) return valor != null && String(valor) > expressao.slice(3);
+  if (expressao.startsWith('lte.')) return valor != null && String(valor) <= expressao.slice(4);
+  if (expressao.startsWith('lt.')) return valor != null && String(valor) < expressao.slice(3);
   if (expressao === 'is.null') return valor === null || valor === undefined;
   if (expressao.startsWith('in.(') && expressao.endsWith(')')) {
     const itens = expressao
@@ -183,7 +200,7 @@ async function rotasDeLogin(req, res, url) {
 
     if (tipo === 'password') {
       const usuario = USUARIOS.find((u) => u.email === String(corpo.email ?? '').toLowerCase());
-      if (!usuario || corpo.password !== SENHA_DE_TESTE) {
+      if (!usuario || !contasESuporteDoBanco.verificarSenha(usuario, corpo.password)) {
         return responder(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
       }
       return responder(res, 200, abrirSessao(usuario));
@@ -205,6 +222,31 @@ async function rotasDeLogin(req, res, url) {
     return usuario ? responder(res, 200, usuarioPublico(usuario)) : naoAutorizado(res);
   }
 
+  if (req.method === 'PUT' && url.pathname === '/auth/v1/user') {
+    const usuario = usuarioDaRequisicao(req);
+    if (!usuario) return naoAutorizado(res);
+    const corpo = await lerCorpo(req);
+    if (typeof corpo.password === 'string' && corpo.password.length >= 6) {
+      contasESuporteDoBanco.atualizarSenha(usuario, corpo.password);
+    }
+    return responder(res, 200, usuarioPublico(usuario));
+  }
+
+  if (req.method === 'POST' && url.pathname === '/auth/v1/admin/users') {
+    if (!ehOServidorDoPainel(req)) return responder(res, 403, { msg: 'Admin access required' });
+    const corpo = await lerCorpo(req);
+    const resCriar = contasESuporteDoBanco.criarUsuarioAdmin(corpo);
+    if (resCriar.erro) return responder(res, resCriar.erro.status, resCriar.erro.corpo);
+    return responder(res, 200, usuarioPublico(resCriar.usuario));
+  }
+
+  if (req.method === 'DELETE' && url.pathname.startsWith('/auth/v1/admin/users/')) {
+    if (!ehOServidorDoPainel(req)) return responder(res, 403, { msg: 'Admin access required' });
+    const id = url.pathname.replace('/auth/v1/admin/users/', '');
+    contasESuporteDoBanco.removerUsuarioAdmin(id);
+    return responder(res, 200, {});
+  }
+
   if (req.method === 'POST' && url.pathname === '/auth/v1/logout') {
     const token = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
     sessoes.delete(token);
@@ -224,9 +266,7 @@ const ESTADOS_DA_EVOLUTION = { open: 'connected', connecting: 'connecting', clos
 function acoesDosChips(res, usuario, nome, corpo) {
   const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
   const workspaceId = corpo.p_workspace_id;
-  const ehDono = PARTICIPACOES.some(
-    (p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.role === 'owner' && p.status === 'active',
-  );
+  const ehDono = contasESuporteDoBanco.papelEfetivo(usuario, workspaceId) === 'owner';
   if (!ehDono) return erro(403, '42501', 'Workspace owner required');
 
   const chips = tabelas.instances;
@@ -287,9 +327,7 @@ const FUNCOES_DO_MOTOR_LOCAL = new Set([
 function acoesDoMotorLocal(res, usuario, nome, corpo) {
   const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
   const workspaceId = corpo.p_workspace_id;
-  const ehDono = PARTICIPACOES.some(
-    (p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.role === 'owner' && p.status === 'active',
-  );
+  const ehDono = contasESuporteDoBanco.papelEfetivo(usuario, workspaceId) === 'owner';
   if (!ehDono) return erro(403, '42501', 'Workspace owner required');
 
   if (nome === 'create_my_local_executor_pairing') {
@@ -491,7 +529,7 @@ const FUNCOES_DO_ATENDENTE = ['read_my_ai_overview', 'pause_my_ai', 'resume_my_a
 function acoesDoAtendente(res, usuario, nome, corpo) {
   const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
   const workspaceId = corpo.p_workspace_id;
-  const papel = PARTICIPACOES.find((p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.status === 'active')?.role ?? null;
+  const papel = contasESuporteDoBanco.papelEfetivo(usuario, workspaceId);
   const ehDono = papel === 'owner';
   const chips = tabelas.instances.filter((chip) => chip.workspace_id === workspaceId && chip.status !== 'revoked');
 
@@ -546,7 +584,7 @@ function acoesDoAtendente(res, usuario, nome, corpo) {
 function acoesDaInbox(res, usuario, nome, corpo) {
   const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
   const workspaceId = corpo.p_workspace_id;
-  const participa = PARTICIPACOES.some((p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.status === 'active');
+  const participa = contasESuporteDoBanco.papelEfetivo(usuario, workspaceId) !== null;
 
   if (nome === 'read_my_inbox_version') {
     if (!participa) return responder(res, 200, '');
@@ -1410,6 +1448,11 @@ async function rotasDeDados(req, res, url) {
     return acoesDoServidor(res, recurso.slice(4), await lerCorpo(req));
   }
 
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_SERVIDOR_FASE7.includes(recurso.slice(4))) {
+    if (!ehOServidorDoPainel(req)) return responder(res, 403, { code: '42501', details: null, hint: null, message: 'permission denied for function' });
+    return contasESuporteDoBanco.acoesDoServidor(res, recurso.slice(4), await lerCorpo(req));
+  }
+
   const usuario = usuarioDaRequisicao(req);
   if (!usuario) return naoAutorizado(res);
   const permitidos = workspacesDoUsuario(usuario);
@@ -1432,6 +1475,10 @@ async function rotasDeDados(req, res, url) {
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_RECURSOS_E_SIMULADOR.includes(recurso.slice(4))) {
     return recursosSimuladorDoBanco.acoes(res, usuario, recurso.slice(4), await lerCorpo(req));
+  }
+
+  if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_CONTAS_E_SUPORTE.includes(recurso.slice(4))) {
+    return contasESuporteDoBanco.acoes(res, usuario, recurso.slice(4), await lerCorpo(req));
   }
 
   if (req.method === 'POST' && recurso.startsWith('rpc/') && FUNCOES_DO_ATENDENTE.includes(recurso.slice(4))) {
@@ -1461,7 +1508,11 @@ async function rotasDeDados(req, res, url) {
   }
 
   if (recurso === 'profiles') {
-    const linhas = usuario.nome ? [{ display_name: usuario.nome }] : [];
+    if (req.method === 'POST') {
+      const salvo = contasESuporteDoBanco.salvarPerfil(usuario, await lerCorpo(req));
+      return responder(res, 200, [salvo]);
+    }
+    const linhas = contasESuporteDoBanco.lerPerfil(usuario);
     const querUmObjeto = String(req.headers.accept ?? '').includes('vnd.pgrst.object');
     if (!querUmObjeto) return responder(res, 200, linhas);
     return linhas.length === 1
@@ -1469,10 +1520,11 @@ async function rotasDeDados(req, res, url) {
       : responder(res, 406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' });
   }
 
+  const daFase7 = contasESuporteDoBanco.consultarTabela(recurso, usuario, url.searchParams);
   const tabela = tabelas[recurso];
-  if (!tabela) return responder(res, 404, { message: `Tabela não imitada: ${recurso}` });
+  if (!daFase7 && !tabela) return responder(res, 404, { message: `Tabela não imitada: ${recurso}` });
 
-  let linhas = tabela.filter((linha) => permitidos.includes(linha.workspace_id));
+  let linhas = daFase7 ?? tabela.filter((linha) => permitidos.includes(linha.workspace_id));
   try {
     for (const [coluna, expressao] of url.searchParams) {
       if (['select', 'order', 'limit', 'offset'].includes(coluna)) continue;
@@ -1480,6 +1532,11 @@ async function rotasDeDados(req, res, url) {
     }
   } catch (erro) {
     return responder(res, 400, { message: erro.message });
+  }
+
+  const limiteParam = Number(url.searchParams.get('limit'));
+  if (Number.isInteger(limiteParam) && limiteParam > 0) {
+    linhas = linhas.slice(0, limiteParam);
   }
 
   const faixa = linhas.length === 0 ? `*/${linhas.length}` : `0-${linhas.length - 1}/${linhas.length}`;
@@ -1524,6 +1581,10 @@ const servidor = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/controle/reiniciar-fase6') {
       recursosSimuladorDoBanco.reiniciarFase6();
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/reiniciar-fase7') {
+      contasESuporteDoBanco.reiniciarFase7();
       return responder(res, 200, { ok: true });
     }
     if (url.pathname === '/controle/simular-envio-incerto') {

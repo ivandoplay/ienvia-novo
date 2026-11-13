@@ -14,6 +14,9 @@ export interface AtributosDeCookie {
   partitioned?: boolean;
 }
 
+export const COOKIE_WORKSPACE = 'ienvia_ws';
+export const DIAS_COOKIE_WORKSPACE = 60 * 60 * 24 * 365;
+
 export function atributosDeCookie(ambiente: NodeJS.ProcessEnv = process.env): AtributosDeCookie {
   const emProducao = ambiente.NODE_ENV === 'production';
   if (!emProducao && ambiente.IENVIA_PREVIA_EMBUTIDA === '1') {

@@ -40,10 +40,24 @@ test.describe('Acessibilidade', () => {
     expect(await problemasGraves(page)).toEqual([]);
   });
 
-  test('aba em reconstrução', async ({ page }) => {
+  test('configurações gerais', async ({ page }) => {
     await entrar(page, 'dona');
     await page.goto('/configuracoes');
+    await expect(page.getByRole('heading', { level: 1, name: 'Geral' })).toBeVisible();
     expect(await problemasGraves(page)).toEqual([]);
+  });
+
+  test('clientes SaaS e modo suporte', async ({ page }) => {
+    await entrar(page, 'master@exemplo.com');
+    await page.goto('/contas');
+    await expect(page.getByRole('heading', { level: 1, name: 'Clientes SaaS' })).toBeVisible();
+    expect(await problemasGraves(page)).toEqual([]);
+
+    await page.getByRole('button', { name: '+ Novo cliente' }).click();
+    await expect(page.getByRole('heading', { level: 2, name: 'Criar nova conta de cliente' })).toBeVisible();
+    expect(await problemasGraves(page)).toEqual([]);
+
+    await page.request.post('http://127.0.0.1:54399/controle/reiniciar-fase7');
   });
 
   test('menu aberto no celular', async ({ page, isMobile }) => {

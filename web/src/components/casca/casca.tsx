@@ -4,12 +4,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { MARCA_PADRAO } from '@ienvia/shared';
+import { sairDoModoSuporte } from '@/app/acoes-de-sessao';
 import { Icone } from '@/components/ui/icone';
 import { ATALHOS_CELULAR, buscarItemPorRota, rotaEstaAtiva, type GrupoMenu, type ItemMenu } from '@/lib/navegacao';
 import type { ResumoDaIa } from '@/lib/atendente/painel';
+import type { ModoSuporteAtivo, Papel } from '@/lib/sessao';
 import { BuscaGlobal } from './busca-global';
 import { ControleDaIa } from './controle-da-ia';
 import { MenuDaConta } from './menu-da-conta';
+
+export interface WorkspaceParaTroca {
+  id: string;
+  nome: string;
+  papel: Papel;
+}
 
 export interface PropsDaCasca {
   menu: GrupoMenu[];
@@ -24,6 +33,10 @@ export interface PropsDaCasca {
     papel: string;
   };
   workspace: string;
+  workspaceAtivoId?: string | null;
+  workspaces?: WorkspaceParaTroca[];
+  marca?: { nome: string; subtitulo: string };
+  modoSuporte?: ModoSuporteAtivo | null;
   conexao: { texto: string; conectado: boolean };
   /** Como está a IA da empresa (para o botão "Pausar tudo"). `null` quando não deu para ler. */
   ia: ResumoDaIa | null;
@@ -49,7 +62,18 @@ function useTelaDeCelular(): boolean {
  * A moldura do painel: menu lateral, barra do topo, conteúdo e navegação do celular.
  * Tudo que é comum a todas as abas mora aqui; cada aba só entrega o seu miolo (`children`).
  */
-export function Casca({ menu, usuario, workspace, conexao, ia, children }: PropsDaCasca) {
+export function Casca({
+  menu,
+  usuario,
+  workspace,
+  workspaceAtivoId = null,
+  workspaces = [],
+  marca = { nome: MARCA_PADRAO.nomeDaMarca, subtitulo: MARCA_PADRAO.subtituloDaMarca },
+  modoSuporte = null,
+  conexao,
+  ia,
+  children,
+}: PropsDaCasca) {
   const caminho = usePathname();
   const ehCelular = useTelaDeCelular();
   const [gavetaAberta, setGavetaAberta] = useState(false);
@@ -81,7 +105,7 @@ export function Casca({ menu, usuario, workspace, conexao, ia, children }: Props
     return () => document.removeEventListener('keydown', aoApertarTecla);
   }, [gavetaAberta]);
 
-  const tituloNoCelular = caminho === '/visao-geral' ? 'Início' : (buscarItemPorRota(caminho)?.rotulo ?? 'Ienvia');
+  const tituloNoCelular = caminho === '/visao-geral' ? 'Início' : (buscarItemPorRota(caminho)?.rotulo ?? marca.nome);
   const gavetaVisivel = ehCelular && gavetaAberta;
 
   return (
@@ -104,8 +128,8 @@ export function Casca({ menu, usuario, workspace, conexao, ia, children }: Props
               <Image src="/ienvia-icone.png" alt="" width={32} height={32} priority />
             </div>
             <div className="brand-textos">
-              <div className="brand-title">Ienvia</div>
-              <div className="brand-sub">Atendente Universal</div>
+              <div className="brand-title">{marca.nome}</div>
+              {marca.subtitulo ? <div className="brand-sub">{marca.subtitulo}</div> : null}
             </div>
           </div>
         </div>
@@ -118,7 +142,7 @@ export function Casca({ menu, usuario, workspace, conexao, ia, children }: Props
 
         <div className="sidebar-footer">
           <div className="active-profile-box">
-            <div className="active-profile-label">Workspace ativo</div>
+            <div className="active-profile-label">{modoSuporte ? 'Modo suporte ativo' : 'Workspace ativo'}</div>
             <div className="active-profile-name">{workspace}</div>
           </div>
         </div>
@@ -182,6 +206,29 @@ export function Casca({ menu, usuario, workspace, conexao, ia, children }: Props
           </div>
         </header>
 
+        {modoSuporte ? (
+          <div className="support-banner" role="region" aria-label="Modo suporte ativo">
+            <div className="support-banner-info">
+              <span className="support-banner-pill">Modo Suporte</span>
+              <span>
+                Acessando <strong>{modoSuporte.workspaceNome}</strong>
+                {modoSuporte.status === 'closed' ? ' (conta desativada)' : ''}
+                {modoSuporte.motivo ? ` — ${modoSuporte.motivo}` : ''} · Ações registradas na auditoria.
+              </span>
+            </div>
+            <div className="support-banner-actions">
+              <Link href="/contas" className="btn btn-secondary btn-sm">
+                Clientes SaaS
+              </Link>
+              <form action={sairDoModoSuporte}>
+                <button type="submit" className="btn btn-primary btn-sm">
+                  Sair do suporte
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
         <main id="conteudo" className="content-area" tabIndex={-1}>
           <div className="pagina">{children}</div>
         </main>
@@ -220,6 +267,9 @@ export function Casca({ menu, usuario, workspace, conexao, ia, children }: Props
         aoFechar={() => setContaAberta(false)}
         usuario={usuario}
         workspace={workspace}
+        workspaceAtivoId={workspaceAtivoId}
+        workspaces={workspaces}
+        emModoSuporte={Boolean(modoSuporte)}
       />
     </div>
   );

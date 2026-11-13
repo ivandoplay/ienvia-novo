@@ -1,17 +1,12 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { apelidoDoLogin, iniciais } from '@ienvia/shared';
-import { Casca } from '@/components/casca/casca';
+import { MolduraDoPainel } from '@/components/casca/moldura-do-painel';
 import { ConfiguracaoPendente } from '@/components/configuracao-pendente';
-import { carregarResumoDaIa } from '@/lib/dados/atendente';
-import { resumirInstancias } from '@/lib/dados/visao-geral';
 import { lerConfigSupabase } from '@/lib/env';
-import { resumoDeConexao } from '@/lib/formato';
-import { menuParaUsuario } from '@/lib/navegacao';
-import { obterSessao, rotuloDoPapel } from '@/lib/sessao';
+import { obterSessao } from '@/lib/sessao';
 
-/** Moldura de todas as abas do painel. Só entra quem está logado. */
+/** Moldura de todas as abas de workspace. Só entra quem está logado. */
 export default async function LayoutDoPainel({ children }: { children: ReactNode }) {
   if (!lerConfigSupabase()) return <ConfiguracaoPendente />;
 
@@ -19,28 +14,17 @@ export default async function LayoutDoPainel({ children }: { children: ReactNode
   if (!sessao) redirect('/login');
 
   const workspace = sessao.workspaceAtivo;
-  const [instancias, ia] = workspace ? await Promise.all([resumirInstancias(workspace.id), carregarResumoDaIa(workspace.id)]) : [null, null];
-  const conexao = instancias
-    ? resumoDeConexao(instancias.conectadas, instancias.total)
-    : { texto: 'Sem informação', conectado: false };
-
 
   return (
-    <Casca
-      menu={menuParaUsuario(sessao.ehMaster)}
-      usuario={{
-        nome: sessao.usuario.nome,
-        login: sessao.usuario.login,
-        apelido: apelidoDoLogin(sessao.usuario.login),
-        iniciais: iniciais(sessao.usuario.nome),
-        papel: rotuloDoPapel(sessao),
-      }}
-      workspace={workspace?.nome ?? 'Nenhum workspace'}
-      conexao={conexao}
-      ia={ia}
-    >
-      {sessao.falhouAoCarregar ? <FalhaAoCarregar /> : workspace ? children : <SemWorkspace />}
-    </Casca>
+    <MolduraDoPainel sessao={sessao}>
+      {sessao.falhouAoCarregar ? (
+        <FalhaAoCarregar />
+      ) : workspace ? (
+        children
+      ) : (
+        <SemWorkspace ehMaster={sessao.ehMaster} temContaDesativada={sessao.temContaDesativada} />
+      )}
+    </MolduraDoPainel>
   );
 }
 
@@ -63,8 +47,45 @@ function FalhaAoCarregar() {
   );
 }
 
-/** A conta existe, mas ainda não foi ligada a nenhuma empresa. */
-function SemWorkspace() {
+/** A conta existe, mas não tem um workspace ativo ligado agora. */
+function SemWorkspace({ ehMaster, temContaDesativada }: { ehMaster: boolean; temContaDesativada: boolean }) {
+  if (temContaDesativada && !ehMaster) {
+    return (
+      <div className="apoio">
+        <div className="page-header">
+          <div>
+            <h1>Esta conta está desativada</h1>
+            <p>
+              O acesso a este workspace foi pausado temporariamente pelo administrador da plataforma. Entre em contato
+              com o suporte para reativar.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ehMaster) {
+    return (
+      <div className="apoio">
+        <div className="page-header">
+          <div>
+            <h1>Nenhum workspace selecionado</h1>
+            <p>
+              Você está conectado como administrador da plataforma. Abra a área Clientes SaaS para criar contas,
+              ajustar limites ou entrar em Modo Suporte em qualquer cliente.
+            </p>
+          </div>
+        </div>
+        <div className="apoio-acoes">
+          <Link href="/contas" className="btn btn-primary">
+            Abrir Clientes SaaS
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="apoio">
       <div className="page-header">
