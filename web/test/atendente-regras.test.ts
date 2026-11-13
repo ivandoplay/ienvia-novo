@@ -188,15 +188,48 @@ describe('quando a IA não deve responder no escuro', () => {
 describe('dividir a resposta em balões', () => {
   const longo = (inicio: string) => `${inicio} ${'palavra '.repeat(30)}`.trim();
 
-  test('resposta curta, ou sem parágrafos, vai num balão só', () => {
+  test('resposta sem parágrafo, ou vazia, vai num balão só', () => {
     expect(dividirResposta('  Entregamos sim!  ', true)).toEqual(['Entregamos sim!']);
-    expect(dividirResposta('Oi!\n\nTudo bem?', true)).toEqual(['Oi!\n\nTudo bem?']);
     expect(dividirResposta(longo('Um parágrafo só.'), true)).toHaveLength(1);
     expect(dividirResposta('', true)).toEqual([]);
     expect(dividirResposta('   ', true)).toEqual([]);
   });
 
-  test('resposta comprida com parágrafos: até três balões (o primeiro, o miolo e o último)', () => {
+  test('parágrafo separado vira balão separado mesmo com a resposta curta', () => {
+    // Era o caso que mais aparecia no WhatsApp: uma resposta de 3 parágrafos chegava como um bloco só.
+    expect(dividirResposta('Oi! Tudo bem?\n\nTudo bem?', true)).toEqual(['Oi! Tudo bem?', 'Tudo bem?']);
+    expect(dividirResposta('Oi, tudo bem?\n\nSai daqui uns 40 min.\n\nPIX ou cartão?', true)).toEqual([
+      'Oi, tudo bem?',
+      'Sai daqui uns 40 min.',
+      'PIX ou cartão?',
+    ]);
+    // Quebra de linha sozinha não divide: só a linha em branco (parágrafo).
+    expect(dividirResposta('Item 1\nItem 2\nItem 3', true)).toEqual(['Item 1\nItem 2\nItem 3']);
+  });
+
+  test('resposta corrida e comprida também se quebra, nas frases e de forma equilibrada', () => {
+    const corrida =
+      'Oi, tudo bem? Aqui é a Bella da Pizzaria do Zé. Funcionamos de terça a domingo, das 18h às 23h. ' +
+      'Entregamos no centro e nos bairros vizinhos, com taxa de R$ 8 no centro e R$ 12 nos bairros. ' +
+      'Aceitamos PIX, cartão, dinheiro e vale-refeição. O pedido mínimo é R$ 30. Quer ver o cardápio?';
+    const baloes = dividirResposta(corrida, true)!;
+    expect(baloes.length).toBeGreaterThan(1);
+    expect(baloes.length).toBeLessThanOrEqual(3);
+    // Nada se perde e nenhum bloco sai nanico.
+    expect(baloes.join(' ').replace(/\s+/g, ' ')).toBe(corrida.replace(/\s+/g, ' '));
+    expect(baloes.every((balao) => balao.length >= 40)).toBe(true);
+    // Frase nunca é cortada no meio: cada balão termina em pontuação.
+    expect(baloes.every((balao) => /[.!?…]$/.test(balao))).toBe(true);
+  });
+
+  test('o que não deve ser quebrado: lista numerada, texto curto e valor com vírgula', () => {
+    const lista = 'Fechou! Anota aí:\n1. PIX de R$ 45 na chave que te mando\n2. Manda o comprovante aqui\n3. O motoboy sai em 20 minutos';
+    expect(dividirResposta(lista, true)).toEqual([lista]);
+    expect(dividirResposta('O valor fica R$ 89,90 e sai em 40 min. Pode ser PIX ou cartão. Fechou?', true)).toHaveLength(1);
+    expect(dividirResposta('Sai em 40 min.', true)).toEqual(['Sai em 40 min.']);
+  });
+
+  test('com mais de três parágrafos, o miolo se junta e a resposta fica em três balões', () => {
     expect(dividirResposta(`${longo('A.')}\n\n${longo('B.')}`, true)).toEqual([longo('A.'), longo('B.')]);
     expect(dividirResposta(`${longo('A.')}\n\n${longo('B.')}\n \n${longo('C.')}`, true)).toEqual([longo('A.'), longo('B.'), longo('C.')]);
     expect(dividirResposta([longo('A.'), longo('B.'), longo('C.'), longo('D.'), longo('E.')].join('\n\n'), true)).toEqual([

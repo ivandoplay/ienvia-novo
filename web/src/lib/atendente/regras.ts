@@ -3,10 +3,18 @@
  * no que a IA lê, escolher o arquivo que vai junto, dividir a resposta em balões, o tempo de "digitando…"
  * e os recados deixados para as pessoas. O servidor, as telas e os testes usam as mesmas.
  */
-import type { Fala } from '@/lib/ia/provedores';
 import { tipoDoAnexo, type TipoDeAnexo } from '@/lib/ia/regras';
 
-export type { Fala };
+/**
+ * A fala da conversa como o atendente a lê. Fica declarada aqui (em vez de importada de
+ * `@/lib/ia/provedores`) para este módulo continuar livre de `server-only` — o simulador, que também
+ * usa `dividirResposta`, importa daqui. `Fala` de `provedores` tem exatamente estes campos.
+ */
+export interface Fala {
+  /** Quem falou: o cliente ou o atendimento. */
+  de: 'cliente' | 'atendente';
+  texto: string;
+}
 
 /** A ficha do arquivo de uma mensagem, como o banco devolve junto com a vez da IA. */
 export interface ArquivoDoHistorico {
@@ -234,7 +242,10 @@ export function porQueNaoDaParaLer(
   return `O contato mandou um arquivo${arquivo.nome ? ` (${arquivo.nome.slice(0, 80)})` : ''} que a IA não consegue abrir.`;
 }
 
-/** A partir deste tamanho, uma resposta com parágrafos separados pode sair em mais de um balão. */
+/**
+ * @deprecated O tamanho não decide mais a divisão: parágrafo separado vira balão do mesmo jeito, curto ou
+ * comprido. Mantido porque é exportado e pode ser lido por quem já mexia aqui.
+ */
 export const TAMANHO_PARA_DIVIDIR = 260;
 /** O tamanho máximo de um balão (o mesmo limite do envio pelo painel). */
 export const TAMANHO_DO_BALAO = 4096;
@@ -257,22 +268,102 @@ function cortarNoLimite(texto: string): string[] {
 }
 
 /**
- * Divide a resposta da IA em balões, do jeito que uma pessoa mandaria: resposta curta vai num balão só;
- * resposta comprida com parágrafos separados vai em até três (o primeiro parágrafo, o miolo e o último).
+ * A partir deste tamanho, um parágrafo único já é "textão" e ganha quebra por frase
+ * (é o que impedia a resposta corrida de chegar como um bloco só).
+ */
+export const CARACTERES_PARA_QUEBRAR_FRASE = 220;
+
+/** Nenhum balão sai menor que isto: mensagem de 3 palavras solta parece robô, não gente. */
+export const CARACTERES_MINIMOS_DO_BALAO = 40;
+
+/**
+ * Quebra um parágrafo comprido em 2 ou 3 blocos, dividindo **nas frases** e de forma equilibrada
+ * (nada de primeiro bloco gigante e último de duas palavras).
+ *
+ * É conservador de propósito, para não estragar texto:
+ * - só age em parágrafo acima de `CARACTERES_PARA_QUEBRAR_FRASE` com pelo menos 3 frases;
+ * - parágrafo com linha solta dentro (lista numerada, um item por linha) fica inteiro;
+ * - só o ponto de fim de frase seguido de espaço conta, então "R$ 89,90", "18h30" e "Rua X, 123" não quebram;
+ * - nenhum bloco sai menor que `CARACTERES_MINIMOS_DO_BALAO`.
+ */
+function quebrarEmBlocos(paragrafo: string): string[] {
+  if (/\n/.test(paragrafo)) return [paragrafo];
+
+  const frases = paragrafo
+    .split(/(?<=[.!?…])\s+/)
+    .map((frase) => frase.trim())
+    .filter(Boolean);
+  if (frases.length < 3) return [paragrafo];
+
+  const quantos = paragrafo.length > CARACTERES_PARA_QUEBRAR_FRASE * 2 ? 3 : 2;
+  const alvo = Math.ceil(paragrafo.length / quantos);
+
+  const blocos: string[] = [];
+  let atual = '';
+  for (const frase of frases) {
+    const tentativa = atual ? `${atual} ${frase}` : frase;
+    // Segura a frase no bloco atual enquanto ele ainda está abaixo do alvo e ainda cabem blocos.
+    if (atual && tentativa.length > alvo && blocos.length < quantos - 1) {
+      blocos.push(atual);
+      atual = frase;
+    } else {
+      atual = tentativa;
+    }
+  }
+  if (atual) blocos.push(atual);
+
+  // Um bloco curto demais se junta ao vizinho (o de trás, ou o da frente se for o primeiro).
+  for (let i = 0; i < blocos.length && blocos.length > 1; i += 1) {
+    if (blocos[i]!.length >= CARACTERES_MINIMOS_DO_BALAO) continue;
+    const vizinho = i === 0 ? 1 : i - 1;
+    blocos[vizinho] = i === 0 ? `${blocos[i]} ${blocos[vizinho]}` : `${blocos[vizinho]} ${blocos[i]}`;
+    blocos.splice(i, 1);
+    i -= 1;
+  }
+
+  return blocos;
+}
+
+/**
+ * Divide a resposta da IA em balões, do jeito que uma pessoa mandaria.
+ *
+ * Duas regras, nesta ordem:
+ * 1. Cada **parágrafo** (linha em branco) vira um balão, mesmo quando a resposta é curta. Antes só
+ *    dividia acima de 260 caracteres, e o efeito era o contrário do desejado: "Oi, tudo bem? / / Sai
+ *    daqui uns 40 min. / / PIX ou cartão?" chegava como um único balão de três parágrafos.
+ * 2. Um parágrafo **sozinho e comprido** (mais de `CARACTERES_PARA_QUEBRAR_FRASE`) também se quebra,
+ *    nas frases dele — senão a IA que escreve tudo corrido continuaria mandando textão.
+ *
+ * O interruptor do Motor de IA continua valendo: desligado, tudo vai num balão só. Acima de três
+ * blocos, o miolo se junta (o primeiro, o miolo e o último) para não virar enxurrada de mensagens.
  * Devolve `null` quando o texto é tão grande que não cabe nem em cinco balões: isso não é resposta de WhatsApp.
  */
 export function dividirResposta(textoDaResposta: string, dividir: boolean): string[] | null {
   const limpo = textoDaResposta.trim();
   if (!limpo) return [];
-  let baloes = [limpo];
-  if (dividir && limpo.length > TAMANHO_PARA_DIVIDIR && /\n\s*\n/.test(limpo)) {
-    const paragrafos = limpo
+
+  let baloes: string[];
+  if (!dividir) {
+    baloes = [limpo];
+  } else if (/\n\s*\n/.test(limpo)) {
+    baloes = limpo
       .split(/\n\s*\n/)
       .map((paragrafo) => paragrafo.trim())
       .filter(Boolean);
-    if (paragrafos.length === 2 || paragrafos.length === 3) baloes = paragrafos;
-    else if (paragrafos.length > 3) baloes = [paragrafos[0]!, paragrafos.slice(1, -1).join('\n\n'), paragrafos.at(-1)!];
+  } else {
+    baloes = [limpo];
   }
+
+  if (dividir) {
+    // A quebra por frase vale para a resposta corrida e também para os parágrafos compridos: só não
+    // quebra quando o texto já veio em 2 ou 3 parágrafos, que é o formato que a gente pede à IA.
+    const jaVeioEmBlocos = baloes.length >= 2 && baloes.length <= 3;
+    if (!jaVeioEmBlocos) {
+      baloes = baloes.flatMap((balao) => (balao.length > CARACTERES_PARA_QUEBRAR_FRASE ? quebrarEmBlocos(balao) : [balao]));
+    }
+    if (baloes.length > 3) baloes = [baloes[0]!, baloes.slice(1, -1).join('\n\n'), baloes.at(-1)!];
+  }
+
   baloes = baloes.flatMap(cortarNoLimite);
   return baloes.length > BALOES_NO_MAXIMO ? null : baloes;
 }

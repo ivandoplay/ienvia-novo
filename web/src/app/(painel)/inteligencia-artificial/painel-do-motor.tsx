@@ -383,8 +383,8 @@ export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConf
               aoMudar={(simularDigitando) => mudar({ simularDigitando })}
             />
             <Interruptor
-              titulo="Dividir respostas longas em mensagens menores"
-              descricao="Em vez de um bloco grande de texto, a resposta chega em até três mensagens curtas."
+              titulo="Responder em mensagens separadas, como uma pessoa"
+              descricao="Cada parágrafo da resposta chega como uma mensagem própria, em até três. Desligado, a resposta inteira chega num bloco só."
               ligado={rascunho.dividirMensagensLongas}
               desativado={!podeEditar}
               aoMudar={(dividirMensagensLongas) => mudar({ dividirMensagensLongas })}

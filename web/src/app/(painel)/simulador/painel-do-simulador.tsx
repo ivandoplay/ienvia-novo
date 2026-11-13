@@ -209,15 +209,37 @@ export function PainelDoSimulador({ dados }: Props) {
                 </p>
               </div>
             ) : (
-              historico.map((m) => (
-                <div key={m.id} className={`f6-sim-bolha f6-sim-bolha--${m.papel}`}>
+              historico.map((m) => {
+                // Como uma pessoa manda: cada balão é uma bolha. Sem balões (mensagens antigas), o texto inteiro.
+                const baloesDaMensagem = m.papel === 'assistant' && m.baloes && m.baloes.length > 1 ? m.baloes : [m.texto].filter(Boolean);
+                const variosBaloes = baloesDaMensagem.length > 1;
+                return (
+                  <div
+                    key={m.id}
+                    className={`f6-sim-bolha f6-sim-bolha--${m.papel}`}
+                    style={variosBaloes ? { background: 'transparent', border: 'none', padding: 0, boxShadow: 'none', gap: 6 } : undefined}
+                  >
                   {m.anexoSimulado ? (
                     <span className="estado">
                       Anexo enviado ({m.anexoSimulado.tipo === 'audio' ? 'Áudio' : 'Foto'}): {m.anexoSimulado.nome}
                     </span>
                   ) : null}
 
-                  {m.texto ? <div style={{ whiteSpace: 'pre-wrap' }}>{m.texto}</div> : null}
+                  {variosBaloes ? (
+                    baloesDaMensagem.map((balao, indice) => (
+                      <div key={indice} className="f6-sim-bolha f6-sim-bolha--assistant" style={{ whiteSpace: 'pre-wrap' }}>
+                        {balao}
+                      </div>
+                    ))
+                  ) : m.texto ? (
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{m.texto}</div>
+                  ) : null}
+
+                  {variosBaloes ? (
+                    <small style={{ color: 'var(--text-secondary)', fontSize: 11.5 }}>
+                      Na conversa de verdade, a IA manda isso em {baloesDaMensagem.length} mensagens separadas — é exatamente o que o cliente recebe.
+                    </small>
+                  ) : null}
 
                   {m.itensCatalogo && m.itensCatalogo.length > 0 ? (
                     <div style={{ display: 'grid', gap: 6 }}>
@@ -292,11 +314,12 @@ export function PainelDoSimulador({ dados }: Props) {
                     </div>
                   ) : null}
 
-                  <span className="f6-sim-bolha-hora">
-                    {m.papel === 'user' ? nomeContato : 'IA'} · {formatarHora(m.criadoEm)}
-                  </span>
-                </div>
-              ))
+                    <span className="f6-sim-bolha-hora">
+                      {m.papel === 'user' ? nomeContato : 'IA'} · {formatarHora(m.criadoEm)}
+                    </span>
+                  </div>
+                );
+              })
             )}
             <div ref={fimChatRef} />
           </div>

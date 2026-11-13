@@ -49,6 +49,9 @@ import { DEPOSITO, tipoParaEnvio } from '@/lib/inbox/arquivos';
 import { numeroParaEnvio } from '@/lib/inbox/regras';
 import { mapearRecursosDoPacote } from '@/lib/recursos/mapeamento';
 
+/** A fala da conversa mora em `regras` (módulo sem `server-only`); aqui segue disponível com o mesmo nome. */
+export type { Fala } from '@/lib/atendente/regras';
+
 /**
  * O atendente de IA: responde, no WhatsApp, uma mensagem que chegou.
  *

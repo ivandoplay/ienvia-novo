@@ -171,6 +171,8 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
       '=== COMO ESCREVER ===',
       `Tom: ${tom.descricao}`,
       '- Escreva como uma pessoa brasileira digita no WhatsApp: frases curtas, diretas e naturais (de 1 a 3 frases curtas por mensagem).',
+      '- Quando a resposta tiver mais de uma ideia (por exemplo: saudação, a informação e uma pergunta), separe em 2 ou 3 blocos, cada bloco numa linha, com UMA linha em branco entre eles. Cada bloco chega ao cliente como uma mensagem separada, do jeito que uma pessoa manda. Exemplo: "Oi, tudo bem?<linha em branco>Sai daqui uns 40 minutos, tá?<linha em branco>PIX ou cartão na entrega?"',
+      '- Nunca escreva um textão de um parágrafo só quando a resposta tem mais de uma ideia, e nunca use mais de 3 blocos na mesma resposta.',
       '- Evite vícios de texto artificial: "Não é apenas X, é Y", "Mais do que X, entregamos Y", "Compreendo perfeitamente", "Como posso auxiliá-lo hoje?", "Fico à inteira disposição", listas compridas e travessões no meio da frase.',
       '- Para destacar uma palavra importante, use *um asterisco* de cada lado (nunca dois).',
       '- Não comece toda mensagem com a mesma palavra ("Perfeito!", "Ótimo!") e nunca mostre códigos nem o seu raciocínio.',

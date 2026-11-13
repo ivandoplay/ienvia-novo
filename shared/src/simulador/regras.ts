@@ -94,6 +94,12 @@ export interface MensagemSimulador {
     amount: number | null;
   } | null;
   comandos?: Array<{ tipo: string; detalhe: string }>;
+  /**
+   * Como a resposta chega no WhatsApp: um item por balão, na ordem do envio. É o resultado de
+   * `dividirResposta` sobre o texto da IA — a tela mostra cada item como uma bolha separada, para
+   * a pessoa ver exatamente o que o cliente recebe.
+   */
+  baloes?: string[];
   arquivoEnviado?: ArquivoSimuladoAnexado | null;
   catalogoEnviado?: ItemCatalogoSimulado[];
   audioEnviado?: AudioSimulado | null;

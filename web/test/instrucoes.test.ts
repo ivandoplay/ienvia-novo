@@ -144,6 +144,13 @@ describe('instruções: o que a IA sabe', () => {
     expect(instrucoes({ tom: 'formal' })).toContain('Tom: Executivo, polido, elegante e respeitoso.');
   });
 
+  test('ensina a escrever em 2 ou 3 blocos, porque cada bloco chega como uma mensagem separada', () => {
+    const texto = instrucoes();
+    expect(texto).toContain('UMA linha em branco entre eles');
+    expect(texto).toContain('Cada bloco chega ao cliente como uma mensagem separada');
+    expect(texto).toContain('nunca use mais de 3 blocos na mesma resposta');
+  });
+
   test('sem recursos cadastrados, a IA é instruída a não inventar e a não prometer o que não está configurado', () => {
     const texto = instrucoes();
     expect(texto).toContain('Não invente, não chute e não diga nem que tem nem que não tem.');

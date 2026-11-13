@@ -31,6 +31,7 @@ import {
   provedorRecebe,
   type Provedor,
 } from '@/lib/ia/regras';
+import { dividirResposta } from '@/lib/atendente/regras';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { obterSessao } from '@/lib/sessao';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
@@ -362,11 +363,17 @@ export async function enviarMensagemSimulador(entrada: {
     criadoEm: agoraIso,
     anexoSimulado: entrada.anexo && tipoAnexoRotulo ? { nome: entrada.anexo.fileName, tipo: tipoAnexoRotulo } : null,
   };
+  const textoDaResposta = (lida.texto.trim() || fallbackAudioTexto).trim();
+  // Os mesmos balões que o atendimento de verdade vai enviar (respeitando o interruptor do Motor de IA):
+  // a tela do simulador mostra cada um como uma bolha, e não um bloco só.
+  const baloesDaResposta = dividirResposta(textoDaResposta, motor.dividirMensagensLongas) ?? [textoDaResposta];
+
   const msgAssistente: MensagemSimulador = {
     id: randomUUID(),
     papel: 'assistant',
-    texto: (lida.texto.trim() || fallbackAudioTexto).trim(),
+    texto: textoDaResposta,
     criadoEm: new Date().toISOString(),
+    baloes: baloesDaResposta.filter(Boolean),
     sentVoiceIds: audiosResolvidos.map((a) => a.id),
     itensCatalogo: itensResolvidos,
     audios: audiosResolvidos,
