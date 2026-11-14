@@ -111,3 +111,24 @@ rodado **de dentro da pasta `scripts/`**. O `node` procura `src/` a partir da pa
    "Etiquetas & respostas" fica sozinho na linha. Funciona, mas parece faltar algo.
 3. **`/contas` para o administrador** continua existindo e funciona; só não é acessível para a conta
    de teste. Se quiser, posso criar um atalho de "área do administrador" no menu quando `ehMaster`.
+
+## Terceira rodada — 12/11 (a prova que faltava, e um bug de verdade)
+
+O item 1 da segunda rodada estava entregue, mas **sem prova de que transcrevia**: eu só tinha
+medido que o botão existia e que ficava desativado sem arquivo. Fui provar com a IA de mentira e
+o teste derrubou um bug real:
+
+- **Bug corrigido:** a parte do áudio ia para o Gemini como `inline_data` / `mime_type`. A API REST
+  do Gemini só entende camelCase (`inlineData` / `mimeType`) e **ignora silenciosamente** a parte
+  desconhecida: o modelo recebia só o texto "transcreva o áudio" e devolvia uma resposta inventada
+  (ou vazia), sem erro na tela. Agora vai em `inlineData` (`web/src/lib/ia/provedores.ts`).
+- **Prova (e2e, 2 tamanhos de tela):** o botão "Transcrever automaticamente" está habilitado com o
+  arquivo escolhido; o campo de transcrição é preenchido pelo Gemini; e o pedido que chegou ao
+  provedor tem `anexo: { tipo: audio/wav, bytes > 0 }` — vídeo do antes/depois: antes `anexo: null`.
+- **Digitar à mão continua funcionando** e sobrescreve o texto automático (testado no mesmo teste).
+- **Exclusão de cliente ganhou a prova visual que faltava**, sem senha de master: e2e "master exclui
+  um cliente…" passa nas duas larguras (10/10 no arquivo `contas-configuracoes.spec.ts`).
+  O que travava era o roteiro do teste, não o produto: o 3º login seguido no mesmo navegador não
+  achava o formulário. Agora a dona desativada sai pela folha da conta antes de o master voltar.
+- **Saúde:** `tsc` 0 erros, `eslint` limpo, `vitest` **1012/1012**, Playwright **300 passaram**
+  (19 pulados por desenho) na suíte completa. Commit `d7a8d6b`, no ar em `app.ienvia.online`.
