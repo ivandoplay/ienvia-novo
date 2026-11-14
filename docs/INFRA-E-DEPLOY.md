@@ -123,3 +123,41 @@ npx --yes wrangler@3 pages deploy . --project-name=ienvia-landing --branch=main 
 4. **Não subir** `auditoria/`, `landing/` e `prompt-mestre/` junto com código do app: são entregáveis
    de trabalho, ficam fora dos commits (a não ser que a decisão seja colocá-los no repo).
 5. **Nunca** commitar `.env` (o `.gitignore` já bloqueia, mas vale lembrar).
+
+---
+
+## 8. Netlify (painel reserva) — deploy **somente manual**
+
+| Item | Valor |
+|---|---|
+| Site | `superb-tapioca-aaf330` (id `2829b40b-a2fc-4f27-9f74-db052c167a08`) |
+| Endereço | https://superb-tapioca-aaf330.netlify.app |
+| Repositório / branch | `github.com/ivandoplay/ienvia-novo` / `main` (conectado, `installation_id` 181399889) |
+| Build | `npm run build -w web` · publica `web/.next` · Node 24 (`netlify.toml` na raiz) |
+| Variáveis | 11 configuradas no site (Supabase, service_role, Evolution, motor signing, CRON_SECRET) |
+| **Deploy automático** | **DESLIGADO de propósito** — `build_settings.stop_builds: true` |
+| Gatilho manual | Build hook **"deploy manual (so quando chamado)"** (`6af8ca7f7a04b8791f23b008`) |
+
+### Como publicar o reserva (passo a passo real, testado em 12/11/2026)
+
+`stop_builds: true` **bloqueia também o build hook** (ele responde `200` e não cria deploy). A sequência que funciona:
+
+```bash
+SITE=2829b40b-a2fc-4f27-9f74-db052c167a08   # NETLIFY_AUTH_TOKEN em /home/user/.env
+# 1. destravar (temporário)
+curl -X PATCH -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"build_settings":{"stop_builds":false}}' https://api.netlify.com/api/v1/sites/$SITE
+# 2. disparar o gatilho manual (URL guardada no comentário do hook no painel da Netlify)
+curl -X POST https://api.netlify.com/build_hooks/<id-do-hook>
+# 3. acompanhar até "ready"
+curl -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" https://api.netlify.com/api/v1/sites/$SITE/deploys?per_page=1
+# 4. RELIGAR o travamento (deixa de ser automático)
+curl -X PATCH -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"build_settings":{"stop_builds":true}}' https://api.netlify.com/api/v1/sites/$SITE
+```
+
+**Deploy de 12/11/2026:** commit `c6e317faa176`, 42 s, `ready`. Conferido no ar: `/api/saude` 200,
+motores servindo **v6.1.0 assinado (27.045 bytes)**, `/api/motor/parear-senha` respondendo `401` para senha errada.
+
+**Aviso:** `IENVIA_URL_PUBLICA` no Netlify ainda aponta para o endereço antigo. Se o reserva for usado de verdade,
+atualizar essa variável — o motor e os webhooks que dependem dela continuam apontando para a Vercel.
