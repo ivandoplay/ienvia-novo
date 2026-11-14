@@ -211,3 +211,15 @@ Galeria: `web/auditoria-visual/clientes-saas/galeria.html` (celular e computador
 - Se o cliente mudar o próprio número do WhatsApp, o "número lógico" do chip pode ficar vazio; nesse
   caso o aviso de suspensão sai pelo número do responsável (se cadastrado) ou não sai — o painel avisa.
 - O master ainda não recebe alerta quando a senha de um cliente é trocada por outra pessoa: só o registro.
+
+## Pendências abertas (14/11)
+
+| Assunto | Situação | O que falta |
+| --- | --- | --- |
+| Clientes SaaS | **Fechado** a pedido do dono ("já tá bom do jeito que tá") | — |
+| Instagram | **Pausado** por decisão do dono | Quando voltar: o domínio já estará cadastrado na Meta e a tela deve pedir **só uma coisa**: o código de pareamento **ou** usuário e senha da conta (um ou o outro, nunca os dois). Nada de refazer o cadastro do domínio. |
+| Motor de IA | Em revisão ("tá bom mas não tá do jeito que eu quero") | Dono pediu para eu identificar os problemas primeiro; pergunta de alinhamento pendente (o que incomoda: a resposta em si ou a tela). |
+| Bug do print no Inbox | Sem reprodução | Precisa acontecer de novo com o dono, na mesma hora, para eu capturar. |
+| Alerta de troca de senha | Só entra no histórico | Se outra pessoa trocar a senha de um cliente, o dono (master) não recebe aviso. |
+| Aviso de suspensão sem destino | Coberto no cadastro | Sem WhatsApp do responsável e sem número do chip, o aviso não sai; o painel avisa na hora. |
+| Faixa assumir/devolver com IA desligada | Aguardando decisão | Mostrar sempre informando "IA desligada neste chip" ou sumir, como hoje. |
