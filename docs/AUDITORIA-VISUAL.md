@@ -132,3 +132,43 @@ o teste derrubou um bug real:
   achava o formulário. Agora a dona desativada sai pela folha da conta antes de o master voltar.
 - **Saúde:** `tsc` 0 erros, `eslint` limpo, `vitest` **1012/1012**, Playwright **300 passaram**
   (19 pulados por desenho) na suíte completa. Commit `d7a8d6b`, no ar em `app.ienvia.online`.
+
+## Quarta rodada — 12/11 (o que a revisão conjunta pediu)
+
+Tudo abaixo foi medido no painel rodando (Playwright, 412 px e 1440 px) e está na galeria
+`web/auditoria-visual/correcoes-12-11/galeria.html`.
+
+### Celular
+- **Simulador.** A conversa tinha altura mínima de 540 px e empurrava o campo de digitar para fora da
+  tela; a caixa de texto mostrava meia linha e o terceiro botão "Testar…" era cortado. Agora a conversa
+  começa compacta (140–38vh), os testes rápidos viraram grade (o primeiro na linha toda, os outros dois
+  embaixo), e o campo + botão "Simular" têm 44 px e ficam inteiros na tela.
+- **Treinamento · Regras.** A barra de salvar flutuava 74 px acima da barra de menu, deixando uma faixa
+  morta, e o recado de estado sumia quando não havia mudança — o "Desfazer" nascia apagado sem
+  explicação (o que parecia bug). Agora a barra encosta na barra de baixo (58 px + área segura), ocupa a
+  largura toda e sempre mostra o estado: "Tudo salvo…" ou "Alterações ainda não salvas…".
+- **Menu "Mais".** A gaveta abria com 304 px e o item Segurança ficava atrás do rodapé "Workspace ativo".
+  O menu agora rola por dentro e o rodapé fica fixo embaixo, sem cobrir nada.
+- **Assumir / Devolver para a IA.** Os botões tinham 28 px de altura e ficavam recuados à esquerda,
+  parecendo texto. No celular agora ocupam a linha inteira com 44 px de altura (medido: 360×44).
+- **Toques pequenos.** Botão da conta 32→38 px; botões "copiar" das fichas 20→38 px; abas do CRM
+  encolhem em telas de 320 px (antes vazavam 6 px da margem).
+
+### Todos os tamanhos
+- **Hora em 24 horas.** Os campos de horário mostravam "08:00 AM / 06:00 PM" porque o navegador estava em
+  inglês. Novo `CampoDeHora` (Segurança e Campanhas): aceita "8", "830" ou "18:30", guarda "HH:MM" e
+  mostra a dica "24 horas, sem AM/PM".
+- **Áudio sempre no formato de voz do WhatsApp.** A gravação agora sai em **OGG/Opus** direto do
+  gravador (biblioteca `opus-recorder` em Web Worker, servida pelo próprio painel) — e o upload de
+  arquivo passa pelo mesmo caminho, com o MediaRecorder do navegador convertendo quando preciso.
+  Prova fora do navegador: `ffprobe` no arquivo gerado → `codec_name=opus, sample_rate=48000, channels=1,
+  duration=2.000000`. Antes, o Chrome no computador gravava WebM e o áudio chegava como anexo.
+- **Transcrição reorganizada.** O bloco agora tem três degraus com nome: o que é o campo (ajuda), o botão
+  "Transcrever com o Gemini" (largura toda no celular) e a caixa "Texto do áudio · em branco/preenchido".
+  A tela também diz se o arquivo já está no formato de voz ou se será convertido.
+
+### Health
+- `tsc` 0 erros, `eslint` limpo (a biblioteca em `public/gravador` ficou fora do lint), `vitest`
+  **1012/1012**, Playwright **367/367**.
+- Testes que fixavam textos antigos do produto foram atualizados (cabeçalho "Chip: …", pílula "2/3
+  chips", lista de modelos do Gemini com 2.0 e 2.5 Flash).
