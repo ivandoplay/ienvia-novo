@@ -10,6 +10,7 @@ import {
 } from './config.mjs';
 import { recuperarAtualizacaoInterrompida, verificarEAtualizar } from './atualizador.mjs';
 import { SupervisorDeSessoes } from './sessoes.mjs';
+import { iniciarPaginaLocal } from './pagina-local.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.resolve(__dirname, '..');
@@ -20,13 +21,15 @@ function lerVersaoLocal(rootDir) {
 }
 
 function lerArgumentos(argv) {
-  const args = { pair: '', url: '', checkUpdate: false, once: false };
+  const args = { pair: '', url: '', checkUpdate: false, once: false, semPagina: false, porta: 0 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--pair' && argv[i + 1]) args.pair = argv[++i];
     else if (a === '--url' && argv[i + 1]) args.url = argv[++i];
     else if (a === '--check-update') args.checkUpdate = true;
     else if (a === '--once') args.once = true;
+    else if (a === '--sem-pagina' || a === '--no-ui') args.semPagina = true;
+    else if ((a === '--porta' || a === '--port') && argv[i + 1]) args.porta = Number(argv[++i]) || 0;
   }
   return args;
 }
@@ -65,6 +68,30 @@ export async function parearComPainel({ rootDir, panelUrl, code, versaoAtual, fe
   return dados;
 }
 
+/** Fica de olho no arquivo de configuração até o pareamento acontecer (ou até Ctrl+C). */
+async function esperarPareamento(pagina, cfgInicial) {
+  let cfg = cfgInicial;
+  let sinalizado = false;
+  const parar = () => {
+    sinalizado = true;
+  };
+  process.once('SIGINT', parar);
+  process.once('SIGTERM', parar);
+  while (!sinalizado) {
+    cfg = lerConfiguracao(ROOT_DIR);
+    if (cfg.panelUrl && cfg.deviceToken) break;
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  process.off('SIGINT', parar);
+  process.off('SIGTERM', parar);
+  if (!sinalizado) {
+    console.log(`[motor] Aparelho "${cfg.displayName}" ligado ao painel ${cfg.panelUrl}.`);
+  } else if (pagina) {
+    console.log('[motor] Página fechada. O motor continua ligado; reabra com o comando de sempre.');
+  }
+  return cfg;
+}
+
 async function rodarLoopPrincipal() {
   const args = lerArgumentos(process.argv.slice(2));
   const versaoAtual = lerVersaoLocal(ROOT_DIR);
@@ -91,11 +118,39 @@ async function rodarLoopPrincipal() {
     return;
   }
 
+  // Sem pareamento: em vez de morrer com uma linha de erro, abre a página local para a pessoa
+  // ligar o aparelho (senha da conta ou código). O loop só começa depois que o pareamento existe.
   if (!cfg.panelUrl || !cfg.deviceToken) {
-    console.error('[motor] Aparelho ainda não pareado.');
-    console.error('Execute: node src/index.mjs --url https://SEU-PAINEL --pair IENV-XXXX-XXXX');
-    process.exitCode = 1;
-    return;
+    if (args.semPagina) {
+      console.error('[motor] Aparelho ainda não pareado.');
+      console.error('Rode sem --sem-pagina para abrir a página do motor, ou use:');
+      console.error('  node src/index.mjs --url https://app.ienvia.online --pair IENV-XXXX-XXXX');
+      process.exitCode = 1;
+      return;
+    }
+
+    let pagina;
+    try {
+      pagina = await iniciarPaginaLocal({
+        rootDir: ROOT_DIR,
+        porta: args.porta || Number(process.env.IENVIA_MOTOR_PORTA || 4599),
+        lerConfiguracao,
+        salvarConfiguracao,
+      });
+    } catch (err) {
+      console.error(`[motor] Não consegui abrir a página local (${err.message}).`);
+      console.error('Use o modo terminal: node src/index.mjs --url https://app.ienvia.online --pair IENV-XXXX-XXXX');
+      process.exitCode = 1;
+      return;
+    }
+
+    cfg = await esperarPareamento(pagina, cfg);
+    await pagina.fechar();
+    if (!cfg.panelUrl || !cfg.deviceToken) {
+      console.error('[motor] Página fechada sem pareamento. Nada foi alterado.');
+      process.exitCode = 1;
+      return;
+    }
   }
 
   console.log(`[motor] Ienvia Motor v${versaoAtual} iniciado (${detectarPlataformaMotor()}) — painel: ${cfg.panelUrl}`);

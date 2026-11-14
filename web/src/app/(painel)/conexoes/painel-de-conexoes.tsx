@@ -151,9 +151,9 @@ export function PainelDeConexoes({ dados, podeEditar }: Props) {
     });
   }
 
-  const codigoParaExemplo = pareamentoAtivo?.codigo ?? 'IENV-XXXX-XXXX';
-  const comandoUnix = `./scripts/iniciar.sh --url ${origem} --pair ${codigoParaExemplo}`;
-  const comandoWindows = `.\\scripts\\iniciar.bat --url ${origem} --pair ${codigoParaExemplo}`;
+  // Sem --pair o motor abre a página local (127.0.0.1) onde a pessoa liga o aparelho.
+  const comandoUnix = `./scripts/iniciar.sh --url ${origem}`;
+  const comandoWindows = `.\\scripts\\iniciar.bat --url ${origem}`;
 
   return (
     <div className="conexoes-page">
@@ -289,6 +289,11 @@ export function PainelDeConexoes({ dados, podeEditar }: Props) {
                   {copiado === 'codigo' ? 'Copiado!' : 'Copiar código'}
                 </button>
               </div>
+              <p className="campo-dica" style={{ margin: '10px 0 6px' }}>
+                Escolha como ligar: rode o comando abaixo e use <strong>o código branco acima</strong> na página que
+                abrir; ou, se preferir, entre nela com <strong>e-mail e senha da sua conta</strong> (nesse caso nem
+                precisa deste código).
+              </p>
               <div className="pareamento-comando">
                 <code>{abaSo === 'windows' ? comandoWindows : comandoUnix}</code>
                 <button
@@ -410,8 +415,12 @@ export function PainelDeConexoes({ dados, podeEditar }: Props) {
                 <pre>PowerShell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1</pre>
               </li>
               <li>
-                Pareie e inicie o motor com o código gerado acima:
+                Inicie o motor. Ele abre sozinho a página <code>http://127.0.0.1:4599</code> no navegador:
                 <pre>{comandoWindows}</pre>
+              </li>
+              <li>
+                Na página que abrir, ligue o aparelho de um dos dois jeitos: <strong>e-mail e senha da sua conta
+                Ienvia</strong> ou <strong>o código gerado acima</strong>.
               </li>
               <li>
                 Depois do pareamento, nas <strong>Instâncias</strong> clique em <strong>Adicionar chip</strong> → escolha{' '}
@@ -431,8 +440,13 @@ export function PainelDeConexoes({ dados, podeEditar }: Props) {
                 <pre>bash ./scripts/setup-linux.sh</pre>
               </li>
               <li>
-                Inicie e pareie com o painel:
+                Inicie o motor (ele abre a página <code>http://127.0.0.1:4599</code>; em servidor sem navegador, use o
+                endereço do próprio servidor):
                 <pre>{comandoUnix}</pre>
+              </li>
+              <li>
+                Na página, ligue o aparelho com <strong>e-mail e senha da conta Ienvia</strong> ou com o
+                <strong>código gerado acima</strong>.
               </li>
             </ol>
           )}
@@ -449,8 +463,12 @@ export function PainelDeConexoes({ dados, podeEditar }: Props) {
                 <pre>{`pkg update -y && pkg install -y curl unzip nodejs-lts\ncurl -fsSL ${origem}/api/motor/pacote -o ienvia-motor.zip && unzip -o ienvia-motor.zip && cd ienvia-motor\nbash ./scripts/setup-termux.sh`}</pre>
               </li>
               <li>
-                Pareie e ligue o motor no aparelho:
+                Inicie o motor no aparelho:
                 <pre>{comandoUnix}</pre>
+              </li>
+              <li>
+                Toque no endereço <code>http://127.0.0.1:4599</code> que aparecer e ligue o aparelho com
+                <strong>e-mail e senha</strong> ou com o <strong>código</strong> mostrado acima.
               </li>
             </ol>
           )}
