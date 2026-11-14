@@ -157,7 +157,7 @@ export const MENU: GrupoMenu[] = [
             rota: '/contas',
             rotulo: 'Clientes SaaS',
             icone: 'contas',
-            descricao: 'Criar e administrar as contas dos seus clientes, limites de chips e modo suporte.',
+            descricao: 'Criar e administrar as contas dos seus clientes: plano, cobrança, limite de chips, suspender e modo suporte.',
             fase: 7,
             somenteMaster: true,
           },
