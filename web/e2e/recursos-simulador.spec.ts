@@ -82,9 +82,9 @@ test.describe('Fase 6 — Catálogo & PIX, Áudios, Simulador e Atalhos na Inbox
     const pedidos = (await (await request.get(`${IA_FALSA}/controle/pedidos`)).json()) as Array<{
       anexo: { tipo: string; bytes: number } | null;
     }>;
-    const pedidoDeAudio = pedidos.find((pedido) => pedido.anexo && pedido.anexo.bytes > 0);
-    expect(pedidoDeAudio).toBeTruthy();
-    expect(pedidoDeAudio.anexo.tipo).toContain('audio');
+    // `pedidos` devolve `anexo: null` quando o pedido foi só texto; o filtro abaixo garante que existe.
+    const pedidoDeAudio = pedidos.find((pedido) => pedido.anexo !== null && pedido.anexo.bytes > 0);
+    expect(pedidoDeAudio?.anexo?.tipo).toContain('audio');
 
     // A pessoa pode preferir digitar à mão: o texto digitado substitui o automático.
     await page.getByLabel(/Texto do áudio/).fill('Oi! Tudo bem? Entregamos em toda Fortaleza no mesmo dia útil.');

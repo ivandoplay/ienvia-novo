@@ -1,7 +1,12 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "types": []
+    "types": [],
+    // O teste de "campo de data" importa a conversão do componente do painel (arquivo .tsx).
+    // Por isso este pacote precisa das mesmas opções de navegador que o painel usa:
+    // "jsx" (sem isso: TS6142 "--jsx is not set") e "dom" (sem isso: TS2812 em HTMLInputElement).
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

@@ -286,11 +286,11 @@ describe('Exclusão de cliente pelo administrador da plataforma', () => {
       expect(typeof res?.contacts).toBe('number');
 
       // A tabela é lida pelo retorno da função: o master não tem SELECT direto em workspaces dentro de RLS.
-      const empresa = await banco.db.query<{ res: { name: string; status: string } }>(
+      const empresa = await banco.db.query<{ res: { name: string; status: string; deletion_started_at: string | null } }>(
         `select public.update_platform_workspace('${LOJA_B}', 'Loja B', 'closed', 2, 'Padrão', '') as res`,
       );
       expect(empresa.rows[0]?.res.status).toBe('closed');
-      expect(empresa.rows[0]?.deletion_started_at).not.toBeNull();
+      expect(empresa.rows[0]?.res.deletion_started_at).not.toBeNull();
 
       // Chips do cliente saem de operação e campanhas rodando param.
       const chips = await banco.db.query<{ ligados: number }>(
