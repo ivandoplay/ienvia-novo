@@ -51,6 +51,57 @@ Arquivos alterados: `web/src/styles/inbox.css`, `web/src/app/(painel)/inbox/pain
 - `npm run build`: OK. Deploy em `a39da90` está **READY** na Vercel e `app.ienvia.online` já responde
   com "Etiquetas & respostas" e "1/2 chips".
 
+---
+
+# Segunda rodada — 14/11, pedidos do usuário
+
+## 1. Transcrição automática na Biblioteca de Áudios (novo)
+
+O modal de gravar/subir áudio ganhou o botão **"Transcrever automaticamente (Gemini)"**, ao lado do
+campo de transcrição. Quem preferir continua digitando à mão.
+
+- Usa a **chave do Gemini que o cliente já cadastrou em Motor de IA** (guardada cifrada no cofre do servidor).
+  Sem chave cadastrada, o botão responde: "Nenhuma chave do Gemini cadastrada…".
+- Fica desativado enquanto não houver arquivo enviado (não há o que transcrever).
+- O áudio é baixado do depósito pelo servidor e enviado ao Gemini; a chave nunca vai para o navegador.
+- Modelos tentados em ordem: `gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-flash-latest`.
+- Erros são traduzidos (chave recusada, sem crédito, limite, áudio longo, conteúdo bloqueado).
+- Código: `web/src/lib/ia/provedores.ts` (`transcreverAudio`), `web/src/app/(painel)/audios/acoes.ts`
+  (`transcreverAudioEstrategico`) e o botão em `painel-de-audios.tsx`.
+
+## 2. Exclusão de clientes na área SaaS (novo)
+
+Cada cliente em `/contas` ganhou **"Excluir cliente"**, com janela de confirmação pedindo o motivo.
+O que acontece na hora: o cliente fica `closed` (perde acesso), campanhas rodando pausam, chips
+desligam. **Os dados não são apagados na hora** — o botão **"Desfazer exclusão"** vale por 30 dias.
+
+- Migração `supabase/migrations/20261120120000_platform_delete_workspace.sql`
+  (`delete_platform_workspace`, `restore_platform_workspace`, auditoria `platform_workspace_deleted/restored`).
+- Aplicada no banco real; retrato do banco atualizado (funções 190 → 192).
+- Teste de banco novo em `supabase/tests/contas_suporte.test.ts`: dono/atendente/intruso são barrados,
+  motivo é obrigatório, chips desligam, histórico registra e o desfazer funciona.
+
+## 3. Aba "Horário & Alertas" — testada de ponta a ponta
+
+Testei em produção e no celular: abre, edita, salva e persiste (`always` → `business_hours_only`,
+08:30–19:15, domingo desligado, mensagem fora do horário). Não há bug de bloqueio.
+
+O que existia de verdade: **para quem não é dono da conta**, a aba abria com tudo desativado e **sem
+botão de salvar** — parecia travada. Agora mostra, no mesmo lugar do botão, "Somente o dono da conta
+altera estes números". Vale para as abas Anti-ban e Horário.
+
+## 4. Motor no Linux — causa do erro
+
+O erro `Cannot find module .../ienvia-motor/scripts/src/index.mjs` acontece porque o comando foi
+rodado **de dentro da pasta `scripts/`**. O `node` procura `src/` a partir da pasta atual.
+
+- `./scripts/iniciar.sh --url ... --pair ...` — roda de qualquer pasta (agora ele entra na pasta do
+  motor sozinho e avisa se o `src/index.mjs` não estiver lá).
+- `node src/index.mjs` — só funciona na raiz `ienvia-motor/`.
+- O `README.txt` do pacote baixado passou a explicar os dois casos, com o erro citado.
+- Testado com o pacote que está no ar: baixei de `app.ienvia.online/api/motor/pacote`, rodei
+  `setup-linux.sh` e `iniciar.sh` de dentro de `scripts/` — funciona.
+
 ## Observações que valem uma decisão sua
 
 1. **Estado vazio da lista de conversas no celular.** Ao abrir `/inbox` no celular com a lista vazia
