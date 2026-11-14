@@ -206,6 +206,7 @@ export async function iniciarPaginaLocal({
     endereco,
     token,
     estado,
+    credenciais: { token, estado },
     fechar: () => new Promise((r) => servidor.close(r)),
   };
 }
@@ -231,6 +232,12 @@ async function parearComCodigo({ rootDir, corpo, estado, fetchFn, lerConfiguraca
   }).catch(() => null);
 
   if (!resp) return { status: 502, dados: { erro: 'Não consegui falar com o painel. Confira sua internet.' } };
+  if (resp.status === 404) {
+    return {
+      status: 404,
+      dados: { erro: `O painel ${painel} está desatualizado e não tem a ligação de aparelho. Fale com o suporte.` },
+    };
+  }
   const dados = await resp.json().catch(() => ({}));
   if (!resp.ok || !dados.device_token) {
     return { status: resp.status || 400, dados: { erro: dados.erro || 'Código inválido ou expirado. Gere outro no painel.' } };
