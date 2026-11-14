@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { usuarioParaEmail } from '@ienvia/shared';
 import { dominioDeUsuario, lerConfigSupabase } from '@/lib/env';
-import { criarClienteDeServico } from '@/lib/supabase/servico';
 import { sha256Hex } from '@/lib/motor/autenticacao';
 
 export const runtime = 'nodejs';
@@ -113,27 +112,39 @@ export async function POST(req: Request) {
   }
 
   // 3) Cria o aparelho já ativo e devolve o token dele.
+  //    IMPORTANTE: a chamada usa o token DO USUÁRIO, não a chave de serviço. A função
+  //    pair_local_executor_by_password confere o dono com auth.uid(); com a chave de serviço
+  //    auth.uid() é nulo e ela recusa com "Workspace owner required".
   const deviceToken = gerarTokenDoAparelho();
-  const supabase = criarClienteDeServico();
-  if (!supabase) {
-    return NextResponse.json({ erro: 'Painel sem configuração de serviço.' }, { status: 503 });
+  const respAparelho = await fetch(`${url}/rest/v1/rpc/pair_local_executor_by_password`, {
+    method: 'POST',
+    headers: cabecalhos,
+    body: JSON.stringify({
+      p_workspace_id: workspaceId,
+      p_display_name: String(corpo.aparelho ?? '').trim().slice(0, 80) || 'Meu aparelho',
+      p_token_sha256: sha256Hex(deviceToken),
+    }),
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+
+  if (!respAparelho) {
+    return NextResponse.json({ erro: 'Não foi possível falar com o banco agora. Tente de novo.' }, { status: 503 });
   }
-
-  const { data, error } = await supabase.rpc('pair_local_executor_by_password', {
-    p_workspace_id: workspaceId,
-    p_display_name: String(corpo.aparelho ?? '').trim().slice(0, 80) || 'Meu aparelho',
-    p_token_sha256: sha256Hex(deviceToken),
-  });
-
-  if (error) {
-    console.error('[motor/parear-senha] falha no banco:', error);
-    const mensagem = error.message?.includes('Too many local executors')
+  const textoAparelho = await respAparelho.text().catch(() => '');
+  if (!respAparelho.ok) {
+    console.error('[motor/parear-senha] falha no banco:', respAparelho.status, textoAparelho.slice(0, 400));
+    const mensagem = textoAparelho.includes('Too many local executors')
       ? 'Muitos aparelhos criados hoje. Tente novamente amanhã ou revogue aparelhos antigos no painel.'
       : 'Não foi possível ligar este aparelho agora.';
     return NextResponse.json({ erro: mensagem }, { status: 500 });
   }
 
-  const res = data as { result?: string; executor_id?: string; display_name?: string } | null;
+  let res: { result?: string; executor_id?: string; display_name?: string } | null = null;
+  try {
+    res = JSON.parse(textoAparelho);
+  } catch {
+    res = null;
+  }
   if (!res || res.result !== 'paired' || !res.executor_id) {
     return NextResponse.json({ erro: 'Não foi possível ligar este aparelho agora.' }, { status: 500 });
   }
