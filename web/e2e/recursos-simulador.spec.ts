@@ -71,6 +71,22 @@ test.describe('Fase 6 — Catálogo & PIX, Áudios, Simulador e Atalhos na Inbox
     await expect(page.getByText(/Arquivo pronto:/)).toBeVisible();
     await page.getByLabel('Nome identificador do áudio').fill('Boas-vindas Flor de Sal');
     await page.getByLabel('Quando a IA deve acionar este áudio?').fill('Primeira dúvida sobre entrega ou troca');
+    // Transcrição automática: o botão usa a chave do Gemini guardada no cofre e escreve no campo.
+    await expect(page.getByRole('button', { name: /Transcrever automaticamente/ })).toBeEnabled();
+    await page.getByRole('button', { name: /Transcrever automaticamente/ }).click();
+    await expect(page.getByLabel('Transcrição exata do que é falado (obrigatória)')).not.toHaveValue('');
+    const transcrito = await page.getByLabel('Transcrição exata do que é falado (obrigatória)').inputValue();
+    expect(transcrito.length).toBeGreaterThan(10);
+
+    // O pedido chegou ao Gemini com o áudio anexado (e não com texto no lugar do arquivo).
+    const pedidos = (await (await request.get(`${IA_FALSA}/controle/pedidos`)).json()) as Array<{
+      anexo: { tipo: string; bytes: number } | null;
+    }>;
+    const pedidoDeAudio = pedidos.find((pedido) => pedido.anexo && pedido.anexo.bytes > 0);
+    expect(pedidoDeAudio).toBeTruthy();
+    expect(pedidoDeAudio.anexo.tipo).toContain('audio');
+
+    // A pessoa pode preferir digitar à mão: o texto digitado substitui o automático.
     await page.getByLabel('Transcrição exata do que é falado (obrigatória)').fill('Oi! Tudo bem? Entregamos em toda Fortaleza no mesmo dia útil.');
     await page.getByRole('button', { name: 'Salvar áudio' }).click();
     await expect(page.getByText('Áudio "Boas-vindas Flor de Sal" salvo na biblioteca.')).toBeVisible();

@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- ============ SEO ============ -->
+<title>Ienvia | Atendimento inteligente e CRM para WhatsApp com IA, PIX e áudios na sua voz</title>
+<meta name="description" content="O Ienvia transforma o WhatsApp da sua empresa em operação de vendas: IA que atende e qualifica, catálogo com PIX, áudios gravados na sua voz, CRM com Kanban e campanhas com segurança anti-ban.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://ienvia.online/">
+<meta name="theme-color" content="#080e13">
+<link rel="icon" href="/ienvia-icone.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/ienvia-icone.png">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Ienvia">
+<meta property="og:title" content="Ienvia | Atendimento inteligente e CRM para WhatsApp">
+<meta property="og:description" content="IA que atende e qualifica, catálogo com PIX, áudios na sua voz, CRM com Kanban e campanhas anti-ban. Teste o simulador na página.">
+<meta property="og:url" content="https://ienvia.online/">
+<meta property="og:image" content="https://ienvia.online/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Ienvia | Atendimento inteligente e CRM para WhatsApp">
+<meta name="twitter:description" content="IA que atende, PIX no chat, áudios na sua voz e CRM com Kanban para o seu WhatsApp.">
+<meta name="twitter:image" content="https://ienvia.online/og-image.png">
+
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Ienvia","url":"https://ienvia.online/","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Atendimento inteligente e CRM para WhatsApp: IA com fallback entre provedores, catálogo com PIX, áudios PTT, Kanban e campanhas com segurança anti-ban.","inLanguage":"pt-BR","offers":{"@type":"Offer","priceCurrency":"BRL","price":"97.00","description":"Planos a partir de R$ 97/mês"}}
+</script>
+
+<!-- ============ FONTES (self-hosted, subset latin + latin-ext) ============ -->
+<link rel="preload" href="/fontes/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fontes/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face {
+font-family: 'Space Grotesk';
+font-style: normal;
+font-weight: 300 700;
+font-display: swap;
+src: url(/fontes/space-grotesk-latin-ext.woff2) format('woff2');
+unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+font-family: 'Space Grotesk';
+font-style: normal;
+font-weight: 300 700;
+font-display: swap;
+src: url(/fontes/space-grotesk-latin.woff2) format('woff2');
+unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+font-family: 'Manrope';
+font-style: normal;
+font-weight: 200 800;
+font-display: swap;
+src: url(/fontes/manrope-latin-ext.woff2) format('woff2');
+unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+font-family: 'Manrope';
+font-style: normal;
+font-weight: 200 800;
+font-display: swap;
+src: url(/fontes/manrope-latin.woff2) format('woff2');
+unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+font-family: 'JetBrains Mono';
+font-style: normal;
+font-weight: 100 800;
+font-display: swap;
+src: url(/fontes/jetbrains-latin-ext.woff2) format('woff2');
+unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+font-family: 'JetBrains Mono';
+font-style: normal;
+font-weight: 100 800;
+font-display: swap;
+src: url(/fontes/jetbrains-latin.woff2) format('woff2');
+unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+
+<!-- Cloudflare Web Analytics (sem cookies) -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"494520fa0e4b419fa8e6eaa9f0a82f10"}'></script>
+
+<script>
+(function(){var d=document.documentElement;d.classList.add('js');try{var t=localStorage.getItem('ienvia-theme');if(t==='light'||t==='dark')d.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+
+<style>
+:root{
+--bg:#080e13; --surface:#111c26; --surface-2:#15232e; --surface-3:#0d1720;
+--border:#20313d; --border-soft:rgba(32,49,61,.6);
+--brand:#10b981; --brand-hi:#4adea7; --brand-text:#4adea7;
+--brand-soft:rgba(16,185,129,.12); --brand-line:rgba(16,185,129,.34);
+--amber:#fbbf24; --amber-soft:rgba(251,191,36,.14);
+--sky:#7dd3fc; --sky-soft:rgba(125,211,252,.14);
+--rose:#fb7185; --rose-soft:rgba(251,113,133,.14);
+--btn:#10b981; --btn-hover:#0ea371; --btn-text:#03130d;
+--text:#edf5f4; --muted:#a0b2ba; --dim:#6d828c;
+--focus:#4adea7; --glow:rgba(16,185,129,.4);
+--shadow-1:0 2px 6px rgba(0,0,0,.35);
+--shadow-2:0 24px 50px -24px rgba(0,0,0,.75);
+--shadow-3:0 50px 90px -35px rgba(0,0,0,.85);
+--font-display:'Space Grotesk','Segoe UI',system-ui,sans-serif;
+--font-body:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+--font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+color-scheme:dark;
+}
+[data-theme="light"]{
+--bg:#eef4f2; --surface:#ffffff; --surface-2:#f2f8f6; --surface-3:#e6efec;
+--border:#cdded9; --border-soft:rgba(205,222,217,.7);
+--brand:#047857; --brand-hi:#059669; --brand-text:#047857;
+--brand-soft:rgba(5,150,105,.1); --brand-line:rgba(5,150,105,.32);
+--amber:#b45309; --amber-soft:rgba(180,83,9,.12);
+--sky:#0369a1; --sky-soft:rgba(3,105,161,.12);
+--rose:#be123c; --rose-soft:rgba(190,18,60,.1);
+--btn:#047857; --btn-hover:#065f46; --btn-text:#ffffff;
+--text:#08170f; --muted:#3c554c; --dim:#5b7268;
+--focus:#047857; --glow:rgba(4,120,87,.28);
+--shadow-2:0 24px 44px -26px rgba(8,40,30,.35);
+--shadow-3:0 44px 80px -34px rgba(8,40,30,.4);
+color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:96px;-webkit-text-size-adjust:100%;overflow-x:clip}
+body{
+margin:0;background:var(--bg);color:var(--text);
+font-family:var(--font-body);font-size:16.5px;line-height:1.65;font-weight:450;
+-webkit-font-smoothing:antialiased;overflow-x:clip;overflow-x:clip;max-width:100%;
+transition:background-color .35s ease,color .35s ease;
+}
+body.has-sticky{padding-bottom:84px}
+img,svg{display:block;max-width:100%}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:8px}
+::selection{background:var(--brand);color:#04120c}
+.only-sm{display:none}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{position:absolute;left:-9999px;top:14px;z-index:200;background:var(--btn);color:var(--btn-text);padding:12px 18px;border-radius:12px;font-weight:800;text-decoration:none}
+.skip-link:focus{left:16px}
+.container{width:min(1220px,calc(100% - 44px));margin-inline:auto}
+main,section,footer{max-width:100%}
+section{padding:104px 0;position:relative}
+.grain{display:none}
+.cursor-light{position:fixed;width:640px;height:640px;left:0;top:0;z-index:1;pointer-events:none;
+margin:-320px 0 0 -320px;opacity:0;transition:opacity .5s ease;
+background:radial-gradient(closest-side,var(--glow),transparent 72%);filter:blur(10px)}
+body.lit .cursor-light{opacity:.5}
+h1,h2,h3,h4{font-family:var(--font-display);line-height:1.08;letter-spacing:-.03em;margin:0 0 14px;font-weight:700;color:var(--text)}
+h1{font-size:clamp(2.35rem,4.7vw,3.7rem);font-weight:700}
+h2{font-size:clamp(1.85rem,3.5vw,2.75rem)}
+h3{font-size:1.22rem;letter-spacing:-.02em}
+p{margin:0 0 16px;color:var(--muted)}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:12px;font-weight:600;
+letter-spacing:.14em;text-transform:uppercase;color:var(--brand-text);margin-bottom:16px}
+.eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+.section-head{max-width:780px;margin:0 auto 60px}
+.section-head.center{text-align:center}
+.section-head.center .eyebrow{justify-content:center}
+.section-head p{font-size:1.12rem;margin:0}
+.mark{color:var(--brand-text);position:relative;white-space:nowrap}
+.mark::after{content:"";position:absolute;left:0;right:0;bottom:-.06em;height:.12em;border-radius:2px;
+background:linear-gradient(90deg,var(--brand),var(--brand-hi));transform:scaleX(0);transform-origin:left;
+transition:transform .9s cubic-bezier(.2,.9,.2,1) .25s}
+.in .mark::after,.hero-copy .mark::after{transform:scaleX(1)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:50px;padding:13px 24px;
+border-radius:13px;font-weight:800;font-size:15.5px;line-height:1.2;text-decoration:none;text-align:center;
+border:1px solid transparent;cursor:pointer;position:relative;overflow:hidden;
+transition:transform .18s cubic-bezier(.2,.9,.2,1),box-shadow .25s ease,background-color .2s ease,border-color .2s ease}
+.btn svg{width:19px;height:19px;flex:none}
+.btn:hover{transform:translateY(-2px)}
+.btn:active{transform:translateY(0)}
+.btn-primary{background:var(--btn);color:var(--btn-text);box-shadow:0 14px 34px -14px var(--glow),inset 0 1px 0 rgba(255,255,255,.22)}
+.btn-primary:hover{background:var(--btn-hover);box-shadow:0 20px 44px -14px var(--glow)}
+.btn-primary::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.4) 48%,transparent 62%);
+transform:translateX(-130%);transition:transform .7s ease}
+.btn-primary:hover::after{transform:translateX(130%)}
+.btn-ghost{background:var(--surface);color:var(--text);border-color:var(--border)}
+.btn-ghost:hover{border-color:var(--brand);background:var(--surface-2)}
+.btn-sm{min-height:42px;padding:9px 17px;font-size:14.5px;border-radius:11px}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface);
+color:var(--text);display:grid;place-items:center;cursor:pointer;flex:none;transition:border-color .2s,background-color .2s,transform .2s}
+.icon-btn:hover{border-color:var(--brand);transform:translateY(-2px)}
+.icon-btn svg{width:19px;height:19px}
+.checklist{list-style:none;padding:0;margin:0}
+.checklist li{position:relative;padding-left:32px;margin-bottom:13px;color:var(--muted);font-size:15.5px;line-height:1.55}
+.checklist li strong{color:var(--text);font-weight:700}
+.checklist li::before{content:"";position:absolute;left:0;top:2px;width:21px;height:21px;border-radius:7px;
+background:var(--brand-soft);border:1px solid var(--brand-line)}
+.checklist li::after{content:"";position:absolute;left:7px;top:9px;width:7px;height:4px;
+border-left:2px solid var(--brand-text);border-bottom:2px solid var(--brand-text);transform:rotate(-45deg)}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11.5px;
+font-weight:700;white-space:nowrap;line-height:1.55;font-family:var(--font-mono);letter-spacing:.02em}
+.t-green{background:var(--brand-soft);color:var(--brand-text);border:1px solid var(--brand-line)}
+.t-amber{background:var(--amber-soft);color:var(--amber);border:1px solid rgba(251,191,36,.3)}
+.t-sky{background:var(--sky-soft);color:var(--sky);border:1px solid rgba(125,211,252,.3)}
+.t-rose{background:var(--rose-soft);color:var(--rose);border:1px solid rgba(251,113,133,.3)}
+.t-gray{background:rgba(160,178,186,.1);color:var(--dim);border:1px solid var(--border)}
+.mock .tag.t-green{background:rgba(16,185,129,.15);color:#4adea7;border-color:rgba(16,185,129,.35)}
+.mock .tag.t-amber{background:rgba(251,191,36,.15);color:#fbbf24;border-color:rgba(251,191,36,.32)}
+.mock .tag.t-sky{background:rgba(125,211,252,.15);color:#7dd3fc;border-color:rgba(125,211,252,.32)}
+.mock .tag.t-rose{background:rgba(251,113,133,.15);color:#fb7185;border-color:rgba(251,113,133,.32)}
+.mock .tag.t-gray{background:#1d2b36;color:#a0b2ba;border-color:#20313d}
+.site-header{position:fixed;top:0;inset-inline:0;z-index:60;
+background:color-mix(in srgb,var(--bg) 82%,transparent);
+backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+border-bottom:1px solid transparent;transition:border-color .25s ease,background-color .25s ease}
+.site-header.scrolled{border-bottom-color:var(--border);background:color-mix(in srgb,var(--bg) 94%,transparent)}
+.progress{position:absolute;left:0;bottom:-1px;height:2px;width:100%;transform:scaleX(var(--p,0));transform-origin:left;
+background:linear-gradient(90deg,var(--brand),var(--brand-hi));box-shadow:0 0 12px var(--glow)}
+.nav-wrap{display:flex;align-items:center;justify-content:space-between;gap:18px;height:74px}
+.brand{display:inline-flex;align-items:center;gap:11px;font-family:var(--font-display);font-weight:700;font-size:21px;
+text-decoration:none;letter-spacing:-.03em;color:var(--text)}
+.brand-logo{width:38px;height:38px;filter:drop-shadow(0 6px 16px var(--glow));transition:transform .5s cubic-bezier(.2,.9,.2,1)}
+.brand-word{font-family:var(--font-display);font-weight:700;letter-spacing:-.03em}
+[data-theme="light"] .brand-word{color:#0b2a1e}
+.brand:hover .brand-logo{transform:rotate(-8deg) scale(1.08)}
+.nav-links{display:flex;align-items:center;gap:30px;list-style:none;margin:0;padding:0}
+.nav-links a{position:relative;text-decoration:none;color:var(--muted);font-weight:650;font-size:15px;padding:6px 0;transition:color .2s}
+.nav-links a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--brand);
+transform:scaleX(0);transform-origin:left;transition:transform .3s cubic-bezier(.2,.9,.2,1)}
+.nav-links a:hover{color:var(--text)}
+.nav-links a:hover::after{transform:scaleX(1)}
+.nav-actions{display:flex;align-items:center;gap:10px}
+.menu-toggle{display:none}
+.mobile-only{display:none}
+.hero{padding:132px 0 64px;isolation:isolate;overflow:visible}
+.hero-floor{position:absolute;left:-25%;right:-25%;bottom:-4vh;height:56vh;z-index:-2;pointer-events:none;
+transform:perspective(560px) rotateX(74deg);transform-origin:bottom center;opacity:.5;
+background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+background-size:72px 72px;animation:floor 9s linear infinite;
+-webkit-mask-image:linear-gradient(to top,#000 0%,transparent 78%);mask-image:linear-gradient(to top,#000 0%,transparent 78%)}
+@keyframes floor{to{background-position:0 72px,72px 0}}
+.hero-top-light{position:absolute;left:50%;top:-320px;width:1100px;height:620px;transform:translateX(-50%);z-index:-2;
+pointer-events:none;background:radial-gradient(ellipse at center,var(--glow),transparent 68%);opacity:.55;filter:blur(20px)}
+.hero-grid{display:grid;grid-template-columns:1fr 1.08fr;gap:56px;align-items:center}
+.hero-copy h1{margin-bottom:22px}
+.lead{font-size:1.16rem;max-width:600px;color:var(--muted);line-height:1.62}
+.hero-ctas{display:flex;flex-wrap:wrap;gap:12px;margin:32px 0 12px}
+.micro{font-size:14px;color:var(--dim);margin-bottom:28px;display:flex;align-items:center;gap:8px}
+.micro svg{width:15px;height:15px;color:var(--brand-text);flex:none}
+.pills{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:0}
+.pills li{font-family:var(--font-mono);font-size:12px;font-weight:600;padding:7px 13px;border-radius:999px;
+border:1px solid var(--border);background:var(--surface);color:var(--muted);
+transition:border-color .25s,color .25s,transform .25s}
+.pills li:hover{border-color:var(--brand-line);color:var(--text);transform:translateY(-2px)}
+.scene{perspective:1600px;perspective-origin:58% 42%;position:relative}
+.tilt{transform-style:preserve-3d;transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));
+transition:transform .7s cubic-bezier(.2,.9,.25,1);will-change:transform}
+.scene.hot .tilt{transition:transform .1s linear}
+.float{position:absolute;transform-style:preserve-3d;z-index:3;pointer-events:none}
+.float.f1{left:-10%;top:-7%;transform:translateZ(78px)}
+.float.f2{right:-9%;bottom:13%;transform:translateZ(110px)}
+.float.f3{left:-9%;bottom:-3%;transform:translateZ(60px)}
+.float>div{animation:floaty 7s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
+.fcard{background:var(--surface);border:1px solid var(--border);border-radius:15px;padding:12px 14px;
+box-shadow:var(--shadow-2);display:flex;gap:10px;align-items:center;max-width:250px}
+.fcard .fi{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--brand-soft);color:var(--brand-text)}
+.fcard .fi svg{width:17px;height:17px}
+.fcard strong{display:block;font-size:12.5px;font-family:var(--font-display);letter-spacing:-.01em}
+.fcard small{font-size:11px;color:var(--muted);line-height:1.35;display:block}
+.chain{display:flex;gap:4px;margin-top:5px}
+.chain i{width:16px;height:4px;border-radius:2px;background:var(--border);display:block}
+.chain i.on{background:var(--brand);box-shadow:0 0 8px var(--glow)}
+.mock{--m-bg:#080e13;--m-s:#111c26;--m-s2:#15232e;--m-s3:#0d1720;--m-b:#20313d;--m-t:#edf5f4;--m-mu:#a0b2ba;
+--m-g:#10b981;--m-g2:#4adea7;--m-a:#fbbf24;--m-s4:#7dd3fc;--m-r:#fb7185;
+background:var(--m-bg);color:var(--m-t);border:1px solid var(--m-b);border-radius:20px;overflow:hidden;
+box-shadow:var(--shadow-3),0 0 0 1px rgba(255,255,255,.03) inset;font-size:14px;text-align:left;width:100%;
+font-family:var(--font-body);position:relative}
+.mock::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:5;border-radius:20px;
+background:linear-gradient(160deg,rgba(255,255,255,.055),transparent 42%)}
+.mock-top{display:flex;align-items:center;gap:12px;padding:13px 17px;background:var(--m-s);
+border-bottom:1px solid var(--m-b);position:relative;z-index:2}
+.dots{display:flex;gap:6px}
+.dots i{width:10px;height:10px;border-radius:50%;background:#2a3d4a;display:block}
+.mock-title{font-family:var(--font-mono);font-size:12.5px;color:var(--m-mu);font-weight:600;flex:1;letter-spacing:-.01em;
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live{font-family:var(--font-mono);font-size:11.5px;color:var(--m-g2);display:flex;align-items:center;gap:7px;font-weight:600}
+.live b{width:8px;height:8px;border-radius:50%;background:var(--m-g);display:inline-block;animation:pulse 2.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.6)}70%{box-shadow:0 0 0 9px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+.mock-body{display:grid;grid-template-columns:184px 1fr;min-height:452px}
+.mock-list{background:var(--m-s);border-right:1px solid var(--m-b);padding:12px;display:flex;flex-direction:column;gap:5px}
+.chip-filter{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.chip-filter span{font-family:var(--font-mono);font-size:10.5px;padding:4px 8px;border-radius:999px;border:1px solid var(--m-b);color:var(--m-mu)}
+.chip-filter span.on{border-color:var(--m-g);color:var(--m-g2);background:rgba(16,185,129,.1)}
+.conv{display:grid;grid-template-columns:34px 1fr;gap:9px;align-items:center;padding:8px;border-radius:11px;
+transition:background-color .25s,transform .25s;cursor:default}
+.conv:hover{background:var(--m-s2);transform:translateX(2px)}
+.conv.active{background:var(--m-s2);box-shadow:inset 2px 0 0 var(--m-g)}
+.conv strong{display:block;font-size:12.5px;color:var(--m-t);line-height:1.3;font-family:var(--font-display)}
+.conv small{color:var(--m-mu);font-size:11px;line-height:1.35;display:block}
+.av{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-family:var(--font-mono);
+font-size:11px;font-weight:600;background:rgba(16,185,129,.16);color:var(--m-g2)}
+.av-a{background:rgba(251,191,36,.16);color:#fbbf24}
+.av-g{background:#1d2b36;color:var(--m-mu)}
+.av-s{background:rgba(125,211,252,.16);color:#7dd3fc}
+.mock-chat{display:flex;flex-direction:column;min-width:0}
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 17px;
+border-bottom:1px solid var(--m-b);font-size:13px;background:var(--m-s3)}
+.chat-head strong{font-family:var(--font-display);font-size:14px}
+.chat-msgs{flex:1;padding:17px;display:flex;flex-direction:column;gap:10px;overflow:hidden;
+background:radial-gradient(circle at 15% -5%,rgba(16,185,129,.08),transparent 58%),
+radial-gradient(circle at 95% 105%,rgba(125,211,252,.06),transparent 55%)}
+.msg{max-width:84%;padding:9px 13px;border-radius:13px;font-size:13px;line-height:1.5;
+background:var(--m-s2);border:1px solid var(--m-b);color:var(--m-t)}
+.msg.in{align-self:flex-start;border-top-left-radius:4px}
+.msg.ai{align-self:flex-end;background:rgba(16,185,129,.13);border-color:rgba(16,185,129,.32);border-top-right-radius:4px}
+.msg.human{align-self:flex-end;background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3);border-top-right-radius:4px}
+.who{display:block;font-family:var(--font-mono);font-size:9.5px;font-weight:600;color:var(--m-g2);
+letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+.msg.human .who{color:var(--m-a)}
+.meta{display:block;font-family:var(--font-mono);font-size:9.5px;color:var(--m-mu);text-align:right;margin-top:4px;opacity:.75}
+.chat-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:11px 13px;border-top:1px solid var(--m-b);background:var(--m-s)}
+.chat-foot .lbl{font-family:var(--font-mono);font-size:11px;color:var(--m-mu);margin-right:auto}
+.mini{font-family:var(--font-body);font-size:12.5px;padding:7px 12px;min-height:34px;border-radius:9px;cursor:pointer;
+font-weight:700;border:1px solid var(--m-b);background:var(--m-s2);color:var(--m-t);
+transition:border-color .2s,background-color .2s,transform .2s,color .2s}
+.mini:hover{border-color:var(--m-g);transform:translateY(-1px);color:var(--m-g2)}
+.mini.danger:hover{border-color:var(--m-r);color:#fecdd3}
+.mini.primary{background:var(--m-g);border-color:var(--m-g);color:#03130d}
+.mini.primary:hover{background:var(--m-g2);color:#03130d}
+.mini.on{background:rgba(16,185,129,.16);border-color:var(--m-g);color:var(--m-g2)}
+html.js .chat-step{opacity:0;transform:translateY(10px) scale(.98);transition:opacity .5s ease,transform .5s cubic-bezier(.2,.9,.2,1)}
+html.js .chat-step.is-on{opacity:1;transform:none}
+.qr{width:88px;height:88px;flex:0 0 88px;min-width:88px;background:#fff;padding:5px;border-radius:7px;line-height:0}
+.qr svg{width:100%;height:100%;display:block;background:#fff;border-radius:2px;aspect-ratio:1/1}
+.qr-lg{width:132px;height:132px;flex:0 0 132px;min-width:132px}
+.thumb{width:46px;height:46px;border-radius:10px;flex:none;background:linear-gradient(135deg,#10b981,#0b4f3d);position:relative;overflow:hidden}
+.thumb::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.35),transparent 55%)}
+.thumb.b{background:linear-gradient(135deg,#38bdf8,#0c4a6e)}
+.thumb.c{background:linear-gradient(135deg,#fbbf24,#78350f)}
+.cat-card{align-self:flex-end;width:82%;display:flex;gap:11px;align-items:center;padding:9px;border-radius:13px;
+background:var(--m-s2);border:1px solid var(--m-b)}
+.cat-card strong{display:block;font-size:12.5px;font-family:var(--font-display)}
+.cat-card small{color:var(--m-mu);font-size:11px}
+.audio{align-self:flex-end;display:flex;align-items:center;gap:11px;padding:8px 15px 8px 8px;border-radius:999px;
+background:var(--m-s2);border:1px solid var(--m-b);cursor:pointer;transition:border-color .2s}
+.audio:hover{border-color:var(--m-g)}
+.play{width:32px;height:32px;border:0;border-radius:50%;background:var(--m-g);color:#03130d;display:grid;place-items:center;
+flex:none;cursor:pointer;transition:transform .2s,background-color .2s}
+#swatches .mini{border-radius:10px}
+#swatches .mini.on{box-shadow:0 0 0 2px var(--m-bg),0 0 0 4px var(--m-g2)}
+.audio:hover .play{transform:scale(1.08)}
+.play svg{width:14px;height:14px}
+.wave{display:flex;align-items:center;gap:3px;height:24px}
+.wave i{width:3px;height:var(--h,8px);border-radius:3px;background:var(--m-g2);display:block;opacity:.55;
+transition:opacity .2s,height .2s}
+.wave.playing i{animation:bounce .9s ease-in-out infinite alternate;animation-delay:var(--d,0s);opacity:1}
+@keyframes bounce{to{height:calc(var(--h,8px) * 1.9)}}
+.audio small{font-family:var(--font-mono);font-size:11px;color:var(--m-mu);white-space:nowrap}
+.pixbox{align-self:stretch;display:flex;gap:13px;align-items:center;padding:13px;border-radius:15px;
+background:linear-gradient(140deg,var(--m-s),var(--m-s3));border:1px solid rgba(16,185,129,.4)}
+.pixbox>div{min-width:0;flex:1}
+.pixbox strong{font-size:13px;display:block;font-family:var(--font-display)}
+.pixbox small{font-size:11px;color:var(--m-mu)}
+.pixbox code{display:block;margin:7px 0;padding:7px 9px;border-radius:7px;background:var(--m-bg);font-size:10.5px;
+color:var(--m-mu);word-break:break-all;font-family:var(--font-mono);border:1px solid var(--m-b);line-height:1.45}
+.typing{align-self:flex-end;display:flex;gap:5px;padding:12px 15px;border-radius:13px;background:rgba(16,185,129,.13);
+border:1px solid rgba(16,185,129,.3);border-top-right-radius:4px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--m-g2);display:block;animation:tdot 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes tdot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-5px)}}
+.mock-pad{padding:17px;display:flex;flex-direction:column;gap:12px}
+.mlabel{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--m-mu);font-weight:600}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:11px;padding:10px 12px;
+border:1px solid var(--m-b);border-radius:11px;background:var(--m-s2);font-size:12.5px;
+transition:border-color .25s,transform .25s}
+.mrow:hover{border-color:rgba(16,185,129,.4);transform:translateX(2px)}
+.mrow strong{font-family:var(--font-display);font-size:12.5px}
+.mrow small{color:var(--m-mu);font-size:11px;display:block;line-height:1.35}
+.mflex{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.bar{height:9px;border-radius:999px;background:var(--m-s3);overflow:hidden;border:1px solid var(--m-b)}
+.bar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--m-g),var(--m-g2));
+box-shadow:0 0 12px rgba(16,185,129,.5);transition:width .8s cubic-bezier(.2,.9,.2,1)}
+.bar.pause i{background:linear-gradient(90deg,#b45309,#fbbf24)}
+.spin{font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--m-bg);border:1px solid var(--m-b);
+border-radius:9px;padding:11px;color:var(--m-g2);min-height:56px}
+.spin .var-word{background:rgba(16,185,129,.18);border-radius:4px;padding:1px 4px;color:#a7f3d0;
+animation:flash .45s ease}
+@keyframes flash{from{background:rgba(74,222,167,.5)}}
+.alert-box{display:flex;gap:10px;align-items:flex-start;padding:11px;border-radius:11px;font-size:12px;
+background:rgba(251,113,133,.09);border:1px solid rgba(251,113,133,.34);color:#fecdd3}
+.alert-box svg{width:18px;height:18px;flex:none;color:#fb7185;margin-top:1px}
+.conn-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.conn{border:1px solid var(--m-b);border-radius:13px;padding:13px;background:var(--m-s2);transition:border-color .25s,transform .25s}
+.conn:hover{border-color:rgba(16,185,129,.45);transform:translateY(-2px)}
+.conn strong{display:block;font-size:13px;font-family:var(--font-display)}
+.conn small{font-size:11px;color:var(--m-mu);display:block;margin:4px 0 9px}
+.terminal{background:#05090d;border:1px solid var(--m-b);border-radius:11px;padding:12px;font-family:var(--font-mono);
+font-size:11.5px;line-height:1.75;color:#9fb3bd;overflow:hidden}
+.terminal .ok{color:#4adea7}
+.terminal .dim{color:#5c7280}
+.caret{display:inline-block;width:7px;height:13px;background:#4adea7;vertical-align:-2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.brandbox{display:flex;align-items:center;gap:13px;padding:13px;border:1px dashed var(--m-b);border-radius:13px;background:var(--m-s3)}
+.brandlogo{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;
+background:linear-gradient(135deg,var(--wl,#10b981),rgba(0,0,0,.45));color:#03130d;font-weight:800;font-size:14px;
+font-family:var(--font-display);transition:background-color .3s}
+.ticker{border-block:1px solid var(--border);background:var(--surface-3);overflow:hidden;padding:15px 0;position:relative}
+.ticker::before,.ticker::after{content:"";position:absolute;top:0;bottom:0;width:120px;z-index:2;pointer-events:none}
+.ticker::before{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
+.ticker::after{right:0;background:linear-gradient(270deg,var(--bg),transparent)}
+.ticker-track{display:flex;width:max-content;animation:tick 42s linear infinite}
+.ticker:hover .ticker-track{animation-play-state:paused}
+@keyframes tick{to{transform:translateX(-50%)}}
+.ticker-track span{display:inline-flex;align-items:center;gap:11px;padding:0 26px;font-family:var(--font-mono);
+font-size:13px;color:var(--muted);white-space:nowrap;font-weight:500}
+.ticker-track span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--brand);flex:none}
+.prob-grid{display:grid;grid-template-columns:.82fr 1.18fr;gap:64px;align-items:start}
+.prob-side{position:sticky;top:120px}
+.prob-side .btn{margin-top:14px}
+.prob-row{display:grid;grid-template-columns:auto 1fr;gap:24px;padding:34px 0;border-top:1px dashed var(--border);
+transition:opacity .3s}
+.prob-row:first-child{border-top:0;padding-top:0}
+.prob-num{font-family:var(--font-display);font-size:2.6rem;font-weight:700;line-height:1;color:transparent;
+-webkit-text-stroke:1.5px var(--border);transition:color .35s,-webkit-text-stroke-color .35s,transform .35s}
+.prob-row:hover .prob-num{color:var(--brand-soft);-webkit-text-stroke-color:var(--brand);transform:translateY(-3px)}
+.prob-row h3{margin-bottom:10px;font-size:1.4rem}
+.prob-fix{margin-top:18px;padding:16px 18px;border-radius:14px;background:var(--surface);border:1px solid var(--border);
+border-left:3px solid var(--brand);transition:transform .3s cubic-bezier(.2,.9,.2,1),box-shadow .3s}
+.prob-row:hover .prob-fix{transform:translateX(6px);box-shadow:var(--shadow-2)}
+.prob-fix strong{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
+text-transform:uppercase;color:var(--brand-text);margin-bottom:8px}
+.prob-fix strong svg{width:15px;height:15px}
+.prob-fix p{margin:0;color:var(--text);font-size:15.5px}
+.tabs-list{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-bottom:46px}
+.tab-btn{padding:13px 21px;border-radius:13px;border:1px solid var(--border);background:var(--surface);color:var(--muted);
+font-weight:750;cursor:pointer;font-size:15px;font-family:var(--font-display);letter-spacing:-.01em;
+display:inline-flex;align-items:center;gap:9px;
+transition:border-color .22s,color .22s,background-color .22s,transform .22s,box-shadow .22s}
+.tab-btn svg{width:17px;height:17px}
+.tab-btn:hover{color:var(--text);border-color:var(--brand-line);transform:translateY(-2px)}
+.tab-btn[aria-selected="true"]{background:var(--brand-soft);border-color:var(--brand);color:var(--text);
+box-shadow:0 12px 30px -16px var(--glow)}
+.tab-panel{display:grid;grid-template-columns:.86fr 1.14fr;gap:56px;align-items:center}
+.tab-panel[hidden]{display:none!important}
+.tab-panel h3{font-size:1.65rem;margin-bottom:18px}
+.tab-copy>p{font-size:1.02rem}
+.demo-stage{position:relative;min-width:0;transform-style:preserve-3d;perspective:1200px}
+.demo-stage .mock{transition:transform .5s cubic-bezier(.2,.9,.2,1),box-shadow .5s}
+.demo-hint{display:flex;align-items:center;gap:8px;margin-top:14px;font-family:var(--font-mono);font-size:11.5px;color:var(--dim)}
+.demo-hint svg{width:15px;height:15px;color:var(--brand-text);flex:none}
+.demo-note{margin-top:12px;font-size:12.5px;color:var(--dim);line-height:1.5}
+.kbd{font-family:var(--font-mono);font-size:11px;padding:2px 7px;border-radius:6px;border:1px solid var(--border);
+background:var(--surface-2);color:var(--muted)}
+.sim-controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:11px 15px;background:var(--m-s3);
+border-bottom:1px solid var(--m-b)}
+.seg{display:inline-flex;background:var(--m-bg);border:1px solid var(--m-b);border-radius:10px;padding:3px;gap:3px}
+.seg-btn{border:0;background:transparent;color:var(--m-mu);font-size:12px;font-weight:700;padding:6px 12px;
+border-radius:8px;cursor:pointer;transition:background-color .2s,color .2s;white-space:nowrap}
+.seg-btn:hover{color:var(--m-t)}
+.seg-btn.is-on{background:rgba(16,185,129,.18);color:var(--m-g2)}
+.seg-btn.is-warn.is-on{background:rgba(251,191,36,.18);color:var(--m-a)}
+.seg-btn.is-off.is-on{background:rgba(251,113,133,.18);color:var(--m-r)}
+.sim-log{height:342px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin;
+scrollbar-color:#20313d transparent;
+background:radial-gradient(circle at 12% 0%,rgba(16,185,129,.07),transparent 55%)}
+.sim-log::-webkit-scrollbar{width:8px}
+.sim-log::-webkit-scrollbar-thumb{background:#20313d;border-radius:8px}
+.sim-quick{display:flex;flex-wrap:wrap;gap:7px;padding:11px 15px;border-top:1px solid var(--m-b);background:var(--m-s)}
+.qchip{font-size:12px;font-weight:650;padding:7px 12px;border-radius:999px;border:1px solid var(--m-b);
+background:var(--m-s2);color:var(--m-mu);cursor:pointer;transition:all .2s}
+.qchip:hover{border-color:var(--m-g);color:var(--m-g2);transform:translateY(-2px)}
+.sim-input{display:flex;gap:9px;padding:12px 15px;border-top:1px solid var(--m-b);background:var(--m-s)}
+.sim-input input{flex:1;min-width:0;background:var(--m-bg);border:1px solid var(--m-b);border-radius:11px;
+padding:11px 14px;color:var(--m-t);font-size:13.5px;transition:border-color .2s}
+.sim-input input::placeholder{color:#5c7280}
+.sim-input input:focus{outline:none;border-color:var(--m-g);box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+.dossie{position:absolute;right:-14px;bottom:96px;width:262px;z-index:6;transform:translateZ(80px) translateY(14px);
+opacity:0;pointer-events:none;transition:opacity .5s ease,transform .5s cubic-bezier(.2,.9,.2,1)}
+.dossie.show{opacity:1;transform:translateZ(80px) translateY(0)}
+.dossie .fcard{width:100%;max-width:none;background:var(--surface);flex-direction:column;align-items:stretch;gap:9px;
+border-color:var(--brand-line);box-shadow:var(--shadow-2),0 0 34px -12px var(--glow)}
+.dossie-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);
+border-top:1px dashed var(--border);padding-top:7px}
+.dossie-row:first-of-type{border-top:0;padding-top:0}
+.dossie-row b{color:var(--text);font-weight:700;text-align:right}
+.kanban{display:grid;grid-template-columns:repeat(5,minmax(112px,1fr));gap:10px;padding:15px;overflow-x:auto;
+scrollbar-width:thin;scrollbar-color:#20313d transparent}
+.kanban::-webkit-scrollbar{height:8px}
+.kanban::-webkit-scrollbar-thumb{background:#20313d;border-radius:8px}
+.kcol{background:var(--m-s3);border:1px solid var(--m-b);border-radius:13px;padding:9px;min-width:0;
+transition:background-color .2s,border-color .2s}
+.kcol.over{border-color:var(--m-g);background:rgba(16,185,129,.08)}
+.kcol h4{margin:3px 5px 10px;font-size:11.5px;color:var(--m-mu);font-weight:700;display:flex;justify-content:space-between;
+gap:6px;letter-spacing:.04em;text-transform:uppercase;font-family:var(--font-mono)}
+.kcol h4 b{color:var(--m-g2);font-weight:600}
+.ksum{font-family:var(--font-mono);font-size:10.5px;color:var(--m-mu);padding:0 5px 9px;display:block}
+.kcard{background:var(--m-s2);border:1px solid var(--m-b);border-radius:10px;padding:9px;margin-bottom:8px;
+cursor:grab;transition:transform .2s cubic-bezier(.2,.9,.2,1),box-shadow .2s,border-color .2s,opacity .2s}
+.kcard:hover{border-color:rgba(16,185,129,.45);transform:translateY(-2px);box-shadow:0 10px 22px -12px rgba(0,0,0,.7)}
+.kcard:focus-visible{outline:2px solid var(--m-g2);outline-offset:2px}
+.kcard.dragging{opacity:.4;cursor:grabbing;transform:scale(.97)}
+.kcard strong{display:block;font-size:12px;margin-bottom:3px;color:var(--m-t);font-family:var(--font-display)}
+.kcard small{color:var(--m-mu);font-size:10.5px;display:block;margin-bottom:6px;font-family:var(--font-mono)}
+.kval{font-family:var(--font-mono);font-size:11px;color:var(--m-g2);font-weight:600}
+.pipeline{display:flex;flex-wrap:wrap;gap:9px;align-items:center;justify-content:space-between;
+padding:12px 15px;border-top:1px solid var(--m-b);background:var(--m-s)}
+.pipeline b{font-family:var(--font-mono);font-size:15px;color:var(--m-g2)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.11em;color:var(--m-mu)}
+.field input,.field select{background:var(--m-bg);border:1px solid var(--m-b);border-radius:9px;padding:9px 11px;
+color:var(--m-t);font-size:13px;transition:border-color .2s,box-shadow .2s;width:100%}
+.field input:focus,.field select:focus{outline:none;border-color:var(--m-g);box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.slots{display:flex;gap:4px;flex-wrap:wrap}
+.slots i{width:14px;height:22px;border-radius:4px;background:var(--m-s3);border:1px solid var(--m-b);display:block;
+transition:background-color .3s,border-color .3s,transform .3s}
+.slots i.sent{background:rgba(16,185,129,.35);border-color:var(--m-g)}
+.slots i.now{background:var(--m-g);border-color:var(--m-g2);transform:scaleY(1.18);box-shadow:0 0 10px rgba(16,185,129,.6)}
+.slots i.wait{background:rgba(251,191,36,.2);border-color:rgba(251,191,36,.4)}
+.timeline{position:relative;max-width:840px;margin:0 auto;padding-left:56px}
+.timeline-rail{position:absolute;left:23px;top:8px;bottom:8px;width:2px;background:var(--border);border-radius:2px;overflow:hidden}
+.timeline-rail i{display:block;width:100%;height:var(--fill,0%);background:linear-gradient(180deg,var(--brand-hi),var(--brand));
+box-shadow:0 0 14px var(--glow);transition:height .25s linear}
+.tstep{position:relative;padding:26px 0 40px}
+.tstep:last-child{padding-bottom:0}
+.tdot{position:absolute;left:-56px;top:30px;width:48px;height:48px;border-radius:16px;display:grid;place-items:center;
+background:var(--surface);border:1px solid var(--border);color:var(--dim);font-family:var(--font-display);
+font-size:19px;font-weight:700;transition:all .45s cubic-bezier(.2,.9,.2,1);z-index:2}
+.tstep.on .tdot{background:var(--btn);border-color:var(--btn);color:var(--btn-text);
+box-shadow:0 14px 34px -14px var(--glow);transform:scale(1.06) rotate(-4deg)}
+.tstep .card{padding:26px 28px}
+.tstep h3{font-size:1.35rem;margin-bottom:10px}
+.tchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:18px}
+.bento .card{padding:26px}
+.b-4{grid-column:span 4}.b-3{grid-column:span 3}.b-2{grid-column:span 2}.b-6{grid-column:span 6}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;position:relative;overflow:hidden;
+transition:border-color .3s,transform .3s cubic-bezier(.2,.9,.2,1),box-shadow .3s}
+.card:hover{border-color:var(--brand-line);transform:translateY(-4px);box-shadow:var(--shadow-2)}
+.ico{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--brand-soft);
+color:var(--brand-text);margin-bottom:18px;border:1px solid var(--brand-line);transition:transform .35s cubic-bezier(.2,.9,.2,1)}
+.card:hover .ico{transform:rotate(-7deg) scale(1.07)}
+.ico svg{width:23px;height:23px}
+.iso-vis{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap}
+.iso-box{flex:1;min-width:92px;border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--surface-2);
+transition:border-color .3s,transform .3s}
+.card:hover .iso-box{border-color:var(--brand-line);transform:translateY(-3px)}
+.iso-box strong{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--dim);letter-spacing:.08em;margin-bottom:5px}
+.iso-box span{font-size:12.5px;color:var(--text);font-weight:650}
+.keyline{font-family:var(--font-mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);
+border-radius:10px;padding:11px 13px;margin-top:16px;color:var(--dim);word-break:break-all;position:relative;overflow:hidden}
+.keyline::after{content:attr(data-real);position:absolute;inset:0;padding:11px 13px;background:var(--surface-2);
+color:var(--brand-text);opacity:0;transition:opacity .3s;word-break:break-all}
+.keyline:hover::after,.keyline:focus-visible::after{opacity:1}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:stretch;perspective:1400px}
+.plan{display:flex;flex-direction:column;position:relative;transform-style:preserve-3d;overflow:visible;
+transition:transform .45s cubic-bezier(.2,.9,.2,1),box-shadow .45s,border-color .3s}
+.plan:hover{transform:translateY(-9px) rotateX(2.5deg)}
+.plan.featured{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand),0 40px 80px -40px var(--glow);
+background:linear-gradient(180deg,var(--surface-2),var(--surface))}
+.plan-badge{position:absolute;top:-17px;left:50%;transform:translateX(-50%);white-space:nowrap;
+display:inline-flex;align-items:center;gap:6px;background:var(--btn);color:var(--btn-text);font-family:var(--font-mono);
+font-size:11px;font-weight:700;padding:7px 14px 7px 11px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase;
+box-shadow:0 10px 24px -10px var(--glow)}
+.plan-badge svg{width:14px;height:14px}
+.plan.featured{padding-top:34px}
+.plan h3{font-size:1.45rem;margin-bottom:8px}
+.plan-desc{min-height:52px;font-size:15px}
+.price{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin:18px 0 8px;color:var(--text);
+font-family:var(--font-display);font-size:2.2rem;font-weight:700;letter-spacing:-.035em;line-height:1.05}
+.price small{font-size:14.5px;color:var(--muted);font-weight:500;letter-spacing:0;font-family:var(--font-body)}
+.chips-limit{font-size:14.5px;color:var(--muted);padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--border);
+display:flex;align-items:center;gap:8px}
+.chips-limit svg{width:16px;height:16px;color:var(--brand-text);flex:none;margin-top:3px;align-self:flex-start}
+.chips-limit strong{color:var(--text)}
+.plan .checklist{flex:1;margin-bottom:28px}
+.plan .btn{width:100%}
+.plans-note{text-align:center;font-size:14px;margin-top:30px;color:var(--dim)}
+.plans-boost{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:1000px;margin:0 auto 42px}
+.boost-item{display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:14px;background:var(--surface);
+border:1px solid var(--border);text-align:left}
+.boost-item .fi{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;
+background:var(--brand-soft);color:var(--brand-text);border:1px solid var(--brand-line)}
+.boost-item .fi svg{width:17px;height:17px}
+.boost-item strong{display:block;font-family:var(--font-display);font-size:14.5px;color:var(--text);letter-spacing:-.01em;line-height:1.25}
+.boost-item small{display:block;font-size:12.5px;color:var(--muted);line-height:1.35}
+.plan-scope{font-family:var(--font-mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+color:var(--brand-text);margin:10px 0 8px}
+.legal-modal{width:min(760px,calc(100% - 24px))}
+.legal-body{font-size:15px;line-height:1.68;color:var(--muted);max-height:58dvh;overflow-y:auto;padding-right:6px}
+.legal-body h3{font-size:1.08rem;color:var(--text);margin:20px 0 8px}
+.legal-body h3:first-child{margin-top:0}
+.legal-body ul{padding-left:20px;margin:0 0 14px}
+.legal-body li{margin-bottom:6px}
+body.has-sticky .site-footer{padding-bottom:108px}
+.faq-wrap{max-width:880px;margin:0 auto}
+.faq-item{border-bottom:1px solid var(--border)}
+.faq-item:first-child{border-top:1px solid var(--border)}
+.faq-h{margin:0;font-size:inherit;font-family:inherit}
+.faq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:18px;background:none;border:0;
+padding:22px 6px;text-align:left;cursor:pointer;color:var(--text);font-weight:750;font-size:1.06rem;line-height:1.4;
+font-family:var(--font-display);letter-spacing:-.015em;transition:color .2s,padding-left .3s}
+.faq-q:hover{color:var(--brand-text);padding-left:12px}
+.chev{width:22px;height:22px;flex:none;color:var(--brand-text);transition:transform .3s cubic-bezier(.2,.9,.2,1)}
+.faq-q[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.faq-a{padding:0 6px 24px;max-width:92%}
+.faq-a p{margin:0;font-size:15.5px}
+.faq-cta{text-align:center;margin-top:34px;font-size:15px;color:var(--muted)}
+.faq-cta a{color:var(--brand-text);font-weight:800}
+.cta-box{position:relative;overflow:hidden;text-align:center;padding:76px 36px;border-radius:28px;
+background:linear-gradient(150deg,var(--surface-2),var(--surface));border:1px solid var(--border);box-shadow:var(--shadow-3)}
+.cta-box::before{content:"";position:absolute;width:640px;height:640px;left:50%;top:-330px;transform:translateX(-50%);
+background:radial-gradient(closest-side,var(--glow),transparent 70%);pointer-events:none}
+.cta-box::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.4;
+background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+background-size:48px 48px;
+-webkit-mask-image:radial-gradient(ellipse at center,#000 5%,transparent 68%);mask-image:radial-gradient(ellipse at center,#000 5%,transparent 68%)}
+.cta-box>*{position:relative;z-index:2}
+.cta-box h2{max-width:780px;margin-inline:auto}
+.cta-box p{max-width:660px;margin-inline:auto;font-size:1.13rem}
+.cta-box .hero-ctas{justify-content:center;margin-bottom:22px}
+.contact-line{font-size:14.5px;margin:0;color:var(--dim)}
+.contact-line a{color:var(--brand-text);font-weight:750;text-decoration:underline;text-underline-offset:4px}
+.site-footer{border-top:1px solid var(--border);padding:56px 0 34px;background:var(--surface-3)}
+.footer-grid{display:flex;justify-content:space-between;align-items:flex-start;gap:36px;flex-wrap:wrap}
+.footer-brand p{margin:14px 0 0;max-width:360px;font-size:15px}
+.footer-links{display:flex;gap:24px;flex-wrap:wrap;list-style:none;padding:0;margin:0}
+.footer-links a{color:var(--muted);text-decoration:none;font-weight:650;font-size:15px;transition:color .2s}
+.footer-links a:hover{color:var(--brand-text)}
+.footer-bottom{margin-top:40px;padding-top:24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;
+gap:14px;flex-wrap:wrap;font-size:14px;color:var(--dim)}
+.footer-bottom a{color:var(--muted)}
+.sticky-cta{display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:55;visibility:hidden;
+transform:translateY(170%);transition:transform .35s cubic-bezier(.2,.9,.2,1),visibility .35s}
+.sticky-cta.show{visibility:visible;transform:none}
+.sticky-cta .btn{width:100%;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}
+html.js .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.9,.2,1),transform .7s cubic-bezier(.2,.9,.2,1)}
+html.js .reveal.in{opacity:1;transform:none}
+html.js .reveal[data-d="1"]{transition-delay:.09s}
+html.js .reveal[data-d="2"]{transition-delay:.18s}
+html.js .reveal[data-d="3"]{transition-delay:.27s}
+html.js .reveal[data-d="4"]{transition-delay:.36s}
+@media (max-width:1080px){
+.nav-links{gap:20px}.nav-links a{font-size:14px}
+.hero-grid{gap:40px}
+.float.f3{display:none}
+.bento{grid-template-columns:repeat(4,1fr)}
+.b-4{grid-column:span 4}.b-3{grid-column:span 2}.b-2{grid-column:span 2}
+}
+@media (max-width:980px){
+.menu-toggle{display:grid}
+.nav-actions .btn-ghost{display:none}
+.nav-links{position:absolute;top:74px;left:0;right:0;display:none;flex-direction:column;align-items:stretch;gap:0;
+background:var(--surface);border-bottom:1px solid var(--border);padding:8px 22px 22px;box-shadow:var(--shadow-2)}
+.nav-links.open{display:flex}
+.nav-links li{border-bottom:1px solid var(--border)}
+.nav-links a{display:block;padding:15px 4px;font-size:16px}
+.nav-links a::after{display:none}
+.mobile-only{display:block}
+.mobile-only .btn{width:100%;margin-top:16px}
+.hero-grid,.tab-panel,.prob-grid{grid-template-columns:1fr;gap:44px}
+.prob-side{position:static}
+.plans{grid-template-columns:1fr;gap:34px}
+.plan-desc{min-height:0}
+.hero{padding-top:118px}
+.dossie{position:static;width:auto;transform:none;opacity:1;margin-top:14px}
+.dossie.show{transform:none}
+.tab-panel .demo-stage{order:2}
+}
+@media (max-width:780px){
+.sticky-cta{display:block}
+.nav-actions .btn-primary{width:44px;min-width:44px;padding:0}
+.nav-actions .btn-primary .long{display:none}
+section{padding:80px 0}
+.bento{grid-template-columns:1fr}
+.b-4,.b-3,.b-2,.b-6{grid-column:span 1}
+}
+@media (max-width:620px){
+body{font-size:16px}
+.container{width:min(1220px,calc(100% - 30px))}
+.mock-body{grid-template-columns:1fr;min-height:0}
+#sim .sim-log{height:min(46dvh,330px)}
+.mock-list{display:none}
+.msg,.cat-card{max-width:94%}
+.cat-card{width:94%}
+.grid-2{grid-template-columns:1fr}
+.conn-grid{grid-template-columns:1fr}
+.hero-ctas .btn{width:100%}
+.cta-box{padding:52px 22px;border-radius:22px}
+.pixbox{flex-direction:column;align-items:flex-start}
+.prob-row{grid-template-columns:1fr;gap:12px}
+.prob-num{font-size:2rem}
+.timeline{padding-left:46px}
+.tdot{left:-46px;width:40px;height:40px;border-radius:13px;font-size:16px}
+.timeline-rail{left:19px}
+.sim-log{height:300px}
+.tab-btn{flex:1 1 auto;justify-content:center}
+}
+:root{
+--dim:#8ea3ad;
+--btn-bg:linear-gradient(135deg,#10b981 0%,#34d399 100%);
+--hl:linear-gradient(100deg,#86f3cb 0%,#4adea7 38%,#10b981 100%);
+}
+[data-theme="light"]{
+--bg:#f3f7f6;
+--dim:#4f665d;
+--btn-bg:linear-gradient(135deg,#065f46 0%,#047857 100%);
+--hl:linear-gradient(100deg,#065f46 0%,#047857 55%,#0f766e 100%);
+}
+html{scroll-padding-top:130px}
+body{font-size:17px;line-height:1.68}
+.container{width:min(1240px,calc(100% - 48px))}
+section{padding:124px 0}
+h1{font-size:clamp(2.65rem,5.3vw,4.3rem);line-height:1.02;letter-spacing:-.042em}
+h2{font-size:clamp(2.05rem,3.9vw,3.2rem);line-height:1.04;letter-spacing:-.036em}
+h3{font-size:1.32rem}
+.section-head{margin-bottom:68px}
+.section-head p{font-size:1.2rem;line-height:1.6}
+.lead{font-size:1.25rem;line-height:1.6;max-width:610px}
+.eyebrow{font-size:12.5px}
+.hl{background:var(--hl,linear-gradient(100deg,#86f3cb,#4adea7 38%,#10b981));
+-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
+-webkit-box-decoration-break:clone;box-decoration-break:clone;padding-bottom:.06em}
+.nav-links a{font-size:15.5px}
+.btn{font-size:16px;min-height:52px}
+.btn-sm{min-height:44px;font-size:15px}
+.btn-lg{min-height:62px;padding:17px 32px;font-size:17.5px;border-radius:16px}
+.btn-lg svg{width:22px;height:22px}
+.btn-primary{background:var(--btn-bg)}
+.btn-primary:hover{background:var(--btn-bg);filter:brightness(1.08) saturate(1.05)}
+.card{border-radius:22px}
+[data-theme="light"] .card,[data-theme="light"] .tab-btn,[data-theme="light"] .pills li{box-shadow:0 1px 2px rgba(8,40,30,.05),0 14px 34px -22px rgba(8,40,30,.28)}
+.checklist li{font-size:16px}
+.msg{font-size:13.5px}
+.tab-btn{font-size:15.5px;padding:14px 22px}
+.tab-panel h3{font-size:1.85rem}
+.price{font-size:2.5rem}
+.faq-q{font-size:1.12rem}
+.sec-tint{background:var(--surface-3);border-block:1px solid var(--border)}
+#planos{background:radial-gradient(ellipse 70% 50% at 50% 0%,var(--brand-soft),transparent 70%)}
+.announce{position:relative;background:linear-gradient(90deg,#062b20,#0b4d38 50%,#062b20);color:#e6fff5;font-size:14.5px;
+border-bottom:1px solid rgba(74,222,167,.25);overflow:hidden}
+.announce::after{content:"";position:absolute;inset:0;pointer-events:none;
+background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.08) 50%,transparent 65%);animation:sheen 6s ease-in-out infinite}
+@keyframes sheen{0%{transform:translateX(-100%)}60%,100%{transform:translateX(100%)}}
+.announce-in{display:flex;align-items:center;justify-content:center;gap:10px 12px;min-height:44px;padding:7px 52px;text-align:center;flex-wrap:wrap;position:relative;z-index:1}
+.announce-in strong{font-weight:800;color:#fff}
+.announce-in a{color:#a7f3d0;font-weight:800;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.announce-in a:hover{color:#fff}
+.announce-dot{width:8px;height:8px;border-radius:50%;background:#4adea7;animation:pulse 2.2s infinite;flex:none}
+.announce-close{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;background:transparent;
+color:#d1fae5;border-radius:9px;cursor:pointer;display:grid;place-items:center;z-index:2}
+.announce-close:hover{background:rgba(255,255,255,.12)}
+.announce-close svg{width:16px;height:16px}
+.announce-in .ann-ico{display:none;width:18px;height:18px}
+.hero{padding-top:178px}
+body.announce-off .hero{padding-top:138px}
+.hero-badge{display:inline-flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border-radius:999px;border:1px solid var(--brand-line);
+background:var(--brand-soft);color:var(--text);font-size:14px;font-weight:650;text-decoration:none;margin-bottom:24px;
+transition:transform .2s,border-color .2s}
+.hero-badge:hover{transform:translateY(-2px);border-color:var(--brand)}
+.hero-badge b{background:var(--btn-bg);color:var(--btn-text);font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;
+text-transform:uppercase;padding:4px 10px;border-radius:999px}
+.hero-badge svg{width:15px;height:15px;color:var(--brand-text);transition:transform .2s}
+.hero-badge:hover svg{transform:translateX(3px)}
+.trust-row{display:flex;flex-wrap:wrap;gap:10px 22px;list-style:none;padding:0;margin:6px 0 28px}
+.trust-row li{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--muted);font-weight:600}
+.trust-row svg{width:20px;height:20px;color:var(--brand-text);flex:none;padding:4px;border-radius:50%;background:var(--brand-soft)}
+.compat{margin-top:76px;display:flex;align-items:center;gap:18px 36px;flex-wrap:wrap;justify-content:center;padding-top:34px;border-top:1px solid var(--border-soft)}
+.compat-label{font-family:var(--font-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.compat-list{display:flex;flex-wrap:wrap;gap:12px 34px;list-style:none;margin:0;padding:0;justify-content:center}
+.compat-list li{font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:-.02em;color:var(--muted);transition:color .2s}
+.compat-list li:hover{color:var(--text)}
+.seg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.seg-card{display:flex;flex-direction:column;padding:26px}
+.seg-card h3{font-size:1.22rem;margin-bottom:8px}
+.seg-card>p{font-size:15px}
+.seg-card ul{list-style:none;padding:0;margin:4px 0 22px;display:flex;flex-direction:column;gap:10px;flex:1}
+.seg-card li{display:flex;gap:9px;font-size:14.5px;color:var(--text);line-height:1.45}
+.seg-card li svg{width:16px;height:16px;color:var(--brand-text);flex:none;margin-top:3px}
+.seg-link{display:inline-flex;align-items:center;gap:7px;color:var(--brand-text);font-weight:800;text-decoration:none;font-size:15px}
+.seg-link svg{width:16px;height:16px;transition:transform .2s}
+.seg-link:hover svg{transform:translateX(4px)}
+.ico.c2{background:var(--sky-soft);color:var(--sky);border-color:rgba(125,211,252,.3)}
+.ico.c3{background:var(--amber-soft);color:var(--amber);border-color:rgba(251,191,36,.3)}
+.ico.c4{background:var(--rose-soft);color:var(--rose);border-color:rgba(251,113,133,.3)}
+.roi-grid{display:grid;grid-template-columns:.92fr 1.08fr;gap:64px;align-items:center}
+.roi-card{background:linear-gradient(160deg,var(--surface-2),var(--surface));border:1px solid var(--border);border-radius:26px;padding:34px;
+box-shadow:var(--shadow-3);position:relative;overflow:hidden}
+.roi-card::before{content:"";position:absolute;right:-120px;top:-120px;width:320px;height:320px;
+background:radial-gradient(closest-side,var(--glow),transparent 70%);opacity:.6;pointer-events:none}
+.roi-card>*{position:relative}
+.roi-field{margin-bottom:22px}
+.roi-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px}
+.roi-top label{font-weight:700;font-size:15.5px;color:var(--text)}
+.roi-top output{font-family:var(--font-mono);font-weight:600;font-size:15px;color:var(--brand-text);background:var(--brand-soft);padding:3px 10px;border-radius:8px}
+.range{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:999px;cursor:pointer;
+background:linear-gradient(90deg,var(--brand) 0 var(--fill,50%),var(--border) var(--fill,50%) 100%)}
+.range::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:5px solid var(--brand);box-shadow:0 4px 14px -2px var(--glow);cursor:grab}
+.range::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:5px solid var(--brand);box-shadow:0 4px 14px -2px var(--glow);cursor:grab}
+.roi-money{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:0 14px}
+.roi-money span{font-family:var(--font-mono);color:var(--dim);font-weight:600}
+.roi-money input{flex:1;min-width:0;background:transparent;border:0;padding:13px 0;font-size:16px;font-weight:700;color:var(--text);font-family:var(--font-mono)}
+.roi-money input:focus{outline:none}
+.roi-money:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.roi-result{margin-top:6px;padding:24px;border-radius:18px;background:var(--bg);border:1px solid var(--brand-line);text-align:center}
+.roi-result small{display:block;font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.roi-big{font-family:var(--font-display);font-size:clamp(2.3rem,4.6vw,3.3rem);font-weight:700;letter-spacing:-.04em;line-height:1.05;display:inline-block}
+.roi-sub{display:flex;justify-content:center;gap:8px 24px;flex-wrap:wrap;margin-top:12px;font-size:14.5px;color:var(--muted)}
+.roi-sub b{color:var(--text)}
+.roi-card .btn{width:100%;margin-top:20px}
+.roi-disc{font-size:12.5px;color:var(--dim);margin:14px 0 0;text-align:center}
+.cmp-wrap{max-width:1000px;margin:0 auto;border:1px solid var(--border);border-radius:24px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-2)}
+.cmp{width:100%;border-collapse:collapse;font-size:15.5px}
+.cmp th,.cmp td{padding:17px 22px;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle}
+.cmp tbody tr:last-child th,.cmp tbody tr:last-child td{border-bottom:0}
+.cmp thead th{font-family:var(--font-display);font-size:16px;background:var(--surface-2);color:var(--text)}
+.cmp thead th.us{background:var(--brand-soft);color:var(--brand-text)}
+.cmp tbody th{font-weight:700;color:var(--text);width:30%}
+.cmp td{color:var(--muted)}
+.cmp td.us{background:color-mix(in srgb,var(--brand) 6%,transparent);color:var(--text);font-weight:650}
+.cmp tbody tr{transition:background-color .2s}
+.cmp tbody tr:hover{background:var(--surface-2)}
+.yes,.no{display:inline-flex;align-items:center;gap:10px}
+.yes svg,.no svg{width:24px;height:24px;padding:5px;border-radius:50%;flex:none}
+.yes svg{background:var(--brand-soft);color:var(--brand-text)}
+.no svg{background:var(--rose-soft);color:var(--rose)}
+.cmp-cta{text-align:center;margin-top:38px}
+.demo-cta{margin-top:56px;display:flex;align-items:center;justify-content:space-between;gap:18px 32px;flex-wrap:wrap;padding:26px 30px;border-radius:22px;
+background:linear-gradient(120deg,var(--brand-soft),transparent 70%),var(--surface);border:1px solid var(--brand-line)}
+.demo-cta strong{display:block;font-family:var(--font-display);font-size:1.4rem;letter-spacing:-.02em;margin-bottom:4px}
+.demo-cta span{color:var(--muted);font-size:15.5px}
+.plan-help{max-width:900px;margin:40px auto 0;display:flex;align-items:center;justify-content:space-between;gap:16px 28px;flex-wrap:wrap;
+padding:22px 26px;border-radius:20px;border:1px dashed var(--brand-line);background:var(--surface)}
+.plan-help p{margin:0;color:var(--text);font-weight:700;font-size:16.5px}
+.plan-help small{display:block;color:var(--dim);font-weight:500;font-size:14.5px;margin-top:2px}
+.cta-split{display:grid;grid-template-columns:1fr 1fr;gap:52px;text-align:left;align-items:center;padding:60px}
+.cta-split .eyebrow{justify-content:flex-start}
+.cta-box.cta-split h2,.cta-box.cta-split p{margin-inline:0}
+.demo-steps{list-style:none;padding:0;margin:26px 0;display:flex;flex-direction:column;gap:14px}
+.demo-steps li{display:flex;gap:14px;align-items:flex-start;color:var(--text);font-size:16px;line-height:1.5}
+.demo-steps b{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--btn-bg);color:var(--btn-text);font-family:var(--font-display)}
+.form-card{background:var(--bg);border:1px solid var(--border);border-radius:22px;padding:30px;box-shadow:var(--shadow-2)}
+.form-card h3{margin-bottom:6px;font-size:1.45rem}
+.cta-box .form-card p{font-size:14.5px;max-width:none}
+.cta-box .form-card .lf-note{font-size:13px}
+.lf-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.lf-field{display:flex;flex-direction:column;gap:7px}
+.lf-field label,.lf-goals legend{font-size:13.5px;font-weight:700;color:var(--text)}
+.lf-field input,.lf-field select{width:100%;min-height:50px;background:var(--surface);border:1px solid var(--border);border-radius:12px;
+padding:12px 14px;font-size:15.5px;color:var(--text);transition:border-color .2s,box-shadow .2s}
+.lf-field select{-webkit-appearance:none;appearance:none;padding-right:40px;background-repeat:no-repeat;background-position:right 14px center;
+background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2310b981' stroke-width='2.4' stroke-linecap='round' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+.lf-field input::placeholder{color:var(--dim)}
+.lf-field input:focus,.lf-field select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.lf-field input[aria-invalid="true"]{border-color:var(--rose);box-shadow:0 0 0 3px var(--rose-soft)}
+.lf-goals{border:0;padding:0;margin:18px 0 0;min-width:0}
+.lf-goals legend{margin-bottom:10px;padding:0}
+.lf-opts{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.lf-opts label{position:relative;cursor:pointer;display:block}
+.lf-opts input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.lf-opts span{display:flex;align-items:center;gap:10px;padding:11px 13px;min-height:50px;border-radius:12px;border:1px solid var(--border);
+background:var(--surface);font-size:14px;font-weight:650;color:var(--muted);line-height:1.3;transition:border-color .2s,background-color .2s,color .2s}
+.lf-opts span::before{content:"";width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex:none;transition:all .2s}
+.lf-opts label:hover span{border-color:var(--brand-line);color:var(--text)}
+.lf-opts input:checked+span{border-color:var(--brand);background:var(--brand-soft);color:var(--text)}
+.lf-opts input:checked+span::before{border-color:var(--brand);background:var(--brand);box-shadow:inset 0 0 0 3px var(--surface)}
+.lf-opts input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}
+.lf-error{color:var(--rose);font-size:14px;font-weight:700;margin:12px 0 0}
+.lf-submit{width:100%;margin-top:20px}
+.lf-note{display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;color:var(--dim);margin:12px 0 0;text-align:center}
+.lf-note svg{width:14px;height:14px;flex:none}
+.lead-modal{width:min(640px,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow-y:auto;padding:0;border:1px solid var(--border);
+border-radius:26px;background:var(--surface-2);color:var(--text);box-shadow:var(--shadow-3)}
+.lead-modal::backdrop{background:rgba(3,8,12,.74);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.lead-modal[open]{animation:pop .38s cubic-bezier(.2,.9,.2,1)}
+@keyframes pop{from{opacity:0;transform:translateY(18px) scale(.97)}}
+.lm-inner{padding:36px;position:relative}
+.lm-close{position:absolute;right:16px;top:16px}
+.lm-head{padding-right:40px;margin-bottom:22px}
+.lm-head h2{font-size:clamp(1.6rem,3vw,2.05rem);margin-bottom:10px}
+.lm-head p{font-size:15.5px;margin-bottom:10px}
+.lm-plan{display:inline-flex;gap:6px;align-items:center;padding:6px 13px;border-radius:999px;background:var(--brand-soft);border:1px solid var(--brand-line);font-size:14px;color:var(--text)}
+.lm-plan b{color:var(--brand-text)}
+.lm-skip{display:block;text-align:center;margin-top:16px;color:var(--muted);font-weight:700;font-size:14.5px}
+.lm-skip:hover{color:var(--brand-text)}
+.wa-float{position:fixed;right:24px;bottom:24px;z-index:54;display:flex;align-items:center;gap:12px;text-decoration:none;
+opacity:0;visibility:hidden;transform:translateY(20px) scale(.9);transition:opacity .35s,transform .35s cubic-bezier(.2,.9,.2,1),visibility .35s}
+.wa-float.show{opacity:1;visibility:visible;transform:none}
+.wa-float-btn{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:#25d366;color:#fff;position:relative;
+box-shadow:0 16px 36px -10px rgba(37,211,102,.6);transition:transform .2s}
+.wa-float-btn::after{content:"";position:absolute;inset:0;border-radius:50%;animation:ring 2.4s infinite}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(37,211,102,.55)}80%,100%{box-shadow:0 0 0 16px rgba(37,211,102,0)}}
+.wa-float-btn svg{width:30px;height:30px}
+.wa-float-tip{background:var(--surface);color:var(--text);border:1px solid var(--border);padding:10px 15px;border-radius:14px;font-size:14px;font-weight:700;
+box-shadow:var(--shadow-2);white-space:nowrap;transition:opacity .25s ease,transform .25s ease;
+opacity:0;transform:translateX(10px);pointer-events:none}
+.wa-float:hover .wa-float-tip,.wa-float:focus-visible .wa-float-tip{opacity:1;transform:none}
+.wa-float:hover .wa-float-btn{transform:scale(1.07)}
+.wa-float:hover .wa-float-tip{transform:translateX(-4px);opacity:1}
+@media (max-width:1080px){.seg-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:980px){
+.nav-links{top:100%}
+.roi-grid,.cta-split{grid-template-columns:1fr;gap:40px}
+.cta-split{padding:44px 28px}
+.hero{padding-top:164px}
+}
+@media (max-width:780px){
+section{padding:88px 0}
+.wa-float{display:none}
+.hide-sm{display:none}
+.only-sm{display:inline}
+.announce-in{font-size:13.5px;padding:7px 46px 7px 14px}
+}
+@media (max-width:620px){
+body{font-size:16.5px}
+.container{width:min(1240px,calc(100% - 32px))}
+section{padding:76px 0}
+.seg-grid,.lf-grid,.lf-opts{grid-template-columns:1fr}
+.roi-card,.form-card{padding:24px 20px}
+.lm-inner{padding:28px 20px}
+.demo-cta{padding:22px}
+.demo-cta .btn,.plan-help .btn{width:100%}
+.compat-list li{font-size:16px}
+.hero{padding-top:26px}
+body.announce-off .hero{padding-top:22px}
+.btn-lg{min-height:58px;font-size:16.5px;padding:15px 22px}
+.cmp th,.cmp td{padding:13px 12px;font-size:14px}
+.cmp thead th{font-size:14px}
+.yes svg,.no svg{display:none}
+.cta-split{padding:36px 18px}
+}
+.hero{overflow:clip}
+.scene{max-width:100%;overflow:visible}
+.scene.iso{padding:14px 0 10px}
+.tilt{transform-origin:center}
+@media (max-width:1080px){
+.scene{perspective:none}
+.tilt{transform:perspective(1100px) rotateX(var(--tc,0deg)) translateZ(0);
+transition:transform .5s cubic-bezier(.2,.9,.25,1)}
+.float.f3{display:none}
+.float.f1{left:0!important;top:-2px!important;transform:none!important}
+.float.f2{right:0!important;top:auto!important;bottom:-2px!important;transform:none!important}
+.fcard{max-width:min(264px,calc(100vw - 72px))}
+}
+@media (max-width:780px){
+html{scroll-padding-top:calc(var(--hdr,104px) + 10px)}
+body{font-size:16px;line-height:1.62}
+p{overflow-wrap:break-word}
+.announce-in{min-height:40px;padding:5px 46px 5px 12px;font-size:12.5px;line-height:1.35;gap:0 7px;flex-wrap:nowrap;
+justify-content:flex-start;text-align:left}
+.announce-in>span:not(.announce-dot){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.announce-in a{flex:none;white-space:nowrap;width:44px;justify-content:center;padding:0;min-height:44px}
+.announce-in a .lbl{display:none}
+.announce-in .ann-ico{display:block}
+.announce-dot{display:none}
+.announce-in strong{font-weight:800}
+.announce-in strong{display:inline}
+.announce-in a{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;font-size:13px}
+.announce-close{width:44px;height:44px;right:2px;top:50%}
+.nav-wrap{height:60px;gap:8px}
+.site-header{backdrop-filter:none;-webkit-backdrop-filter:none;background:color-mix(in srgb,var(--bg) 97%,transparent)}
+.tabbar{backdrop-filter:none;-webkit-backdrop-filter:none;background:color-mix(in srgb,var(--bg) 97%,transparent)}
+.brand{font-size:19px;gap:9px;min-height:44px}
+.brand-logo{width:30px;height:30px}
+.nav-links{top:100%;padding:6px 16px 18px;max-height:calc(100dvh - var(--hdr,104px) - 12px);overflow-y:auto}
+.nav-links a{font-size:17px;padding:13px 2px}
+.nav-actions{gap:6px}
+.nav-actions .btn-primary{width:44px;min-width:44px;height:44px;padding:0;border-radius:12px}
+.nav-actions .btn-primary .long{display:none}
+.icon-btn{width:44px;height:44px}
+section{padding:58px 0}
+.section-head{margin-bottom:28px}
+.section-head p{font-size:16px}
+.eyebrow{font-size:11px;margin-bottom:10px}
+h1{font-size:clamp(1.95rem,8.5vw,2.7rem);margin-bottom:16px}
+h2{font-size:clamp(1.55rem,6.4vw,2.1rem)}
+h3{font-size:1.12rem}
+.lead{font-size:16.5px;line-height:1.55}
+.hero{padding-top:22px;padding-bottom:34px}
+.hero-top-light{display:none}
+.hero-floor{height:38vh;bottom:-2vh;opacity:.35}
+.hero-grid{gap:26px}
+.hero-badge{font-size:12.5px;padding:5px 12px 5px 5px;gap:8px;min-height:42px;text-align:left;line-height:1.3}
+.hero-badge b{font-size:10.5px;white-space:nowrap;flex:none}
+.hero-ctas{gap:10px;margin:22px 0 10px}
+.hero-ctas .btn{width:100%}
+.trust-row{gap:6px 14px;margin:0 0 18px}
+.trust-row li{font-size:13.5px;gap:6px}
+.trust-row svg{width:18px;height:18px}
+.pills{gap:6px}
+.pills li{font-size:11px;padding:6px 10px}
+.hero-grid > .hero-copy{display:contents}
+.hero-copy h1{order:1}
+.hero-copy .lead{order:2}
+.hero-copy .hero-badge{order:0;align-self:flex-start}
+.hero-copy .hero-ctas{order:3;display:flex;width:100%}
+.hero-grid > .scene{order:4}
+.hero-copy .trust-row{order:5}
+.hero-copy .pills{order:6}
+.scene.iso{overflow:hidden;overflow:clip;padding:6px 0 4px;margin-inline:0;display:flex;flex-direction:column;gap:9px}
+.scene.iso .tilt{display:flex;flex-direction:column;gap:9px;transform-style:flat}
+.scene.iso .float{position:static!important;inset:auto!important;transform:none!important;width:100%}
+.scene.iso .float>div{animation:none}
+.scene.iso .float .fcard{max-width:none;width:100%;padding:10px 12px;box-shadow:var(--shadow-1)}
+.scene.iso .mock{order:-1}
+.mock{border-radius:16px}
+.mock-body{grid-template-columns:1fr;min-height:0}
+.chat-msgs{overflow-y:auto;overflow-x:hidden;max-height:min(56dvh,430px);padding:13px}
+.msg,.cat-card{max-width:94%}
+.chat-foot{gap:6px;padding:9px 11px}
+.chat-foot .lbl{display:none}
+.chat-foot .mini{flex:1 1 auto;min-height:40px}
+.mock-pad{padding:13px;gap:10px}
+.mock-top{padding:11px 13px;gap:9px}
+.mock-title{font-size:11px}
+.pixbox{flex-direction:row;align-items:center;gap:11px;padding:11px}
+.pixbox .qr{width:78px;height:78px;flex:0 0 78px;min-width:78px}
+.pixbox .qr-lg{width:96px;height:96px}
+.pixbox code{font-size:9.5px;line-height:1.4}
+.grid-2{grid-template-columns:1fr}
+.mrow{padding:9px 11px}
+.cmp-wrap{border:0;background:transparent;box-shadow:none;overflow:visible}
+.cmp,.cmp tbody,.cmp tr,.cmp th,.cmp td{display:block;width:100%}
+.cmp thead{display:none}
+.cmp tbody{display:flex;flex-direction:column;gap:9px}
+.cmp tbody tr{border:1px solid var(--border);border-radius:16px;background:var(--surface);overflow:hidden}
+.cmp tbody th{background:var(--surface-2);border-bottom:1px solid var(--border);padding:11px 14px;
+font-family:var(--font-display);font-size:15px;width:auto}
+.cmp tbody td{border-bottom:0;padding:11px 14px;font-size:14.5px;display:flex;align-items:flex-start;gap:8px}
+.cmp tbody td::before{content:"Hoje";font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+text-transform:uppercase;color:var(--rose);font-weight:700;flex:none;width:58px;padding-top:3px}
+.cmp tbody td.us{background:var(--brand-soft);font-weight:650}
+.cmp tbody td.us::before{content:"Ienvia";color:var(--brand-text)}
+.cmp tbody td:first-of-type{border-top:1px solid var(--border)}
+.yes,.no{gap:8px;align-items:flex-start}
+.yes svg,.no svg{display:inline-flex;width:19px;height:19px;padding:0;margin-top:2px}
+.iso-vis{gap:6px}
+.iso-box{min-width:0;flex:1 1 0;padding:9px}
+.iso-box strong{font-size:9px;letter-spacing:.04em;word-break:break-all}
+.iso-box span{font-size:11px}
+.keyline{font-size:11px;line-height:1.55}
+.seg-grid{gap:14px}
+.prob-grid{gap:24px}
+.prob-row{padding:24px 0;gap:14px}
+.prob-num{font-size:1.9rem}
+.prob-fix{padding:14px;transform:none!important}
+.bento{gap:14px}
+.bento .card{padding:22px}
+.timeline{padding-left:44px}
+.tdot{left:-44px;width:38px;height:38px;font-size:17px}
+.timeline-rail{left:18px}
+.tstep{padding:20px 0 30px}
+.tstep .card{padding:20px}
+.tstep h3{font-size:1.18rem}
+.roi-card{padding:20px 16px}
+.roi-big{font-size:2.05rem}
+.roi-sub{font-size:13.5px;gap:6px 16px}
+.range{height:10px}
+.range::-webkit-slider-thumb{width:30px;height:30px}
+.range::-moz-range-thumb{width:20px;height:20px}
+.roi-money{padding:0 12px}
+.roi-money input{font-size:16px;padding:14px 0}
+.roi-top{flex-wrap:wrap;gap:4px 10px}
+.roi-top label{font-size:15px}
+.form-card{padding:20px 16px}
+.cta-split{padding:26px 16px;gap:26px}
+.cta-box{padding:34px 16px;border-radius:20px}
+.cta-box h2{font-size:1.5rem}
+.cta-box p{font-size:16px}
+.demo-cta{padding:20px 16px;gap:14px}
+.demo-cta strong{font-size:1.2rem}
+.demo-cta span{font-size:14.5px}
+.demo-cta .btn,.plan-help .btn{width:100%}
+.plan-help{padding:18px 16px}
+.plan-help p{font-size:15.5px}
+.plan{padding:22px;border-radius:18px}
+.plan-desc{min-height:0}
+.price{font-size:2rem}
+.plan-badge{left:50%;top:-15px;font-size:10px;padding:7px 13px 7px 10px;letter-spacing:.05em}
+.plan.featured{padding-top:32px}
+.plans-boost{grid-template-columns:1fr;gap:9px;margin:0 0 26px}
+.boost-item{padding:11px 13px}
+.boost-item strong{font-size:14px}
+.boost-item small{font-size:12px}
+.faq-q{padding:18px 2px;font-size:1.02rem;gap:12px}
+.faq-a{padding:0 2px 20px;max-width:100%}
+.faq-a p{font-size:15px}
+.site-footer{padding:38px 0 24px}
+.footer-grid{gap:22px}
+.footer-links{gap:10px 18px;align-items:stretch}
+.footer-links a{display:flex;align-items:center;min-height:44px;font-size:15px}
+.faq-cta a,.contact-line a,.footer-bottom a,.cta-box .contact-line a{display:inline-flex;align-items:center;min-height:44px}
+.footer-bottom{margin-top:24px;padding-top:18px;font-size:13px;gap:8px}
+.compat{margin-top:38px;padding-top:22px;gap:12px 20px}
+.compat-list{gap:10px 18px}
+.compat-list li{font-size:14.5px}
+.ticker{padding:11px 0}
+.ticker::before,.ticker::after{width:44px}
+.ticker-track span{font-size:11.5px;padding:0 16px;gap:8px}
+.seg-link{min-height:44px;align-items:center}
+.qchip{min-height:44px;font-size:12.5px;padding:10px 14px}
+.seg-btn{min-height:44px;font-size:12px;padding:10px 11px}
+.mini{min-height:44px;font-size:13px}
+.play{width:44px;height:44px}
+.slots i{width:11px;height:18px}
+.sim-input input{font-size:16px;padding:12px 13px;min-height:44px}
+.sim-input .mini.primary{min-width:52px;min-height:44px}
+.field input,.field select{font-size:16px;padding:11px 12px;min-height:44px}
+.lf-field input,.lf-field select{font-size:16px;min-height:52px}
+.roi-money input,.roi-field input{font-size:16px}
+.lf-opts span{min-height:52px;font-size:14.5px}
+.lead-modal{width:100%;max-width:none;max-height:92dvh;border-radius:20px 20px 0 0;margin:auto auto 0}
+.lm-inner{padding:24px 18px calc(20px + env(safe-area-inset-bottom))}
+.lm-close{width:44px;height:44px;right:10px;top:10px}
+.lm-head{padding-right:44px}
+.legal-body{max-height:52dvh;font-size:14.5px;padding-right:2px}
+.lf-grid,.lf-opts{grid-template-columns:1fr}
+.sticky-cta{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));display:block}
+.sticky-cta .btn{min-height:52px;font-size:16px}
+body.has-sticky{padding-bottom:86px}
+body.has-sticky .site-footer{padding-bottom:96px}
+}
+@media (max-width:400px){
+.seg-link{width:100%}
+.footer-links{flex-direction:column;gap:0;align-items:stretch}
+h1{font-size:clamp(1.85rem,9vw,2.3rem)}
+.trust-row li{font-size:13px}
+.slots i{width:9px;height:16px}
+}
+.tabbar{display:none}
+@media (max-width:980px){
+.tabs-list{display:none}
+.tabbar{display:flex;flex-direction:column;gap:8px;margin:0 0 20px;position:sticky;top:calc(var(--hdr,104px) + 4px);
+z-index:30;padding:6px 0;background:color-mix(in srgb,var(--bg) 88%,transparent);
+backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.tabbar .tabs-list{display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;justify-content:flex-start;margin:0;
+padding:2px 2px 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabbar .tabs-list::-webkit-scrollbar{display:none}
+.tabbar .tabs-list{-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent)}
+.sim-controls{gap:7px;padding:10px 12px}
+.sim-controls .seg{flex:1 1 auto;min-width:0}
+.sim-controls .seg-btn{padding:8px 9px;font-size:11.5px;flex:1 1 auto}
+.sim-controls #sim-reset{margin-left:0!important;flex:0 0 auto;min-width:44px;padding:8px 10px}
+.sim-controls .reset-txt{display:none}
+.tabbar .tab-btn{flex:0 0 auto;scroll-snap-align:start;min-height:44px;padding:10px 15px;font-size:13.5px;gap:7px}
+.tabbar .tab-btn svg{width:15px;height:15px}
+.tabs-bar-hint{display:none}
+.tab-panel{display:flex;flex-direction:column;align-items:stretch;gap:22px}
+.tab-panel .demo-stage{width:100%;min-width:0}
+.tab-panel .mock{max-width:100%}
+.tab-panel .tab-copy{min-width:0}
+.tab-panel .demo-stage{order:-1}
+.tab-panel .tab-copy{order:1}
+.tab-panel h3{font-size:1.4rem;margin-bottom:10px}
+.tab-copy>p{font-size:15.5px}
+.tab-copy .demo-hint{margin-top:12px;font-size:11px}
+.tab-copy .checklist{margin-top:16px}
+.tab-copy .checklist li{font-size:15px;padding-left:29px;margin-bottom:11px}
+.tab-copy .checklist li::before{width:19px;height:19px}
+.tab-copy .checklist li::after{left:6px;top:8px}
+}
+.kb-bar{display:none}
+@media (max-width:980px){
+.kb-bar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:var(--m-s3);border-bottom:1px solid var(--m-b)}
+.kb-stage{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.kb-stage::-webkit-scrollbar{display:none}
+.kb-pill{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:9px 12px;border-radius:999px;
+border:1px solid var(--m-b);background:var(--m-s2);color:var(--m-mu);font-size:12px;font-weight:700;cursor:pointer;
+font-family:var(--font-mono);letter-spacing:.01em;transition:border-color .2s,background-color .2s,color .2s}
+.kb-pill b{color:var(--m-g2);font-weight:700}
+.kb-pill[aria-pressed="true"]{border-color:var(--m-g);background:rgba(16,185,129,.16);color:var(--m-t)}
+.kb-nav{display:flex;gap:6px;align-items:center}
+.kb-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:44px;min-width:44px;padding:9px 12px;
+border-radius:10px;border:1px solid var(--m-b);background:var(--m-s2);color:var(--m-t);font-size:12.5px;font-weight:700;
+cursor:pointer;transition:border-color .2s,background-color .2s,opacity .2s;flex:1 1 auto}
+.kb-btn:disabled{opacity:.35;cursor:not-allowed}
+.kb-btn.primary{background:var(--m-g);border-color:var(--m-g);color:#03130d;flex:0 0 auto}
+.kb-hint{font-family:var(--font-mono);font-size:10.5px;color:var(--m-mu);line-height:1.4}
+.kanban{overflow-x:auto;scroll-snap-type:x proximity;padding:12px;gap:9px}
+.kcol{scroll-snap-align:start;min-width:172px}
+.kcard{cursor:pointer;min-height:44px}
+.kcard.sel{border-color:var(--m-g2);box-shadow:0 0 0 1px var(--m-g2) inset,0 10px 22px -12px rgba(0,0,0,.8)}
+}
+@media (max-width:780px){
+.sim-quick{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+padding:9px 12px;gap:6px;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);
+mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.sim-quick::-webkit-scrollbar{display:none}
+.qchip{flex:0 0 auto;white-space:nowrap}
+}
+body{--announce-h:0px}
+.site-header{position:sticky;top:0}
+body:not(.announce-off) .site-header{top:var(--announce-h,44px)}
+.main-zone{position:relative}
+@media (prefers-reduced-motion:reduce){
+.announce::after,.wa-float-btn::after,.announce-dot,.lead-modal[open]{animation:none}
+*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+html{scroll-behavior:auto}
+html.js .reveal,html.js .chat-step{opacity:1;transform:none}
+.cursor-light{display:none}
+.hero-floor{animation:none}
+.ticker-track{animation:none}
+}
+</style>
+</head>
+
+<body>
+<div class="grain" aria-hidden="true"></div>
+<div class="cursor-light" id="cursor-light" aria-hidden="true"></div>
+
+<!-- ===================== SPRITE DE ÍCONES ===================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <!-- marca oficial: infinito conversa (verde/menta), sem fundo -->
+  <symbol id="i-logo" viewBox="0 0 120 120">
+    <defs>
+      <linearGradient id="lgA" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0" stop-color="#10b981"/><stop offset=".55" stop-color="#4adea7"/><stop offset="1" stop-color="#a7f3d0"/>
+      </linearGradient>
+      <linearGradient id="lgB" x1="0.1" y1="0.9" x2="0.95" y2="0.1">
+        <stop offset="0" stop-color="#5eead4"/><stop offset=".45" stop-color="#a7f3d0"/><stop offset="1" stop-color="#ecfdf5"/>
+      </linearGradient>
+    </defs>
+    <!-- contorno suave: mantém o laço claro legível no tema claro -->
+    <path d="M60 60c-6.2-8.4-13-14.8-22.6-14.8C27.2 45.2 18 54.6 18 65s9.2 19.8 19.4 19.8c9.6 0 16.4-6.4 22.6-14.8"
+      fill="none" stroke="#064e3b" stroke-opacity=".22" stroke-width="15" stroke-linecap="round"/>
+    <path d="M60 60c6.2-8.4 13-14.8 22.6-14.8C92.8 45.2 102 54.6 102 65s-9.2 19.8-19.4 19.8c-9.6 0-16.4-6.4-22.6-14.8"
+      fill="none" stroke="#064e3b" stroke-opacity=".22" stroke-width="15" stroke-linecap="round"/>
+    <path d="M60 60c-6.2-8.4-13-14.8-22.6-14.8C27.2 45.2 18 54.6 18 65s9.2 19.8 19.4 19.8c9.6 0 16.4-6.4 22.6-14.8z"
+      fill="none" stroke="url(#lgA)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M60 60c6.2-8.4 13-14.8 22.6-14.8C92.8 45.2 102 54.6 102 65s-9.2 19.8-19.4 19.8c-9.6 0-16.4-6.4-22.6-14.8z"
+      fill="none" stroke="url(#lgB)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M23.4 80.2c-.4 8.2-2.2 13.4-5.6 17.6 7.4.6 13-1.1 17.8-4.7" fill="url(#lgA)"/>
+    <path d="M52 58c3.4-2.4 6.4-2.6 9.6-.8" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24"><path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.6L3 21l1.9-5.5A8.5 8.5 0 1 1 21 11.5z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v2M14 20h2M18 18h3v3"/></symbol>
+  <symbol id="i-kanban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.1a4 4 0 0 1 0 7.8M22 21a7 7 0 0 0-4-6.3"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-corner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10L4 15l5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.6 12 3.5 3.5 0 0 0 6.5 19z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z"/></symbol>
+  <symbol id="i-drag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 9l3 3-3 3M12 15h6"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a9 9 0 1 1 9-9c0 2-1.5 3-3 3h-2a2 2 0 0 0-1.5 3.3c.5.7 0 2.7-2.5 2.7z"/><circle cx="7.5" cy="11" r="1"/><circle cx="11" cy="7.5" r="1"/><circle cx="15.5" cy="9" r="1"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="i-megaphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8a4 4 0 0 1 0 8M17.5 5a8 8 0 0 1 0 14"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7 7 7 0 0 1-7-7v-2a1.5 1.5 0 0 1 3 0"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 19a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9V3"/><path d="M7.5 14h9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8M10 20v-5h4v5"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 15h2M14 15h2"/></symbol>
+  <symbol id="i-briefcase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M2 13h20"/></symbol>
+</defs></svg>
+
+<a class="skip-link" href="#main">Pular para o conteúdo</a>
+
+<!-- ===================== AVISO (acima do header fixo) ===================== -->
+<div class="announce" id="announce">
+  <div class="announce-in">
+    <span class="announce-dot" aria-hidden="true"></span>
+    <span><span class="hide-sm">Veja o Ienvia funcionando no seu caso: </span><strong><span class="hide-sm">demonstração ao vivo pelo WhatsApp, sem compromisso.</span><span class="only-sm">Demonstração ao vivo pelo WhatsApp</span></strong></span>
+    <a href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20agendar%20uma%20demonstra%C3%A7%C3%A3o%20do%20Ienvia." data-link="whatsapp" data-open-lead data-msg="Olá! Quero agendar uma demonstração do Ienvia." aria-label="Agendar demonstração pelo WhatsApp"><span class="lbl">Agendar agora →</span><svg class="ann-ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+  </div>
+  <button class="announce-close" id="announce-close" type="button" aria-label="Fechar aviso"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+</div>
+
+<!-- ===================== HEADER ===================== -->
+<header class="site-header" id="topo">
+  <div class="container nav-wrap">
+    <a href="#topo" class="brand" aria-label="Ienvia — voltar ao topo">
+      <svg class="brand-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+      <span class="brand-word" data-brand>Ienvia</span>
+    </a>
+    <nav aria-label="Navegação principal">
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#problemas">Por que</a></li>
+        <li><a href="#recursos">Recursos</a></li>
+        <li><a href="#como-funciona">Como funciona</a></li>
+        <li><a href="#seguranca">Segurança</a></li>
+        <li><a href="#planos">Planos</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li class="mobile-only"><a class="btn btn-ghost" data-link="painel" href="https://app.ienvia.online/login">Acessar painel</a></li>
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-ghost btn-sm" data-link="painel" href="https://app.ienvia.online/login">Acessar painel</a>
+      <a class="btn btn-primary btn-sm" data-link="whatsapp" data-msg="Olá! Quero conhecer o Ienvia e ver uma demonstração." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20conhecer%20o%20Ienvia%20e%20ver%20uma%20demonstra%C3%A7%C3%A3o." aria-label="Falar no WhatsApp">
+        <svg aria-hidden="true"><use href="#i-wa"/></svg><span class="long">Falar no WhatsApp</span>
+      </a>
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Ativar tema claro"><svg aria-hidden="true"><use href="#i-sun"/></svg></button>
+      <button class="icon-btn menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-links" aria-label="Abrir menu de navegação"><svg aria-hidden="true"><use href="#i-menu"/></svg></button>
+    </div>
+  </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</header>
+
+<main id="main">
+
+<!-- ===================== HERO ===================== -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-top-light" aria-hidden="true"></div>
+  <div class="hero-floor" aria-hidden="true"></div>
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <a class="hero-badge" href="#recursos"><b>Teste agora</b> O simulador de IA funciona nesta página <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      <h1 id="hero-title">Seu WhatsApp vendendo <span class="hl">24 horas por dia</span>, sem deixar cliente esperando.</h1>
+      <p class="lead">A IA do Ienvia atende com o seu treinamento, envia catálogo e áudios gravados na sua voz, gera o PIX na conversa e passa o cliente quente para você na hora certa. Tudo organizado em um CRM com Kanban, em vários chips, num painel só.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary btn-lg" data-link="whatsapp" data-open-lead data-msg="Olá! Quero ver uma demonstração do Ienvia no meu WhatsApp." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20ver%20uma%20demonstra%C3%A7%C3%A3o%20do%20Ienvia%20no%20meu%20WhatsApp.">
+          <svg aria-hidden="true"><use href="#i-wa"/></svg> Quero uma demonstração
+        </a>
+        <a class="btn btn-ghost btn-lg" href="#recursos"><svg aria-hidden="true"><use href="#i-flask"/></svg> Testar o simulador</a>
+      </div>
+      <ul class="trust-row" aria-label="Como funciona a demonstração">
+        <li><svg aria-hidden="true"><use href="#i-check"/></svg> Sem compromisso</li>
+        <li><svg aria-hidden="true"><use href="#i-check"/></svg> Ao vivo pelo WhatsApp</li>
+        <li><svg aria-hidden="true"><use href="#i-check"/></svg> Teste a IA antes de ativar</li>
+      </ul>
+      <ul class="pills" aria-label="Destaques">
+        <li>Vários chips</li><li>Evolution e Motor Local</li><li>IA com fallback</li><li>PIX e áudios na sua voz</li>
+      </ul>
+    </div>
+
+    <div class="scene iso" id="hero-scene">
+      <div class="tilt" id="hero-tilt">
+        <p class="sr-only">Prévia do painel Ienvia: conversa de WhatsApp atendida pela IA, com catálogo, áudio gravado e cobrança PIX.</p>
+        <div class="mock" role="img" aria-label="Mockup do Inbox ao vivo do Ienvia">
+          <div class="mock-top">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mock-title">ienvia · inbox ao vivo</span>
+            <span class="live"><b aria-hidden="true"></b>online</span>
+          </div>
+          <div class="mock-body">
+            <aside class="mock-list" aria-hidden="true">
+              <div class="chip-filter"><span class="on">Todos</span><span>Chip 1</span><span>Chip 2</span></div>
+              <div class="conv active" id="conv-1"><div class="av">MR</div><div><strong>Mariana R.</strong><small>IA atendendo</small></div></div>
+              <div class="conv" id="conv-2"><div class="av av-a">CL</div><div><strong>Carlos Lima</strong><small>Aguardando humano</small></div></div>
+              <div class="conv" id="conv-3"><div class="av av-s">AB</div><div><strong>Ana Beatriz</strong><small>Chip 2 · histórico</small></div></div>
+              <div class="conv"><div class="av av-g">PT</div><div><strong>Paulo T.</strong><small>Kanban · proposta</small></div></div>
+            </aside>
+            <div class="mock-chat" id="hero-chat">
+              <div class="chat-head"><strong>Mariana Ribeiro</strong><span class="tag t-green">IA ativa</span></div>
+              <div class="chat-msgs">
+                <div class="msg in chat-step" data-wait="250">Oi! Vi o anúncio do kit de hidratação. Vocês entregam em Campinas?</div>
+                <div class="msg ai chat-step" data-wait="1150"><span class="who">IA</span>Oi, Mariana! Entregamos sim, chega em até 2 dias úteis. Já te mando o catálogo com os kits.<span class="meta">agora ✓✓</span></div>
+                <div class="cat-card chat-step" data-wait="950"><div class="thumb" aria-hidden="true"></div><div><strong>Kit Hidratação Completa</strong><small>R$ 189,90 · 5 mídias</small></div></div>
+                <div class="audio chat-step" data-wait="1050" aria-hidden="true">
+                  <span class="play"><svg><use href="#i-play"/></svg></span>
+                  <span class="wave"><i style="--h:8px"></i><i style="--h:16px"></i><i style="--h:10px"></i><i style="--h:20px"></i><i style="--h:12px"></i><i style="--h:18px"></i><i style="--h:8px"></i><i style="--h:14px"></i><i style="--h:10px"></i><i style="--h:16px"></i></span>
+                  <small>0:12</small>
+                </div>
+                <div class="msg ai chat-step" data-wait="900"><span class="who">IA</span>Esse é um áudio meu explicando como usar o kit. Quer que eu gere o PIX à vista?<span class="meta">agora ✓✓</span></div>
+                <div class="pixbox chat-step" data-wait="850">
+                  <div class="qr" data-qr data-seed="hero" aria-hidden="true"></div>
+                  <div><strong>Cobrança PIX · R$ 189,90</strong><small>copia e cola · padrão Banco Central</small><code>00020126…5204000053039865406189.905802BR…6304A1B2</code></div>
+                </div>
+              </div>
+              <div class="chat-foot" aria-hidden="true">
+                <span class="lbl">controle humano</span>
+                <button class="mini" type="button" tabindex="-1">Assumir</button>
+                <button class="mini" type="button" tabindex="-1">Devolver p/ IA</button>
+                <button class="mini danger" type="button" tabindex="-1">Pausar tudo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="float f1">
+          <div class="fcard">
+            <span class="fi"><svg aria-hidden="true"><use href="#i-spark"/></svg></span>
+            <div><strong>IA com fallback</strong><small>Gemini → OpenRouter → NVIDIA</small>
+              <span class="chain" aria-hidden="true"><i class="on"></i><i></i><i></i></span></div>
+          </div>
+        </div>
+        <div class="float f2">
+          <div class="fcard">
+            <span class="fi" style="background:var(--amber-soft);color:var(--amber)"><svg aria-hidden="true"><use href="#i-hand"/></svg></span>
+            <div><strong>Carlos pediu humano</strong><small>“Assumir” com 1 clique</small></div>
+          </div>
+        </div>
+        <div class="float f3">
+          <div class="fcard">
+            <span class="fi" style="background:var(--sky-soft);color:var(--sky)"><svg aria-hidden="true"><use href="#i-layers"/></svg></span>
+            <div><strong>3 chips conectados</strong><small>rodízio ativo nas campanhas</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="container">
+    <div class="compat reveal">
+      <span class="compat-label">Funciona com</span>
+      <ul class="compat-list">
+        <li>Google Gemini</li><li>OpenRouter</li><li>NVIDIA</li><li>Evolution API</li><li>Baileys</li><li>PIX (padrão BCB)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TICKER ===================== -->
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-track" id="ticker-track"></div>
+</div>
+
+<!-- ===================== PROBLEMAS ===================== -->
+<section id="problemas" aria-labelledby="prob-title">
+  <div class="container prob-grid">
+    <div class="prob-side reveal">
+      <span class="eyebrow">O que o Ienvia resolve</span>
+      <h2 id="prob-title">O WhatsApp não perdoa espera, esquecimento nem disparo errado.</h2>
+      <p>Três falhas comuns que aparecem em quase toda operação — e o módulo exato do painel que cuida de cada uma.</p>
+      <a class="btn btn-ghost" href="#recursos">Ver os módulos <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+    </div>
+    <div>
+      <article class="prob-row reveal">
+        <div class="prob-num" aria-hidden="true">01</div>
+        <div>
+          <h3>Demora para responder</h3>
+          <p>Quem espera minutos já está falando com o concorrente. Sem cobertura fora do horário comercial, o lead esfria no chat.</p>
+          <div class="prob-fix">
+            <strong><svg aria-hidden="true"><use href="#i-spark"/></svg> Inbox ao vivo + atendente de IA</strong>
+            <p>Resposta imediata com o seu treinamento (FAQs, documentos, habilidades e objeções) e fallback automático entre Google Gemini, OpenRouter e NVIDIA. Precisa de gente? “Assumir” com 1 clique — e “Devolver para a IA” quando acabar.</p>
+          </div>
+        </div>
+      </article>
+      <article class="prob-row reveal" data-d="1">
+        <div class="prob-num" aria-hidden="true">02</div>
+        <div>
+          <h3>Leads perdidos sem CRM</h3>
+          <p>Conversas espalhadas em vários celulares, sem etapa, sem valor e sem lembrete de retorno. A oportunidade some sem aviso.</p>
+          <div class="prob-fix">
+            <strong><svg aria-hidden="true"><use href="#i-kanban"/></svg> CRM com Kanban e agenda</strong>
+            <p>Funil visual com etapas, etiquetas coloridas, valor do negócio, ganho/perdido, notas internas, respostas rápidas, agenda de contatos e agendamento de mensagens para o follow-up não depender da memória de ninguém.</p>
+          </div>
+        </div>
+      </article>
+      <article class="prob-row reveal" data-d="2">
+        <div class="prob-num" aria-hidden="true">03</div>
+        <div>
+          <h3>Risco de banimento nos disparos</h3>
+          <p>Disparo em massa sem cadência, sem rodízio e sem janela de horário é o caminho mais rápido para perder o chip.</p>
+          <div class="prob-fix">
+            <strong><svg aria-hidden="true"><use href="#i-shield"/></svg> Campanhas com segurança anti-ban</strong>
+            <p>Envio multi-bloco com spintax, rotação e variação por IA, prévia obrigatória, fila segura, rodízio de chips, horário de expediente e alerta no seu WhatsApp se algum chip cair.</p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PARA QUEM É ===================== -->
+<section id="para-quem" class="sec-tint" aria-labelledby="pq-title">
+  <div class="container">
+    <header class="section-head center reveal">
+      <span class="eyebrow">Para quem é</span>
+      <h2 id="pq-title">Feito para quem vende pelo WhatsApp <span class="hl">todos os dias</span></h2>
+      <p>Veja como cada tipo de negócio usa o painel na prática.</p>
+    </header>
+    <div class="seg-grid">
+      <article class="card seg-card reveal">
+        <div class="ico"><svg aria-hidden="true"><use href="#i-store"/></svg></div>
+        <h3>Lojas e e-commerce</h3>
+        <p>Do “quanto custa?” ao pagamento sem sair da conversa.</p>
+        <ul>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Catálogo com até 5 mídias por produto</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>PIX copia e cola + QR Code automático</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Áudio na sua voz apresentando o produto</li>
+        </ul>
+        <a class="seg-link" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Tenho%20uma%20loja%20e%20quero%20ver%20o%20Ienvia." data-link="whatsapp" data-open-lead data-seg="Loja / e-commerce" data-msg="Olá! Tenho uma loja e quero ver o Ienvia.">Ver no meu caso <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </article>
+      <article class="card seg-card reveal" data-d="1">
+        <div class="ico c2"><svg aria-hidden="true"><use href="#i-calendar"/></svg></div>
+        <h3>Clínicas e serviços</h3>
+        <p>Menos tempo no celular respondendo sempre a mesma pergunta.</p>
+        <ul>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>IA treinada com seus FAQs e documentos</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Agenda de contatos e mensagens agendadas</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Passe para a recepção com 1 clique</li>
+        </ul>
+        <a class="seg-link" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Tenho%20uma%20cl%C3%ADnica/servi%C3%A7o%20e%20quero%20ver%20o%20Ienvia." data-link="whatsapp" data-open-lead data-seg="Clínica / serviços" data-msg="Olá! Tenho uma clínica/serviço e quero ver o Ienvia.">Ver no meu caso <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </article>
+      <article class="card seg-card reveal" data-d="2">
+        <div class="ico c3"><svg aria-hidden="true"><use href="#i-megaphone"/></svg></div>
+        <h3>Infoprodutos e lançamentos</h3>
+        <p>Volume de conversa sem queimar número.</p>
+        <ul>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Campanhas com spintax, imagem e áudio PTT</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Rodízio de chips e horário de expediente</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Objeções tratadas pela IA treinada</li>
+        </ul>
+        <a class="seg-link" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Trabalho%20com%20infoprodutos%20e%20quero%20ver%20o%20Ienvia." data-link="whatsapp" data-open-lead data-seg="Infoproduto / cursos" data-msg="Olá! Trabalho com infoprodutos e quero ver o Ienvia.">Ver no meu caso <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </article>
+      <article class="card seg-card reveal" data-d="3">
+        <div class="ico c4"><svg aria-hidden="true"><use href="#i-briefcase"/></svg></div>
+        <h3>Agências e revendas</h3>
+        <p>Uma operação, vários clientes, com a sua marca.</p>
+        <ul>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>White-label com nome e subtítulo próprios</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Painel isolado por empresa (RLS)</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Evolution API ou Motor Local por cliente</li>
+        </ul>
+        <a class="seg-link" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Tenho%20uma%20ag%C3%AAncia%20e%20quero%20conhecer%20o%20white-label%20do%20Ienvia." data-link="whatsapp" data-open-lead data-seg="Agência / revenda" data-msg="Olá! Tenho uma agência e quero conhecer o white-label do Ienvia.">Ver no meu caso <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CALCULADORA ===================== -->
+<section id="calculadora" aria-labelledby="roi-title">
+  <div class="container roi-grid">
+    <div class="reveal">
+      <span class="eyebrow">Calculadora de vendas em risco</span>
+      <h2 id="roi-title">Quanto a demora no WhatsApp pode estar <span class="hl">custando para você?</span></h2>
+      <p>Cada mensagem sem resposta rápida é uma chance de o cliente comprar do concorrente. Coloque os números da sua operação e veja a estimativa.</p>
+      <ul class="checklist" style="margin-top:26px">
+        <li><strong>A IA responde em segundos</strong>, inclusive fora do horário comercial</li>
+        <li><strong>Nenhum lead some</strong>: cada conversa entra no funil Kanban</li>
+        <li><strong>Follow-up agendado</strong> para quem parou de responder</li>
+      </ul>
+    </div>
+    <div class="roi-card reveal" data-d="1">
+      <div class="roi-field">
+        <div class="roi-top"><label for="roi-leads">Contatos novos por mês</label><output id="roi-leads-o" for="roi-leads">400</output></div>
+        <input class="range" type="range" id="roi-leads" min="50" max="5000" step="50" value="400">
+      </div>
+      <div class="roi-field">
+        <div class="roi-top"><label for="roi-lost">Quantos esperam mais de 5 min pela resposta</label><output id="roi-lost-o" for="roi-lost">30%</output></div>
+        <input class="range" type="range" id="roi-lost" min="5" max="90" step="5" value="30">
+      </div>
+      <div class="roi-field">
+        <div class="roi-top"><label for="roi-conv">Taxa de conversão quando bem atendido</label><output id="roi-conv-o" for="roi-conv">10%</output></div>
+        <input class="range" type="range" id="roi-conv" min="1" max="50" step="1" value="10">
+      </div>
+      <div class="roi-field">
+        <div class="roi-top"><label for="roi-ticket">Ticket médio</label></div>
+        <div class="roi-money"><span aria-hidden="true">R$</span><input id="roi-ticket" type="text" inputmode="decimal" value="250"></div>
+      </div>
+      <div class="roi-result">
+        <small>Vendas em risco por mês</small>
+        <span class="roi-big hl" id="roi-total">R$ 0</span>
+        <div class="roi-sub"><span><b id="roi-leadsr">0</b> contatos esfriando</span><span><b id="roi-sales">0</b> vendas</span><span><b id="roi-year">R$ 0</b> por ano</span></div>
+      </div>
+      <a class="btn btn-primary btn-lg" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Fiz%20a%20conta%20na%20calculadora%20e%20quero%20ver%20o%20Ienvia." id="roi-cta" data-link="whatsapp" data-open-lead data-msg="Olá! Fiz a conta na calculadora e quero ver o Ienvia."><svg aria-hidden="true"><use href="#i-wa"/></svg> Quero parar de perder esses contatos</a>
+      <p class="roi-disc">Estimativa ilustrativa feita só com os números que você informou. Não é promessa de resultado e nada é enviado.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== RECURSOS + DEMOS ===================== -->
+<section id="recursos" aria-labelledby="rec-title" style="background:var(--surface-3);border-block:1px solid var(--border)">
+  <div class="container">
+    <header class="section-head center reveal">
+      <span class="eyebrow">Recursos interativos</span>
+      <h2 id="rec-title">Não leia sobre o painel. <span class="mark">Mexa nele.</span></h2>
+      <p>Cada módulo abaixo tem uma demonstração funcional nesta página: converse com a IA simulada, arraste negócios no Kanban, gere um código PIX válido e veja a cadência anti-ban rodando.</p>
+    </header>
+
+    <div class="tabbar" id="tabbar">
+      <div class="tabs-list" role="tablist" aria-label="Módulos do Ienvia">
+        <button class="tab-btn" role="tab" type="button" id="tab-inbox" aria-controls="panel-inbox" aria-selected="true" tabindex="0"><svg aria-hidden="true"><use href="#i-chat"/></svg> Inbox &amp; IA</button>
+        <button class="tab-btn" role="tab" type="button" id="tab-crm" aria-controls="panel-crm" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-kanban"/></svg> CRM &amp; Kanban</button>
+        <button class="tab-btn" role="tab" type="button" id="tab-cat" aria-controls="panel-cat" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-qr"/></svg> Catálogo, Áudio &amp; PIX</button>
+        <button class="tab-btn" role="tab" type="button" id="tab-camp" aria-controls="panel-camp" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-megaphone"/></svg> Campanhas &amp; Anti-ban</button>
+        <button class="tab-btn" role="tab" type="button" id="tab-motor" aria-controls="panel-motor" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-terminal"/></svg> Motor Local &amp; SaaS</button>
+      </div>
+    </div>
+
+    <!-- ===== ABA 1: SIMULADOR ===== -->
+    <div class="tab-panel" role="tabpanel" id="panel-inbox" aria-labelledby="tab-inbox" tabindex="0">
+      <div class="tab-copy">
+        <h3>Simulador de Atendimento</h3>
+        <p>Escreva como se você fosse o cliente e veja a IA responder, enviar catálogo, cobrar no PIX e chamar um humano quando necessário. No painel, esse mesmo ambiente isolado permite testar tudo antes de colocar clientes reais na conversa.</p>
+        <ul class="checklist">
+          <li><strong>Inbox em tempo real</strong> com texto, foto, áudio, vídeo, documento e figurinha</li>
+          <li><strong>Filtro por chip</strong>, inclusive chips desconectados que permanecem no histórico</li>
+          <li><strong>Assumir</strong> e <strong>Devolver para a IA</strong> com 1 clique, além do botão de emergência <strong>Pausar tudo</strong></li>
+          <li><strong>Correção de respostas</strong> da IA com 1 clique, direto na conversa</li>
+          <li><strong>Dossiê resumido</strong> enviado ao WhatsApp do administrador</li>
+        </ul>
+        <p class="demo-hint"><svg aria-hidden="true"><use href="#i-flask"/></svg> Troque o modo acima do chat para ver como a IA se comporta quando um humano assume ou quando tudo é pausado.</p>
+      </div>
+      <div class="demo-stage">
+        <div class="mock" id="sim">
+          <div class="mock-top">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mock-title">simulador · ambiente isolado</span>
+            <span class="tag t-green" id="sim-status">IA ativa</span>
+          </div>
+          <div class="sim-controls">
+            <div class="seg" role="group" aria-label="Modo de atendimento do simulador">
+              <button class="seg-btn is-on" type="button" data-mode="ia" aria-pressed="true">IA ativa</button>
+              <button class="seg-btn is-warn" type="button" data-mode="humano" aria-pressed="false">Humano assumiu</button>
+              <button class="seg-btn is-off" type="button" data-mode="pausado" aria-pressed="false">Pausar tudo</button>
+            </div>
+            <button class="mini" type="button" id="sim-reset" aria-label="Limpar a conversa simulada" style="margin-left:auto"><span style="display:inline-flex;align-items:center;gap:6px"><svg width="13" height="13" aria-hidden="true"><use href="#i-refresh"/></svg><span class="reset-txt">Limpar</span></span></button>
+          </div>
+          <div class="sim-log" id="sim-log" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversa simulada"></div>
+          <div class="sim-quick" id="sim-quick" aria-label="Mensagens sugeridas para testar"></div>
+          <form class="sim-input" id="sim-form" autocomplete="off">
+            <label class="sr-only" for="sim-text">Escreva uma mensagem de teste</label>
+            <input id="sim-text" type="text" placeholder="Escreva como se fosse um cliente…" maxlength="240">
+            <button class="mini primary" type="submit" aria-label="Enviar mensagem"><svg width="14" height="14" aria-hidden="true"><use href="#i-send"/></svg></button>
+          </form>
+        </div>
+        <div class="dossie" id="dossie" aria-hidden="true">
+          <div class="fcard">
+            <div style="display:flex;gap:10px;align-items:center">
+              <span class="fi"><svg aria-hidden="true"><use href="#i-file"/></svg></span>
+              <div><strong>Dossiê enviado ao administrador</strong><small>resumo automático no WhatsApp do gestor</small></div>
+            </div>
+            <div>
+              <div class="dossie-row"><span>Contato</span><b id="ds-nome">Visitante</b></div>
+              <div class="dossie-row"><span>Interesse</span><b id="ds-int">—</b></div>
+              <div class="dossie-row"><span>Valor estimado</span><b id="ds-val">—</b></div>
+              <div class="dossie-row"><span>Etapa sugerida</span><b id="ds-etapa">Novo lead</b></div>
+            </div>
+          </div>
+        </div>
+        <p class="demo-note">Demonstração ilustrativa: as respostas são geradas por regras nesta página. No painel, quem responde é a sua IA treinada com os seus FAQs, documentos, catálogo e objeções.</p>
+      </div>
+    </div>
+
+    <!-- ===== ABA 2: KANBAN ===== -->
+    <div class="tab-panel" role="tabpanel" id="panel-crm" aria-labelledby="tab-crm" tabindex="0" hidden>
+      <div class="tab-copy">
+        <h3>CRM completo com funil Kanban</h3>
+        <p>Arraste os cartões abaixo como se estivesse no painel. O total do funil e a soma de cada etapa recalculam na hora — é assim que o time enxerga o dinheiro parado em cada fase.</p>
+        <ul class="checklist">
+          <li><strong>Funil visual</strong> com etapas configuráveis e marcação de ganho/perdido</li>
+          <li><strong>Valor do negócio</strong> em cada contato, com totais por etapa</li>
+          <li><strong>Etiquetas coloridas</strong> para origem, temperatura e interesse</li>
+          <li><strong>Notas internas</strong> que o cliente nunca vê</li>
+          <li><strong>Agenda de contatos</strong>, respostas rápidas e agendamento de mensagens</li>
+        </ul>
+        <p class="demo-hint"><svg aria-hidden="true"><use href="#i-drag"/></svg> No celular: toque no cartão e use <b>Mover</b>. No computador: arraste ou use <span class="kbd">←</span> <span class="kbd">→</span>.</p>
+      </div>
+      <div class="demo-stage">
+        <div class="mock">
+          <div class="mock-top">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mock-title">crm · funil de vendas</span>
+            <span class="tag t-sky" id="kb-count">0 negócios</span>
+          </div>
+          <div class="kb-bar" id="kb-bar">
+            <div class="kb-stage" id="kb-stage" role="group" aria-label="Ir para uma etapa do funil"></div>
+            <div class="kb-nav">
+              <button class="kb-btn" type="button" id="kb-prev" aria-label="Mover o negócio selecionado para a etapa anterior">‹ Anterior</button>
+              <button class="kb-btn" type="button" id="kb-move" disabled aria-label="Mover o negócio selecionado para a próxima etapa">Mover para Br ›</button>
+            </div>
+            <span class="kb-hint" id="kb-hint">Toque num cartão e use “Mover” — ou arraste com o mouse no computador.</span>
+          </div>
+          <div class="kanban" id="kanban">
+            <div class="kcol" data-col="novo"><h4>Novo lead <b>0</b></h4><span class="ksum">R$ 0</span><div class="klist"></div></div>
+            <div class="kcol" data-col="qualificado"><h4>Qualificado <b>0</b></h4><span class="ksum">R$ 0</span><div class="klist"></div></div>
+            <div class="kcol" data-col="proposta"><h4>Proposta <b>0</b></h4><span class="ksum">R$ 0</span><div class="klist"></div></div>
+            <div class="kcol" data-col="ganho"><h4>Ganho <b>0</b></h4><span class="ksum">R$ 0</span><div class="klist"></div></div>
+            <div class="kcol" data-col="perdido"><h4>Perdido <b>0</b></h4><span class="ksum">R$ 0</span><div class="klist"></div></div>
+          </div>
+          <div class="pipeline">
+            <span class="mlabel">Funil aberto (sem ganho/perdido)</span>
+            <b id="kb-total">R$ 0,00</b>
+          </div>
+        </div>
+        <p class="sr-only" id="kb-live" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <!-- ===== ABA 3: CATÁLOGO, ÁUDIO E PIX ===== -->
+    <div class="tab-panel" role="tabpanel" id="panel-cat" aria-labelledby="tab-cat" tabindex="0" hidden>
+      <div class="tab-copy">
+        <h3>Catálogo, PIX e a sua voz no chat</h3>
+        <p>Digite um valor e um recebedor: o gerador abaixo monta um código PIX copia e cola no padrão EMV do Banco Central, com CRC calculado de verdade. É o mesmo formato que o painel envia dentro da conversa.</p>
+        <ul class="checklist">
+          <li><strong>Catálogo</strong> de produtos e serviços com até 5 mídias por item</li>
+          <li><strong>PIX copia e cola</strong> gerado automaticamente + <strong>QR Code</strong></li>
+          <li><strong>Áudios estratégicos (PTT)</strong> gravados por você e enviados como mensagem de voz nativa, sem parecer robô</li>
+          <li><strong>Simulador</strong> para testar catálogo, áudio e PIX antes de ir para o cliente real</li>
+        </ul>
+        <p class="demo-hint"><svg aria-hidden="true"><use href="#i-play"/></svg> Toque no áudio para ver a reprodução da mensagem de voz.</p>
+      </div>
+      <div class="demo-stage">
+        <div class="mock">
+          <div class="mock-top">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mock-title">catálogo · gerador de cobrança pix</span>
+            <span class="tag t-green">EMV/BCB</span>
+          </div>
+          <div class="mock-pad">
+            <div class="mrow">
+              <div style="display:flex;gap:11px;align-items:center">
+                <span class="thumb" aria-hidden="true"></span>
+                <div><strong>Kit Hidratação Completa</strong><small>R$ 189,90 · 5 mídias publicadas</small></div>
+              </div>
+              <span class="tag t-green">ativo</span>
+            </div>
+            <div class="mflex" aria-hidden="true">
+              <span class="thumb" style="width:34px;height:34px;border-radius:8px"></span>
+              <span class="thumb b" style="width:34px;height:34px;border-radius:8px"></span>
+              <span class="thumb c" style="width:34px;height:34px;border-radius:8px"></span>
+              <span class="tag t-gray">vídeo</span>
+              <span class="tag t-gray">ficha técnica</span>
+            </div>
+            <div class="grid-2">
+              <div class="field"><label for="pix-valor">Valor (R$)</label><input id="pix-valor" type="text" inputmode="decimal" value="189,90"></div>
+              <div class="field"><label for="pix-nome">Recebedor</label><input id="pix-nome" type="text" value="IENVIA COMERCIO" maxlength="25"></div>
+            </div>
+            <div class="pixbox" style="align-self:stretch">
+              <div class="qr qr-lg" id="pix-qr" aria-hidden="true"></div>
+              <div>
+                <strong id="pix-title">Cobrança PIX · R$ 189,90</strong>
+                <small>código copia e cola gerado agora</small>
+                <code id="pix-code">—</code>
+                <button class="mini primary" type="button" id="pix-copy">Copiar código</button>
+              </div>
+            </div>
+            <div class="mlabel">Biblioteca de áudios (PTT)</div>
+            <div class="mrow">
+              <span style="display:flex;align-items:center;gap:11px;min-width:0">
+                <button class="play" type="button" id="audio-play" aria-label="Reproduzir áudio de exemplo"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
+                <span style="min-width:0"><strong>Boas-vindas — gravado pelo dono</strong><small id="audio-time">0:00 / 0:12 · enviado como mensagem de voz</small></span>
+              </span>
+              <span class="wave" id="audio-wave" aria-hidden="true"><i style="--h:8px;--d:0s"></i><i style="--h:16px;--d:.06s"></i><i style="--h:10px;--d:.12s"></i><i style="--h:20px;--d:.18s"></i><i style="--h:12px;--d:.24s"></i><i style="--h:18px;--d:.3s"></i><i style="--h:8px;--d:.36s"></i><i style="--h:15px;--d:.42s"></i></span>
+            </div>
+          </div>
+        </div>
+        <p class="demo-note">O QR Code exibido é ilustrativo e muda conforme os dados. O código copia e cola é montado no formato EMV real, com CRC16 calculado — para conferência técnica.</p>
+        <p class="sr-only" id="pix-live" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <!-- ===== ABA 4: CAMPANHAS ===== -->
+    <div class="tab-panel" role="tabpanel" id="panel-camp" aria-labelledby="tab-camp" tabindex="0" hidden>
+      <div class="tab-copy">
+        <h3>Campanhas em lote sem queimar chip</h3>
+        <p>Veja a cadência rodando: o texto varia por spintax, os chips se alternam entre envio e pausa, e a fila só anda dentro do horário de expediente. Se um chip cai, o gestor é avisado no próprio WhatsApp.</p>
+        <ul class="checklist">
+          <li><strong>Envio multi-bloco</strong> com spintax, rotação e variação por IA</li>
+          <li><strong>Imagem e áudio PTT</strong> dentro da mesma campanha</li>
+          <li><strong>Importação</strong> de contatos por CSV, TXT ou XLSX</li>
+          <li><strong>Prévia obrigatória</strong> antes de qualquer disparo</li>
+          <li><strong>Cadência segura</strong>: rodízio de chips, fila segura e horário de expediente</li>
+          <li><strong>Alertas</strong> no WhatsApp do gestor quando um chip desconecta</li>
+        </ul>
+      </div>
+      <div class="demo-stage">
+        <div class="mock">
+          <div class="mock-top">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mock-title">campanha · reativação de clientes</span>
+            <span class="tag t-green" id="camp-status">em envio</span>
+          </div>
+          <div class="mock-pad">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+              <span class="mlabel">Prévia aprovada</span><span class="tag t-green">obrigatória ✓</span>
+            </div>
+            <div class="mlabel">Variação por spintax (ao vivo)</div>
+            <div class="spin" id="spintax-out">—</div>
+            <div class="mlabel">Rodízio de chips</div>
+            <div class="mrow" data-chip="0"><div><strong>Chip 1 · +55 11 9••••-1042</strong><small id="chip-msg-0">enviando bloco 3</small></div><div style="min-width:96px"><div class="bar" id="bar-0"><i></i></div></div></div>
+            <div class="mrow" data-chip="1"><div><strong>Chip 2 · +55 19 9••••-7781</strong><small id="chip-msg-1">em pausa de cadência</small></div><div style="min-width:96px"><div class="bar pause" id="bar-1"><i></i></div></div></div>
+            <div class="mrow" data-chip="2"><div><strong>Chip 3 · +55 21 9••••-3390</strong><small id="chip-msg-2">conexão perdida</small></div><div style="min-width:96px"><div class="bar pause" id="bar-2"><i></i></div></div></div>
+            <div class="mlabel">Fila · janela de expediente 09:00–18:00</div>
+            <div class="slots" id="slots" aria-hidden="true"></div>
+            <div style="display:flex;gap:9px;flex-wrap:wrap">
+              <span class="tag t-green"><b id="camp-sent" style="font-weight:700">0</b>&nbsp;enviados</span>
+              <span class="tag t-amber"><b id="camp-queue" style="font-weight:700">0</b>&nbsp;na fila</span>
+              <span class="tag t-gray">importação CSV/TXT/XLSX</span>
+            </div>
+            <div class="alert-box" id="camp-alert">
+              <svg aria-hidden="true"><use href="#i-alert"/></svg>
+              <div>Alerta enviado ao WhatsApp do gestor: <strong>Chip 3 desconectou</strong>. A campanha seguiu no rodízio com os chips 1 e 2.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ABA 5: MOTOR LOCAL & SAAS ===== -->
+    <div class="tab-panel" role="tabpanel" id="panel-motor" aria-labelledby="tab-motor" tabindex="0" hidden>
+      <div class="tab-copy">
+        <h3>Conecte do seu jeito. Entregue com a sua marca.</h3>
+        <p>Use chips na nuvem pela Evolution API ou rode o Motor Local próprio (Baileys) no seu PC ou no celular via Termux. E, se você é agência, personalize o nome e o subtítulo da sua marca no painel de cada cliente.</p>
+        <ul class="checklist">
+          <li><strong>Evolution API</strong> para chips na nuvem e <strong>Motor Local</strong> (Baileys) para PC ou Termux</li>
+          <li><strong>Atualização automática assinada</strong> do Motor Local</li>
+          <li><strong>Painel multiempresa</strong> isolado por empresa com RLS</li>
+          <li><strong>White-label</strong>: nome e subtítulo da sua marca no painel</li>
+          <li><strong>Exportação em JSON</strong> e limpeza automática de mídias expiradas</li>
+        </ul>
+        <p class="demo-hint"><svg aria-hidden="true"><use href="#i-palette"/></svg> Digite o nome e o subtítulo da sua marca para ver o cabeçalho white-label atualizar ao lado.</p>
+      </div>
+      <div class="demo-stage">
+        <div class="mock" id="motor-mock">
+          <div class="mock-top">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mock-title" id="wl-title">conexões · sua empresa</span>
+            <span class="tag t-green">RLS ativo</span>
+          </div>
+          <div class="sim-controls">
+            <div class="seg" role="group" aria-label="Modo de conexão">
+              <button class="seg-btn is-on" type="button" data-conn="nuvem" aria-pressed="true">Nuvem · Evolution API</button>
+              <button class="seg-btn" type="button" data-conn="local" aria-pressed="false">Motor Local · Baileys</button>
+            </div>
+          </div>
+          <div class="mock-pad">
+            <div id="view-nuvem">
+              <div class="conn-grid" style="margin-bottom:12px">
+                <div class="conn"><strong>Instance chip 1</strong><small>Evolution API · QR lido</small><span class="tag t-green">conectado</span></div>
+                <div class="conn"><strong>Instance chip 2</strong><small>Evolution API · sessão expirada</small><span class="tag t-amber">reconectar</span></div>
+              </div>
+              <div class="mrow"><div><strong>Webhook de mensagens</strong><small>texto, foto, áudio, vídeo, documento e figurinha</small></div><span class="tag t-green">ativo</span></div>
+            </div>
+            <div id="view-local" hidden>
+              <div class="terminal" style="margin-bottom:12px" id="term" aria-label="Terminal do Motor Local"></div>
+              <div style="display:flex;gap:13px;align-items:center;border:1px solid var(--m-b);border-radius:13px;padding:13px;background:var(--m-s2)">
+                <div class="qr" data-qr data-seed="motor" aria-hidden="true"></div>
+                <div><strong style="font-family:var(--font-display);font-size:13px;display:block">Aponte a câmera do WhatsApp</strong><small style="font-size:11px;color:var(--m-mu);display:block;margin-top:4px">Motor Local rodando no seu PC ou no Termux. Pareamento por QR, sem nuvem intermediária.</small></div>
+              </div>
+              <div class="mrow" style="margin-top:12px"><div><strong>Atualização do Motor Local</strong><small>pacote assinado · verificação automática</small></div><span class="tag t-green">v6.0.0 · Ed25519</span></div>
+            </div>
+            <div class="mlabel" style="margin-top:4px">White-label</div>
+            <div class="grid-2">
+              <div class="field"><label for="wl-name">Nome da marca</label><input id="wl-name" type="text" value="Sua Marca" maxlength="20"></div>
+              <div class="field"><label for="wl-sub">Subtítulo no menu</label><input id="wl-sub" type="text" value="Atendimento e CRM" maxlength="28"></div>
+            </div>
+            <div class="brandbox" id="wl-preview" style="--wl:#10b981">
+              <span class="brandlogo" id="wl-logo">SM</span>
+              <div><strong style="font-size:13.5px;font-family:var(--font-display);display:block;color:var(--m-t)" id="wl-brand">Sua Marca</strong>
+              <small id="wl-sub-out">Atendimento e CRM · dados isolados por empresa</small></div>
+            </div>
+            <div class="mrow"><span style="display:flex;align-items:center;gap:9px"><svg width="16" height="16" aria-hidden="true" style="color:var(--m-g2)"><use href="#i-lock"/></svg><span>Exportação de dados e limpeza de mídias</span></span><span class="tag t-gray">JSON</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-cta reveal">
+      <div>
+        <strong id="demo-cta-title">Gostou do Simulador de IA?</strong>
+        <span id="demo-cta-sub">Mostramos isso funcionando com o seu catálogo, os seus preços e o seu jeito de atender.</span>
+      </div>
+      <a class="btn btn-primary btn-lg" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Vi%20as%20demonstra%C3%A7%C3%B5es%20e%20quero%20o%20Ienvia%20no%20meu%20WhatsApp." data-link="whatsapp" data-open-lead data-msg="Olá! Vi as demonstrações e quero o Ienvia no meu WhatsApp."><svg aria-hidden="true"><use href="#i-wa"/></svg> Quero isso no meu WhatsApp</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COMO FUNCIONA ===================== -->
+<section id="como-funciona" aria-labelledby="como-title">
+  <div class="container">
+    <header class="section-head center reveal">
+      <span class="eyebrow">Como funciona</span>
+      <h2 id="como-title">Do primeiro chip ao atendimento no ar em 3 passos</h2>
+      <p>Configuração guiada, sem equipe técnica dedicada e sem migrar de ferramenta.</p>
+    </header>
+    <div class="timeline" id="timeline">
+      <div class="timeline-rail" aria-hidden="true"><i id="tl-fill"></i></div>
+      <article class="tstep reveal">
+        <div class="tdot" aria-hidden="true">1</div>
+        <div class="card">
+          <h3>Conecte seus chips</h3>
+          <p>Adicione seus números pela Evolution API, na nuvem, ou pelo Motor Local (Baileys) rodando no seu PC ou celular via Termux. Vários chips em um único painel, com histórico preservado mesmo quando algum desconecta.</p>
+          <div class="tchips"><span class="tag t-green">Evolution API</span><span class="tag t-sky">Motor Local</span><span class="tag t-gray">QR Code</span><span class="tag t-gray">multi-chip</span></div>
+        </div>
+      </article>
+      <article class="tstep reveal">
+        <div class="tdot" aria-hidden="true">2</div>
+        <div class="card">
+          <h3>Treine a IA e cadastre catálogo e áudios</h3>
+          <p>Suba FAQs, documentos, habilidades e objeções. Escolha o provedor de IA (Gemini, OpenRouter ou NVIDIA, com fallback automático) e cadastre produtos e serviços com até 5 mídias. Grave os áudios estratégicos com a sua voz para envio como PTT.</p>
+          <div class="tchips"><span class="tag t-green">FAQs e documentos</span><span class="tag t-amber">objeções</span><span class="tag t-sky">catálogo</span><span class="tag t-green">áudios PTT</span></div>
+        </div>
+      </article>
+      <article class="tstep reveal">
+        <div class="tdot" aria-hidden="true">3</div>
+        <div class="card">
+          <h3>Teste no Simulador e coloque no ar</h3>
+          <p>Rode conversas de teste em ambiente isolado, com catálogo, áudio e PIX. Ajuste as respostas com correção em 1 clique e, quando estiver satisfeito, ative a IA nos chips reais — sabendo que pode assumir ou pausar tudo a qualquer momento.</p>
+          <div class="tchips"><span class="tag t-sky">Simulador</span><span class="tag t-green">correção 1 clique</span><span class="tag t-amber">Assumir</span><span class="tag t-rose">Pausar tudo</span></div>
+        </div>
+      </article>
+    </div>
+    <div style="text-align:center;margin-top:52px" class="reveal">
+      <a class="btn btn-primary" data-link="whatsapp" data-msg="Olá! Quero começar a configurar o Ienvia no meu WhatsApp." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20come%C3%A7ar%20a%20configurar%20o%20Ienvia%20no%20meu%20WhatsApp."><svg aria-hidden="true"><use href="#i-wa"/></svg> Quero começar pelo passo 1</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SEGURANÇA ===================== -->
+<section id="seguranca" aria-labelledby="seg-title" style="background:var(--surface-3);border-block:1px solid var(--border)">
+  <div class="container">
+    <header class="section-head center reveal">
+      <span class="eyebrow">Segurança &amp; LGPD</span>
+      <h2 id="seg-title">Proteção em cada camada da operação</h2>
+      <p>Conversas, chaves de API e dados de clientes tratados com isolamento, cifra e controle de emergência.</p>
+    </header>
+    <div class="bento">
+      <article class="card b-4 reveal">
+        <div class="ico"><svg aria-hidden="true"><use href="#i-shield"/></svg></div>
+        <h3>Isolamento por empresa (RLS)</h3>
+        <p>Cada empresa enxerga apenas os próprios dados, com regras de segurança aplicadas no nível do banco. No white-label, cada cliente tem um painel isolado.</p>
+        <div class="iso-vis" aria-hidden="true">
+          <div class="iso-box"><strong>empresa_a</strong><span>1.240 conversas</span></div>
+          <div class="iso-box"><strong>empresa_b</strong><span>806 conversas</span></div>
+          <div class="iso-box"><strong>empresa_c</strong><span>2.113 conversas</span></div>
+        </div>
+      </article>
+      <article class="card b-2 reveal" data-d="1">
+        <div class="ico"><svg aria-hidden="true"><use href="#i-lock"/></svg></div>
+        <h3>Chaves cifradas no servidor</h3>
+        <p>As chaves dos provedores de IA ficam cifradas no servidor, nunca expostas no navegador. Passe o mouse no campo:</p>
+        <div class="keyline" tabindex="0" aria-label="Exemplo de chave de API cifrada em repouso" data-real="sk-••••••••••••••••••••4f2a — cifrada em repouso">sk-********************************</div>
+      </article>
+      <article class="card b-2 reveal" data-d="1">
+        <div class="ico"><svg aria-hidden="true"><use href="#i-download"/></svg></div>
+        <h3>Exportação em JSON</h3>
+        <p>Seus dados saem com você, em formato aberto, quando quiser.</p>
+        <div class="keyline" style="color:var(--brand-text)">{"contatos":1843,"conversas":9210,"exportado_em":"..."}</div>
+      </article>
+      <article class="card b-2 reveal" data-d="2">
+        <div class="ico"><svg aria-hidden="true"><use href="#i-clock"/></svg></div>
+        <h3>Limpeza automática de mídias</h3>
+        <p>Arquivos expirados são removidos sem intervenção, reduzindo dados armazenados sem necessidade.</p>
+      </article>
+      <article class="card b-2 reveal" data-d="3">
+        <div class="ico"><svg aria-hidden="true"><use href="#i-bolt"/></svg></div>
+        <h3>Atualização assinada</h3>
+        <p>O Motor Local recebe pacotes assinados, com verificação de origem antes de instalar.</p>
+      </article>
+      <article class="card b-6 reveal" data-d="4" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <div class="ico" style="margin:0;background:var(--rose-soft);color:var(--rose);border-color:rgba(251,113,133,.3)"><svg aria-hidden="true"><use href="#i-pause"/></svg></div>
+        <div style="flex:1;min-width:240px">
+          <h3 style="margin-bottom:6px">Botão de emergência “Pausar tudo”</h3>
+          <p style="margin:0">Um clique interrompe toda a automação — IA e disparos — enquanto você verifica o que está acontecendo. Controle humano sempre à frente da máquina.</p>
+        </div>
+        <a class="btn btn-ghost" data-link="whatsapp" data-msg="Olá! Quero entender como funciona a segurança e a LGPD no Ienvia." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20entender%20como%20funciona%20a%20seguran%C3%A7a%20e%20a%20LGPD%20no%20Ienvia."><svg aria-hidden="true"><use href="#i-wa"/></svg> Tirar dúvidas</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COMPARATIVO ===================== -->
+<section id="comparativo" aria-labelledby="cmp-title" style="padding-bottom:40px">
+  <div class="container">
+    <header class="section-head center reveal">
+      <span class="eyebrow">Comparativo</span>
+      <h2 id="cmp-title">WhatsApp só no celular <span style="color:var(--dim)">vs.</span> <span class="hl">com o Ienvia</span></h2>
+      <p>O mesmo número, agora com uma operação de vendas por trás.</p>
+    </header>
+    <div class="cmp-wrap reveal">
+      <table class="cmp">
+        <caption class="sr-only">Comparação entre usar o WhatsApp só no celular e usar o WhatsApp com o Ienvia</caption>
+        <thead><tr><th scope="col">Na prática</th><th scope="col">Só no celular</th><th scope="col" class="us">Com o Ienvia</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Cliente chama fora do horário</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Espera alguém ver</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>IA responde em segundos</span></td></tr>
+          <tr><th scope="row">Vários números de WhatsApp</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Um aparelho ou app por número</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Todos num painel, com filtro por chip</span></td></tr>
+          <tr><th scope="row">Saber a etapa de cada lead</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Memória e etiquetas soltas</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Kanban com valor, ganho e perdido</span></td></tr>
+          <tr><th scope="row">Cobrar o cliente</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Digitar a chave PIX na mão</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>PIX copia e cola + QR Code automático</span></td></tr>
+          <tr><th scope="row">Mandar áudio explicando</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Gravar de novo toda vez</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Biblioteca de áudios na sua voz (PTT)</span></td></tr>
+          <tr><th scope="row">Disparar para a base</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Risco alto de bloqueio</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Cadência, rodízio de chips e fila segura</span></td></tr>
+          <tr><th scope="row">Um número desconecta</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Ninguém fica sabendo</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Alerta no WhatsApp do gestor</span></td></tr>
+          <tr><th scope="row">Cliente pede um humano</th><td><span class="no"><svg aria-hidden="true"><use href="#i-x"/></svg>Depende de quem estiver com o celular</span></td><td class="us"><span class="yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Assumir e devolver para a IA em 1 clique</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PLANOS ===================== -->
+<section id="planos" aria-labelledby="planos-title">
+  <div class="container">
+    <header class="section-head center reveal">
+      <span class="eyebrow">Planos</span>
+      <h2 id="planos-title">Planos a partir de <span class="hl">R$ 97/mês</span></h2>
+      <p>Comece pelo essencial e evolua para campanhas, múltiplos chips e white-label conforme a sua operação crescer.</p>
+    </header>
+    <div class="plans-boost reveal">
+      <div class="boost-item">
+        <span class="fi"><svg aria-hidden="true"><use href="#i-spark"/></svg></span>
+        <div><strong>Sem fidelidade</strong><small>Cancele quando quiser, sem multa</small></div>
+      </div>
+      <div class="boost-item">
+        <span class="fi"><svg aria-hidden="true"><use href="#i-phone"/></svg></span>
+        <div><strong>Chips sob medida</strong><small>1 ou vários números, em rodízio</small></div>
+      </div>
+      <div class="boost-item">
+        <span class="fi"><svg aria-hidden="true"><use href="#i-wa"/></svg></span>
+        <div><strong>A partir de R$ 97/mês</strong><small>Valor e capacidade no diagnóstico rápido</small></div>
+      </div>
+    </div>
+    <div class="plans">
+      <article class="card plan reveal">
+        <p class="plan-scope">Entrada ideal</p>
+        <h3>Starter</h3>
+        <p class="plan-desc">Para quem está começando a atender e vender pelo WhatsApp.</p>
+        <p class="chips-limit"><svg aria-hidden="true"><use href="#i-phone"/></svg> Para iniciar com seu WhatsApp conectado</p>
+        <ul class="checklist">
+          <li>Inbox ao vivo com filtro por chip</li>
+          <li>Atendente de IA com fallback entre provedores</li>
+          <li>CRM com Kanban, etiquetas e notas internas</li>
+          <li>Catálogo com PIX copia e cola e QR Code</li>
+          <li>Simulador de Atendimento</li>
+        </ul>
+        <a class="btn btn-ghost" data-link="whatsapp" data-msg="Olá! Quero conhecer o plano Starter do Ienvia." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20conhecer%20o%20plano%20Starter%20do%20Ienvia.">Consultar plano Starter</a>
+      </article>
+
+      <article class="card plan featured reveal" data-d="1">
+        <span class="plan-badge"><svg aria-hidden="true"><use href="#i-check"/></svg> Recomendado</span>
+        <p class="plan-scope">Operação em escala</p>
+        <h3>Pro</h3>
+        <p class="plan-desc">Para equipes que vendem todos os dias e precisam disparar campanhas.</p>
+        <p class="chips-limit"><svg aria-hidden="true"><use href="#i-phone"/></svg> Múltiplos chips em rodízio e campanhas diárias</p>
+        <ul class="checklist">
+          <li>Tudo do Starter</li>
+          <li>Campanhas multi-bloco com spintax, rotação e variação por IA</li>
+          <li>Cadência segura, rodízio de chips, fila segura e horário de expediente</li>
+          <li>Biblioteca de áudios PTT gravados na sua voz</li>
+          <li>Importação CSV, TXT e XLSX com prévia obrigatória</li>
+          <li>Alerta no seu WhatsApp se um chip cair</li>
+          <li>Dossiê resumido ao administrador</li>
+        </ul>
+        <a class="btn btn-primary" data-link="whatsapp" data-msg="Olá! Quero conhecer o plano Pro do Ienvia." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20conhecer%20o%20plano%20Pro%20do%20Ienvia.">Consultar plano Pro</a>
+      </article>
+
+      <article class="card plan reveal" data-d="2">
+        <p class="plan-scope">Multiempresa</p>
+        <h3>Agência White-label</h3>
+        <p class="plan-desc">Para agências e revendas que entregam o Ienvia com a própria marca.</p>
+        <p class="chips-limit"><svg aria-hidden="true"><use href="#i-phone"/></svg> Múltiplos clientes e chips isolados no painel</p>
+        <ul class="checklist">
+          <li>Tudo do Pro</li>
+          <li>Marca personalizável: nome e subtítulo no painel</li>
+          <li>Painel multiempresa isolado por cliente (RLS)</li>
+          <li>Evolution API e Motor Local (Baileys / Termux)</li>
+          <li>Exportação de dados em JSON por empresa</li>
+        </ul>
+        <a class="btn btn-ghost" data-link="whatsapp" data-msg="Olá! Quero conhecer o plano Agência White-label do Ienvia." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20conhecer%20o%20plano%20Ag%C3%AAncia%20White-label%20do%20Ienvia.">Falar sobre white-label</a>
+      </article>
+    </div>
+    <div class="plan-help reveal">
+      <div>
+        <p>Não sabe qual formato escolher?</p>
+        <small>Responda 3 perguntas rápidas e indicamos o plano (a partir de R$ 97/mês) e o número de chips ideais.</small>
+      </div>
+      <a class="btn btn-ghost" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20ajuda%20para%20escolher%20o%20plano%20do%20Ienvia." data-link="whatsapp" data-open-lead data-msg="Olá! Quero ajuda para escolher o plano do Ienvia."><svg aria-hidden="true"><use href="#i-spark"/></svg> Me ajude a escolher</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FAQ ===================== -->
+<section id="faq" aria-labelledby="faq-title" style="background:var(--surface-3);border-block:1px solid var(--border)">
+  <div class="container">
+    <header class="section-head center reveal">
+      <span class="eyebrow">FAQ</span>
+      <h2 id="faq-title">Perguntas frequentes</h2>
+      <p>Respostas diretas para as dúvidas de quem vai colocar o sistema no ar.</p>
+    </header>
+    <div class="faq-wrap">
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b1" aria-expanded="true" aria-controls="faq-p1"><span>Preciso deixar o computador ligado o tempo todo?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p1" role="region" aria-labelledby="faq-b1"><p>Depende do modo de conexão. Na Evolution API (nuvem), não: os chips ficam conectados na nuvem. No Motor Local (Baileys), o motor roda no seu PC ou no celular via Termux, então precisa estar ligado para manter os chips ativos — em compensação, a conexão é direta, sem intermediário. A atualização do Motor Local é automática e assinada.</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b2" aria-expanded="false" aria-controls="faq-p2"><span>Funciona com mais de um número de WhatsApp?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p2" role="region" aria-labelledby="faq-b2" hidden><p>Sim. Você conecta vários chips no mesmo painel, filtra a inbox por chip e usa o rodízio entre números nas campanhas. Chips desconectados permanecem no histórico para consulta, sem perder as conversas anteriores.</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b3" aria-expanded="false" aria-controls="faq-p3"><span>Como o Ienvia reduz o risco de bloqueio nos disparos?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p3" role="region" aria-labelledby="faq-b3" hidden><p>Com cadência segura, rodízio de chips, fila segura, horário de expediente, variação de texto (spintax e por IA), imagem e áudio PTT, além de prévia obrigatória antes de qualquer envio. Se um chip cair, o gestor recebe alerta no próprio WhatsApp. Nenhuma ferramenta elimina o risco por completo: listas com consentimento e mensagens relevantes continuam sendo a base.</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b4" aria-expanded="false" aria-controls="faq-p4"><span>Consigo assumir a conversa manualmente?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p4" role="region" aria-labelledby="faq-b4" hidden><p>Sim. Com 1 clique em “Assumir”, a IA para de responder naquela conversa e você atende pessoalmente. Quando terminar, clique em “Devolver para a IA”. Em emergência, o botão “Pausar tudo” interrompe a automação inteira na hora.</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b5" aria-expanded="false" aria-controls="faq-p5"><span>A IA pode errar? Como corrijo uma resposta?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p5" role="region" aria-labelledby="faq-b5" hidden><p>Pode, e por isso existe correção com 1 clique direto na conversa. Quanto mais FAQs, documentos, habilidades e objeções você cadastrar no treinamento, mais precisas ficam as respostas. Se o provedor escolhido falhar, o sistema faz fallback automático para o próximo (Gemini, OpenRouter ou NVIDIA).</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b6" aria-expanded="false" aria-controls="faq-p6"><span>Como funciona o PIX e o envio de áudios?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p6" role="region" aria-labelledby="faq-b6" hidden><p>O painel gera o código copia e cola no padrão EMV do Banco Central junto com o QR Code, e envia dentro da conversa. Os áudios ficam em uma biblioteca gravada por você e saem como mensagem de voz nativa (PTT), com player igual ao do WhatsApp — não como arquivo anexado.</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b7" aria-expanded="false" aria-controls="faq-p7"><span>Tem fidelidade?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p7" role="region" aria-labelledby="faq-b7" hidden><p>Não. Trabalhamos sem fidelidade nem multa de cancelamento nos planos mensais — você pode solicitar o cancelamento a qualquer momento antes da próxima renovação e exportar seus dados em JSON direto pelo painel.</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b8" aria-expanded="false" aria-controls="faq-p8"><span>Como ficam proteção de dados e LGPD?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p8" role="region" aria-labelledby="faq-b8" hidden><p>Cada empresa tem painel isolado (RLS), as chaves de API ficam cifradas no servidor, você pode exportar seus dados em JSON e as mídias expiradas são limpas automaticamente. Os detalhes completos estão na Política de Privacidade.</p></div>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-h"><button class="faq-q" type="button" id="faq-b9" aria-expanded="false" aria-controls="faq-p9"><span>Posso usar com a minha marca e revender?</span><svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button></h3>
+        <div class="faq-a" id="faq-p9" role="region" aria-labelledby="faq-b9" hidden><p>Sim. No plano Agência White-label você personaliza nome e subtítulo da sua marca no painel e entrega um ambiente multiempresa isolado por cliente (RLS).</p></div>
+      </div>
+    </div>
+    <p class="faq-cta reveal">Ficou alguma dúvida? <a href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Tenho%20uma%20d%C3%BAvida%20sobre%20o%20Ienvia." data-link="whatsapp" data-msg="Olá! Tenho uma dúvida sobre o Ienvia.">Pergunte no WhatsApp</a></p>
+  </div>
+</section>
+
+<!-- ===================== CTA FINAL ===================== -->
+<section id="demo" aria-labelledby="cta-title">
+  <div class="container">
+    <div class="cta-box cta-split reveal">
+      <div>
+        <span class="eyebrow">Próximo passo</span>
+        <h2 id="cta-title">Veja o Ienvia atendendo <span class="hl">o seu cliente</span>, não um exemplo genérico.</h2>
+        <p>Responda 3 perguntas e continue no WhatsApp com a mensagem pronta. A demonstração começa direto pelo seu caso.</p>
+        <ol class="demo-steps">
+          <li><b>1</b><span>Você conta como atende hoje e quantos números usa.</span></li>
+          <li><b>2</b><span>Mostramos o painel ao vivo, com IA, catálogo, PIX e Kanban aplicados ao seu negócio.</span></li>
+          <li><b>3</b><span>Indicamos o plano e a conexão ideal: Evolution API ou Motor Local.</span></li>
+        </ol>
+        <p class="contact-line">Prefere e-mail? <a data-link="email" data-show-email href="mailto:contato@ienvia.online">contato@ienvia.online</a> · Já é cliente? <a data-link="painel" href="https://app.ienvia.online/login">Acessar painel</a></p>
+      </div>
+      <div class="form-card">
+        <h3>Quero uma demonstração</h3>
+        <p>Sem compromisso. Leva menos de 30 segundos.</p>
+        <div data-lead-form="final">
+          <a class="btn btn-primary btn-lg" style="width:100%" data-link="whatsapp" data-msg="Olá! Quero agendar uma demonstração do Ienvia." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20agendar%20uma%20demonstra%C3%A7%C3%A3o%20do%20Ienvia."><svg aria-hidden="true"><use href="#i-wa"/></svg> Falar no WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#topo" class="brand" aria-label="Ienvia — voltar ao topo"><svg class="brand-logo" aria-hidden="true"><use href="#i-logo"/></svg><span class="brand-word" data-brand>Ienvia</span></a>
+        <p>Atendimento inteligente e CRM para WhatsApp: IA treinada, catálogo com PIX, áudios na sua voz, funil Kanban e campanhas com cadência segura.</p>
+      </div>
+      <nav aria-label="Links do rodapé">
+        <ul class="footer-links">
+          <li><a href="#recursos">Recursos</a></li>
+          <li><a href="#como-funciona">Como funciona</a></li>
+          <li><a href="#planos">Planos</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a data-link="privacidade" data-legal="privacidade" href="/privacidade">Política de Privacidade</a></li>
+          <li><a data-link="termos" data-legal="termos" href="/termos">Termos de Uso</a></li>
+          <li><a data-link="painel" href="https://app.ienvia.online/login">Acessar painel</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span data-year>2026</span> <span data-brand>Ienvia</span>. Todos os direitos reservados.</span>
+      <span>Contato: <a data-link="email" data-show-email href="mailto:contato@ienvia.online">contato@ienvia.online</a></span>
+    </div>
+  </div>
+</footer>
+
+<dialog class="lead-modal" id="lead-modal" aria-labelledby="lm-title" aria-describedby="lm-sub">
+  <div class="lm-inner">
+    <button class="icon-btn lm-close" type="button" data-close aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+    <div class="lm-head">
+      <span class="eyebrow">Demonstração pelo WhatsApp</span>
+      <h2 id="lm-title">Conte rapidinho sobre o seu atendimento</h2>
+      <p id="lm-sub">São 3 perguntas. Você continua no WhatsApp com a mensagem pronta e a gente já começa pelo seu caso.</p>
+      <p class="lm-plan" id="lm-plan" hidden>Plano de interesse: <b></b></p>
+    </div>
+    <div data-lead-form="modal"></div>
+    <a class="lm-skip" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20conhecer%20o%20Ienvia." data-link="whatsapp" data-msg="Olá! Quero conhecer o Ienvia.">Prefiro abrir o WhatsApp direto →</a>
+  </div>
+</dialog>
+
+<dialog class="lead-modal legal-modal" id="legal-modal" aria-labelledby="lg-title">
+  <div class="lm-inner">
+    <button class="icon-btn lm-close" type="button" data-close aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+    <div class="lm-head">
+      <span class="eyebrow" id="lg-eyebrow">Documento legal</span>
+      <h2 id="lg-title">Política de Privacidade</h2>
+    </div>
+    <div class="legal-body" id="lg-body"></div>
+    <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <a class="lm-skip" id="lg-page-link" href="/privacidade" style="margin:0">Abrir em página dedicada →</a>
+      <button class="btn btn-primary btn-sm" type="button" data-close>Fechar</button>
+    </div>
+  </div>
+</dialog>
+
+<a class="wa-float" id="wa-float" href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Tenho%20uma%20d%C3%BAvida%20sobre%20o%20Ienvia." data-link="whatsapp" data-msg="Olá! Tenho uma dúvida sobre o Ienvia." aria-label="Falar com um especialista no WhatsApp">
+  <span class="wa-float-tip" aria-hidden="true">Dúvidas? Fale com um especialista</span>
+  <span class="wa-float-btn" aria-hidden="true"><svg><use href="#i-wa"/></svg></span>
+</a>
+
+<div class="sticky-cta" id="sticky-cta">
+  <a class="btn btn-primary" data-link="whatsapp" data-msg="Olá! Quero conhecer o Ienvia e ver uma demonstração." href="https://wa.me/5586981638438?text=Ol%C3%A1%21%20Quero%20conhecer%20o%20Ienvia%20e%20ver%20uma%20demonstra%C3%A7%C3%A3o."><svg aria-hidden="true"><use href="#i-wa"/></svg> Falar no WhatsApp</a>
+</div>
+
+<script defer src="/app.js"></script>
+</body>
+</html>

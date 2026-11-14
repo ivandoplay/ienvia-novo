@@ -178,4 +178,54 @@ test.describe('Fase 7 — Configurações, Multi-workspace e Clientes SaaS', () 
     await expect(page).toHaveURL(/\/visao-geral$/);
     await expect(page.getByRole('heading', { name: 'Esta conta está desativada' })).toBeVisible();
   });
+
+  test('master exclui um cliente, o acesso cai na hora, fica no histórico e dá para desfazer', async ({ page }) => {
+    await entrar(page, 'master@exemplo.com');
+    await page.goto('/contas');
+    await expect(page.getByRole('heading', { level: 1, name: 'Clientes SaaS' })).toBeVisible();
+
+    // 1. Exclui a Loja da Maria: abre a janela, exige motivo e confirma
+    const card = page.locator('.conta-card', { hasText: 'Loja da Maria' }).first();
+    await card.getByRole('button', { name: 'Excluir cliente' }).click();
+
+    const janela = page.getByRole('dialog', { name: /Excluir Loja da Maria/ });
+    await expect(janela).toBeVisible();
+    const confirmar = janela.getByRole('button', { name: 'Excluir cliente' });
+    await expect(confirmar).toBeDisabled(); // sem motivo não exclui
+
+    await janela.getByLabel('Motivo da exclusão (fica no histórico)').fill('Cliente pediu para sair');
+    await expect(confirmar).toBeEnabled();
+    await confirmar.click();
+
+    await expect(page.getByText(/Loja da Maria foi excluído/)).toBeVisible();
+
+    // 2. O cartão vira "Desativada" e oferece desfazer
+    const cardDesativado = page.locator('.conta-card', { hasText: 'Loja da Maria' }).first();
+    await expect(cardDesativado.getByText('Desativada')).toBeVisible();
+    await expect(cardDesativado.getByRole('button', { name: 'Desfazer exclusão' })).toBeVisible();
+    await expect(page.getByText('Excluiu cliente — Loja da Maria')).toBeVisible();
+    await expect(page.getByText(/Motivo: Cliente pediu para sair/)).toBeVisible();
+
+    // 3. O dono da loja perde o acesso na hora
+    const folha = await abrirMenuDaConta(page);
+    await folha.getByRole('button', { name: 'Sair desta conta' }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    await page.getByLabel('Usuário ou e-mail').fill('dona@zapia.local');
+    await page.getByLabel('Senha', { exact: true }).fill(SENHA_DE_TESTE);
+    await page.getByRole('button', { name: 'Acessar Meu Painel' }).click();
+    await expect(page.getByRole('heading', { name: 'Esta conta está desativada' })).toBeVisible();
+
+    // 4. Master volta e desfaz a exclusão por engano
+    const folhaDaDona = await abrirMenuDaConta(page);
+    await folhaDaDona.getByRole('button', { name: 'Sair desta conta' }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    await entrar(page, 'master@exemplo.com');
+
+    await page.goto('/contas');
+    const cardRestaurar = page.locator('.conta-card', { hasText: 'Loja da Maria' }).first();
+    await cardRestaurar.getByRole('button', { name: 'Desfazer exclusão' }).click();
+    await expect(page.getByText(/Loja da Maria voltou a ficar ativo/)).toBeVisible();
+    await expect(page.locator('.conta-card', { hasText: 'Loja da Maria' }).first().getByText('Ativa')).toBeVisible();
+    await expect(page.getByText('Restaurou cliente — Loja da Maria')).toBeVisible();
+  });
 });

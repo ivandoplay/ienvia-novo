@@ -327,7 +327,8 @@ export async function transcreverAudio(pedido: {
       {
         role: 'user',
         parts: [
-          { inline_data: { mime_type: pedido.contentType, data: base64 } },
+          // A API REST do Gemini só aceita camelCase: em snake_case ela ignora a parte e transcreve o vazio.
+          { inlineData: { mimeType: pedido.contentType, data: base64 } },
           { text: INSTRUCAO_DE_TRANSCRICAO },
         ],
       },

@@ -404,6 +404,8 @@ describe('teste de conexão e lista de modelos', () => {
 
   test('Gemini: só os modelos de conversa que a chave enxerga (voz e os que não geram texto ficam de fora)', async () => {
     expect(await listarModelos('gemini', CHAVE_GEMINI_DE_TESTE)).toEqual([
+      { id: 'gemini-2.0-flash', nome: 'Gemini 2.0 Flash' },
+      { id: 'gemini-2.5-flash', nome: 'Gemini 2.5 Flash' },
       { id: 'gemini-3.5-flash-lite', nome: 'Gemini 3.5 Flash-Lite' },
       { id: 'gemini-3.8-flash', nome: 'Gemini 3.8 Flash' },
       { id: 'gemini-4-argon', nome: 'Gemini 4 Argon' },

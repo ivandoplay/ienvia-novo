@@ -1,0 +1,225 @@
+{
+  "problemas": [
+    {
+      "tela": "visao-geral",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"(concluído)\" (19px em caixa de 1px)"
+    },
+    {
+      "tela": "visao-geral",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=mobbPiKb47UvHJ5LVqpdA' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "visao-geral",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=Pm-yY8cFYnftPMYLEClP6' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Buscar conversa\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"Buscar\" (20px em caixa de 1px)"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"1 mensagem não lida\" (16px em caixa de 1px)"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"1 mensagem não lida\" (16px em caixa de 1px)"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"3 mensagens não lidas\" (16px em caixa de 1px)"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"1 mensagem não lida\" (16px em caixa de 1px)"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"2 mensagens não lidas\" (16px em caixa de 1px)"
+    },
+    {
+      "tela": "inbox",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=Pm-yY8cFYnftPMYLEClP6' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "conexoes",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=E8POJuhT4M42jXA0tNxMn' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "conexoes",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=qgpFVLWl-yKbPMWRw1TCU' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "campanhas",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=oya_SLZxehU6yTka56CIk' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "catalogo",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Buscar item do catálogo\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "catalogo",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Filtrar por categoria\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "catalogo",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=qLZwnj-pGTn9FNB2qkfdt' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "treinamento",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=ZdsMoe-7_mXBHR6zKaYPT' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "treinamento",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=66JMoD-6-2RL12D0Z3go4' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "ia",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"do Google Gemini\" (18px em caixa de 1px)"
+    },
+    {
+      "tela": "ia",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"do OpenRouter\" (18px em caixa de 1px)"
+    },
+    {
+      "tela": "ia",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"do OpenRouter\" (20px em caixa de 1px)"
+    },
+    {
+      "tela": "ia",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"da NVIDIA\" (18px em caixa de 1px)"
+    },
+    {
+      "tela": "ia",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"da NVIDIA\" (20px em caixa de 1px)"
+    },
+    {
+      "tela": "ia",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=66JMoD-6-2RL12D0Z3go4' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "ia",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=eaGi-ZMlyWS-KX6PWMQ2x' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "crm",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=eaGi-ZMlyWS-KX6PWMQ2x' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "crm",
+      "tipo": "erro de console/rede",
+      "detalhe": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "tela": "crm",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=ugcqz7vsgaZiA0UKLcXEn' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "audios",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Buscar áudio estratégico\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "audios",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Filtrar uso pela IA\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "audios",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=AFFrufYymkLCIKpBKMbtH' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "simulador",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Base de treinamento\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "simulador",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Nome simulado do cliente\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "simulador",
+      "tipo": "texto cortado",
+      "detalhe": "span.so-leitor-de-tela \"Anexar foto ou áudio de teste\" (20px em caixa de 1px)"
+    },
+    {
+      "tela": "simulador",
+      "tipo": "texto cortado",
+      "detalhe": "label.so-leitor-de-tela \"Mensagem de teste\" (24px em caixa de 1px)"
+    },
+    {
+      "tela": "seguranca",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=wZBYQjUulFX4UUw0qnBNg' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "configuracoes",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=Vscj0jqncg9tW6FqoI_hC' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "contas",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=IH1SNx9AcfmGiQm6xrOV3' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    },
+    {
+      "tela": "contas",
+      "tipo": "erro de console/rede",
+      "detalhe": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "tela": "contas",
+      "tipo": "erro de console/rede",
+      "detalhe": "WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=5xSZ8_1y62fzCUdrMmNU-' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    }
+  ],
+  "telas": [
+    "/visao-geral",
+    "/inbox",
+    "/conexoes",
+    "/instancias",
+    "/campanhas",
+    "/catalogo",
+    "/treinamento",
+    "/inteligencia-artificial",
+    "/crm",
+    "/audios",
+    "/simulador",
+    "/seguranca",
+    "/configuracoes",
+    "/contas"
+  ]
+}

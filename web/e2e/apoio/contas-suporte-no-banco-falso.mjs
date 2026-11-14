@@ -14,6 +14,8 @@ export const FUNCOES_CONTAS_E_SUPORTE = [
   'start_support_session',
   'end_support_session',
   'update_platform_workspace',
+  'delete_platform_workspace',
+  'restore_platform_workspace',
 ];
 
 export const FUNCOES_SERVIDOR_FASE7 = ['provision_platform_workspace'];
@@ -351,6 +353,50 @@ export function criarContasESuporteDoBanco({
         admin_notes: ws.admin_notes,
         closed_at: ws.closed_at,
       });
+    }
+
+    if (nome === 'delete_platform_workspace') {
+      const ws = workspaces.find((w) => w.id === corpo.p_workspace_id);
+      if (!ws) return erro(404, 'P0002', 'Workspace not found');
+      const motivo = String(corpo.p_motivo ?? '').trim();
+      if (motivo.length < 3 || motivo.length > 500) return erro(400, '22023', 'Invalid reason');
+      ws.status = 'closed';
+      ws.closed_at = ws.closed_at ?? new Date().toISOString();
+      ws.deletion_started_at = ws.deletion_started_at ?? new Date().toISOString();
+      registrarAuditoria({
+        workspaceId: ws.id,
+        actorUserId: usuario.id,
+        action: 'platform_workspace_deleted',
+        details: { name: ws.name, status: ws.status, reason: motivo },
+      });
+      return responder(res, 200, {
+        id: ws.id,
+        name: ws.name,
+        status: ws.status,
+        closed_at: ws.closed_at,
+        deletion_started_at: ws.deletion_started_at,
+        contacts: 0,
+        conversations: 0,
+        instances: 0,
+      });
+    }
+
+    if (nome === 'restore_platform_workspace') {
+      const ws = workspaces.find((w) => w.id === corpo.p_workspace_id);
+      if (!ws) return erro(404, 'P0002', 'Workspace not found');
+      if (ws.status === 'active' && !ws.deletion_started_at) {
+        return responder(res, 200, { id: ws.id, status: ws.status, restored: false });
+      }
+      ws.status = 'active';
+      ws.closed_at = null;
+      ws.deletion_started_at = null;
+      registrarAuditoria({
+        workspaceId: ws.id,
+        actorUserId: usuario.id,
+        action: 'platform_workspace_restored',
+        details: { name: ws.name, status: ws.status },
+      });
+      return responder(res, 200, { id: ws.id, name: ws.name, status: ws.status, restored: true });
     }
 
     if (nome === 'start_support_session') {

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade (LGPD) | Ienvia</title>
+<meta name="description" content="Política de Privacidade e proteção de dados (LGPD) do Ienvia.">
+<link rel="canonical" href="https://ienvia.online/privacidade">
+<meta name="theme-color" content="#080e13">
+<link rel="icon" href="/ienvia-icone.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/ienvia-icone.png">
+<link rel="preload" href="/fontes/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;
+  src:url(/fontes/manrope-latin.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Space Grotesk';font-style:normal;font-weight:300 700;font-display:swap;
+  src:url(/fontes/space-grotesk-latin.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{--bg:#080e13;--surface:#111c26;--border:#20313d;--brand:#10b981;--brand-hi:#4adea7;--text:#edf5f4;--muted:#a0b2ba}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  font-size:16.5px;line-height:1.7;padding:28px 18px 64px}
+a{color:var(--brand-hi);text-decoration:none;font-weight:600}
+a:hover{text-decoration:underline}
+.wrap{max-width:820px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:32px 30px 36px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 24px;
+  padding-bottom:16px;border-bottom:1px solid var(--border)}
+.top a{display:inline-flex;align-items:center;min-height:44px;padding:0 2px}
+h1{font-family:'Space Grotesk','Segoe UI',system-ui,sans-serif;margin:0 0 8px;font-size:clamp(1.6rem,5.4vw,2.3rem);line-height:1.18;letter-spacing:-.02em}
+h2{margin:26px 0 10px;font-size:clamp(1.08rem,3.4vw,1.25rem);color:var(--brand-hi);line-height:1.3}
+p,li{color:var(--muted);font-size:16px;overflow-wrap:break-word}
+ul{padding-left:20px;margin:0 0 14px}
+li{margin-bottom:8px}
+.meta{font-size:14.5px;color:var(--muted)}
+strong{color:var(--text)}
+.top-note{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+.top-note a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:12px;
+  border:1px solid var(--border);background:#0d1720;font-size:14px}
+@media (max-width:620px){
+  body{padding:12px 10px calc(40px + env(safe-area-inset-bottom))}
+  .wrap{border-radius:16px;padding:20px 16px 26px}
+  .top{gap:8px;margin-bottom:18px;padding-bottom:12px}
+  .top a{font-size:15px}
+  h1{font-size:1.5rem}
+  h2{margin-top:22px}
+  p,li{font-size:15.5px;line-height:1.65}
+  ul{padding-left:18px}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="top">
+    <a href="/">← Voltar para Ienvia</a>
+    <span style="display:flex;gap:14px;flex-wrap:wrap"><a href="/termos">Termos de Uso</a><a href="https://app.ienvia.online/login">Acessar painel</a></span>
+  </div>
+  <h1>Política de Privacidade</h1>
+  <p class="meta">Última atualização: novembro de 2026 · Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).</p>
+
+  <h2>1. Dados na página institucional (ienvia.online)</h2>
+  <p>O simulador interativo, a calculadora de vendas em risco e os formulários de qualificação desta página funcionam localmente no seu navegador. Nenhum dado digitado nos formulários desta página é armazenado em banco de dados externo: ao clicar em “Continuar no WhatsApp”, a mensagem é montada localmente para abrir a conversa oficial com nossa equipe.</p>
+
+  <h2>2. Dados tratados na plataforma (app.ienvia.online)</h2>
+  <ul>
+    <li><strong>Isolamento por empresa (RLS):</strong> cada workspace opera em ambiente logicamente isolado no banco de dados com Row Level Security, impedindo acesso entre contas distintas.</li>
+    <li><strong>Credenciais e chaves de IA:</strong> chaves de API cadastradas pelos administradores (Google Gemini, OpenRouter, NVIDIA, Evolution API) são cifradas no servidor e nunca expostas no navegador.</li>
+    <li><strong>Retenção e limpeza de mídias:</strong> mídias temporárias armazenadas durante o atendimento passam por rotinas automáticas de expiração e remoção.</li>
+    <li><strong>Portabilidade em formato aberto:</strong> o administrador pode gerar e baixar a exportação completa dos dados do workspace em JSON diretamente pelo painel em <em>Configurações</em>.</li>
+    <li><strong>Registro de consentimento e descarte:</strong> o painel conta com módulos dedicados de consentimento (opt-in/opt-out) e solicitações de exclusão de dados de contatos.</li>
+  </ul>
+
+  <h2>3. Direitos dos titulares e contato</h2>
+  <p>Para solicitar esclarecimentos, correção, portabilidade ou exclusão de dados pessoais, entre em contato pelo e-mail <a href="mailto:contato@ienvia.online">contato@ienvia.online</a> ou pelo WhatsApp comercial <a href="https://wa.me/5586981638438" target="_blank" rel="noopener">+55 (86) 98163-8438</a>.</p>
+</main>
+</body>
+</html>

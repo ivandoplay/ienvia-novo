@@ -1,0 +1,21 @@
+import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const BASE='https://app.ienvia.online';
+const env = Object.fromEntries(readFileSync('/home/user/.env','utf8').split('\n').map(l=>l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const b=await chromium.launch();
+const p=await (await b.newContext({viewport:{width:1440,height:1000},locale:'pt-BR'})).newPage();
+await p.goto(`${BASE}/login`,{waitUntil:'networkidle'});
+await p.getByLabel(/usuário|usuario|e-mail|email/i).first().fill(env.TESTE_USUARIO);
+await p.getByLabel(/senha/i).first().fill(env.TESTE_SENHA);
+await p.getByRole('button',{name:/entrar|acessar/i}).first().click(); await p.waitForTimeout(3500);
+await p.goto(`${BASE}/audios`,{waitUntil:'networkidle'}); await p.waitForTimeout(2000);
+const novo = p.getByRole('button',{name:/Novo áudio estratégico/i}).first();
+if (await novo.count()) { await novo.click(); await p.waitForTimeout(1500); }
+console.log('produção: botão transcrever =', await p.getByRole('button',{name:/Transcrever automaticamente/i}).count());
+await p.goto(`${BASE}/seguranca`,{waitUntil:'networkidle'}); await p.waitForTimeout(1500);
+await p.getByRole('tab',{name:/Horário & Alertas/i}).click(); await p.waitForTimeout(1200);
+console.log('produção: aba horários abre =', await p.evaluate(()=>!!document.querySelector('#sec-sched-mode')));
+await p.goto(`${BASE}/instancias`,{waitUntil:'networkidle'}); await p.waitForTimeout(1500);
+const baixar = p.getByRole('link',{name:/motor|baixar/i}).first();
+console.log('link do motor existe =', await baixar.count());
+await b.close();
