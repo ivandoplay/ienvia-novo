@@ -653,14 +653,21 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
 
         {podeEditar && aba !== 'arquivos' && (
           <div className="barra-de-salvar">
-            <div className="barra-de-salvar-recado" role="status">
+            {/*
+              O estado tem de estar sempre visível, com a mesma frase: era isso que parecia bug —
+              o "Desfazer" nascia apagado (nada para desfazer) sem nada explicando o motivo, e a
+              pessoa achava que o botão não funcionava.
+            */}
+            <div className="barra-de-salvar-recado" role="status" aria-live="polite">
               {recado ? (
                 <span className={`recado--${recado.tipo}`}>{recado.texto}</span>
               ) : desatualizada ? (
                 <span className="recado--erro">Esta base foi alterada em outro lugar. Recarregue a página antes de salvar.</span>
               ) : mudou ? (
-                <span className="recado--atencao">Há alterações que ainda não foram salvas.</span>
-              ) : null}
+                <span className="recado--atencao">Alterações ainda não salvas. Use Salvar treinamento para valer.</span>
+              ) : (
+                <span className="barra-de-salvar-tudo-certo">Tudo salvo. Este é o treinamento que a IA está usando agora.</span>
+              )}
             </div>
             <div className="barra-de-salvar-acoes">
               {desatualizada ? (
@@ -674,14 +681,20 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
                     type="button"
                     className="btn btn-secondary"
                     disabled={!mudou || parado}
+                    title={mudou ? 'Volta tudo ao que está salvo agora' : 'Nada mudou desde o último salvamento'}
                     onClick={() => {
                       setRascunho(gravado);
-                      setRecado(null);
+                      setRecado({ tipo: 'ok', texto: 'Alterações desfeitas. O treinamento salvo voltou a aparecer aqui.' });
                     }}
                   >
                     Desfazer
                   </button>
-                  <button type="submit" className="btn btn-primary" disabled={!mudou || parado}>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={!mudou || parado}
+                    title={mudou ? 'Salva o treinamento para a IA usar' : 'Nada mudou desde o último salvamento'}
+                  >
                     {ocupado === 'salvar' ? 'Salvando…' : 'Salvar treinamento'}
                   </button>
                 </>

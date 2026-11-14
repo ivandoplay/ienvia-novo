@@ -498,7 +498,27 @@
 
   .nav-menu {
     overscroll-behavior: contain;
-    padding-bottom: 28px;
+    /* O último item precisa terminar acima do rodapé "Workspace ativo" (antes, Segurança ficava atrás). */
+    padding-bottom: 8px;
+  }
+
+  /* A gaveta no celular: menu rola por dentro e o rodapé fica sempre visível, nunca sobre o menu. */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar .nav-menu {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .sidebar-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-sidebar);
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .sidebar-drawer-backdrop {
@@ -554,8 +574,9 @@
   }
 
   .account-trigger-btn {
-    width: 32px;
-    height: 32px;
+    /* 38px: o mínimo para o dedo acertar sem errar o botão do lado (era 32px). */
+    width: 38px;
+    height: 38px;
     padding: 0;
     justify-content: center;
     gap: 0;

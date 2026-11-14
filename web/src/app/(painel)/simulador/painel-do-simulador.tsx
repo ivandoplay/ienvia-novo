@@ -200,11 +200,9 @@ export function PainelDoSimulador({ dados }: Props) {
 
           <div className="f6-sim-mensagens">
             {historico.length === 0 ? (
-              <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 380, color: 'var(--text-secondary)', fontSize: 13.5 }}>
-                <p style={{ margin: '0 0 8px', fontWeight: 600, color: 'var(--text-main)' }}>
-                  Sessão isolada e segura
-                </p>
-                <p style={{ margin: 0 }}>
+              <div className="f6-sim-vazio">
+                <p className="f6-sim-vazio-titulo">Sessão isolada e segura</p>
+                <p className="f6-sim-vazio-texto">
                   Mande uma pergunta abaixo ou use os testes rápidos para validar o catálogo, áudios estratégicos, Skill S06 e geração de PIX com QR Code.
                 </p>
               </div>

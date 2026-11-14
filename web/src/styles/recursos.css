@@ -331,6 +331,25 @@
   color: var(--text-secondary);
 }
 
+.f6-sim-vazio {
+  margin: auto;
+  max-width: 380px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.f6-sim-vazio-titulo {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.f6-sim-vazio-texto {
+  margin: 0;
+}
+
 .f6-sim-rodape {
   display: grid;
   gap: 8px;
@@ -485,18 +504,146 @@
   .f6-pix-previa {
     position: static;
   }
+
+  /*
+   * Simulador no celular. Antes: a altura mínima de 540px empurrava o campo de digitar para fora da
+   * primeira tela, a caixa de texto ficava com 1 linha cortada e os três "Testar..." ocupavam a
+   * largura toda em três linhas. Agora a conversa começa compacta, cresce com o uso e o campo de
+   * digitar fica sempre visível e com o botão inteiro na tela.
+   */
+  .f6-sim-chat {
+    min-height: 0;
+    max-height: none;
+  }
+
+  .f6-sim-mensagens {
+    padding: 12px;
+    min-height: 140px;
+    max-height: 38vh;
+  }
+
+  /*
+   * Os testes rápidos não cabem lado a lado no celular: em vez de rolar de lado (e cortar
+   * "recusa áudio" no meio), viram uma grade — o primeiro ocupa a linha toda e os outros dois
+   * dividem a de baixo.
+   */
+  .f6-sim-acoes-rapidas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .f6-sim-acoes-rapidas .btn {
+    min-height: 42px;
+    padding-inline: 8px;
+    font-size: 12px;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .f6-sim-acoes-rapidas .btn:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .f6-sim-entrada {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+  }
+
+  .f6-sim-entrada textarea {
+    /* Cresce com o texto (1 a 4 linhas) em vez de mostrar meia linha. */
+    min-height: 44px;
+    max-height: 118px;
+    padding-block: 11px;
+    resize: none;
+    line-height: 1.4;
+  }
+
+  .f6-sim-entrada .btn {
+    min-height: 44px;
+  }
+
+  /* O botão "Simular" do rodapé também precisa de 44px (o cabeçalho do chat segue compacto). */
+  .f6-sim-rodape .btn-primary {
+    min-height: 44px;
+    padding-inline: 16px;
+  }
+
+  .f6-sim-bolha {
+    max-width: 92%;
+  }
+
+  /* O aviso de sessão isolada ocupava metade da tela no celular; aqui ele fica compacto. */
+  .f6-sim-vazio {
+    max-width: none;
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+
+  .f6-sim-vazio-texto {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* A caixa de digitar não pode mostrar só meia linha do texto de exemplo. */
+  .f6-sim-entrada textarea::placeholder {
+    font-size: 12.5px;
+  }
 }
 
-/* Botão de transcrição automática, acima da caixa de texto do áudio. */
-.f6-transcricao-acoes {
+/*
+ * Transcrição do áudio: antes o botão do Gemini, um parágrafo de ajuda e a caixa de texto ficavam
+ * espremidos na mesma linha, parecendo tudo a mesma coisa. Agora são três degraus com nome:
+ * o que é o campo (ajuda) -> o botão que faz sozinho -> a caixa onde o texto aparece.
+ */
+.campo-ajuda {
+  margin: 4px 0 8px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.f6-transcricao-topo {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
-  margin: 6px 0 4px;
+  gap: 6px 10px;
+  padding: 9px 11px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
 }
 
-.f6-transcricao-acoes small {
+.f6-transcricao-nota {
+  flex: 1 1 220px;
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 12px;
+  line-height: 1.45;
+}
+
+.f6-transcricao-rotulo {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.f6-formato-audio {
+  color: var(--accent-bright);
+}
+
+@media (max-width: 640px) {
+  /* No celular o botão ocupa a linha inteira: é a ação principal deste bloco. */
+  .f6-transcricao-botao {
+    width: 100%;
+    min-height: 42px;
+    justify-content: center;
+  }
 }

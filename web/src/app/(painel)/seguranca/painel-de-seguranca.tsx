@@ -1,5 +1,6 @@
 'use client';
 
+import { CampoDeHora } from '@/components/ui/campo-de-hora';
 import { useState, useTransition } from 'react';
 import {
   EVENTOS_ALERTA_SEGURANCA_INFO,
@@ -619,26 +620,20 @@ export function PainelDeSeguranca({ dados, secaoInicial }: Props) {
             </div>
 
             <div className="f5-grade-2">
-              <div className="campo">
-                <label htmlFor="sec-sched-start">Início do expediente</label>
-                <input
-                  id="sec-sched-start"
-                  type="time"
-                  disabled={!podeEditar || cfg.scheduleMode === 'always'}
-                  value={cfg.scheduleStart}
-                  onChange={(e) => atualizarCampo('scheduleStart', e.target.value, false)}
-                />
-              </div>
-              <div className="campo">
-                <label htmlFor="sec-sched-end">Fim do expediente</label>
-                <input
-                  id="sec-sched-end"
-                  type="time"
-                  disabled={!podeEditar || cfg.scheduleMode === 'always'}
-                  value={cfg.scheduleEnd}
-                  onChange={(e) => atualizarCampo('scheduleEnd', e.target.value, false)}
-                />
-              </div>
+              <CampoDeHora
+                id="sec-sched-start"
+                rotulo="Início do expediente"
+                valor={cfg.scheduleStart}
+                aoMudar={(novo) => atualizarCampo('scheduleStart', novo, false)}
+                desabilitado={!podeEditar || cfg.scheduleMode === 'always'}
+              />
+              <CampoDeHora
+                id="sec-sched-end"
+                rotulo="Fim do expediente"
+                valor={cfg.scheduleEnd}
+                aoMudar={(novo) => atualizarCampo('scheduleEnd', novo, false)}
+                desabilitado={!podeEditar || cfg.scheduleMode === 'always'}
+              />
             </div>
 
             <div className="campo">

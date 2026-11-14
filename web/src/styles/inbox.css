@@ -358,6 +358,30 @@
   box-shadow: none;
 }
 
+/*
+ * Botões de "copiar" das fichas (telefone, e-mail) são pequenos de propósito no computador — o mouse
+ * acerta. No celular, 20px de altura não dá: vira 38px.
+ */
+@media (max-width: 900px) {
+  .contato-copiar {
+    min-height: 38px;
+    padding-inline: 10px;
+  }
+}
+
+/* Em telas muito estreitas (320px) a barra de abas do CRM precisa encolher, não vazar da margem. */
+@media (max-width: 360px) {
+  .inbox-crm-topo,
+  .inbox-crm-acoes {
+    gap: 6px;
+  }
+
+  .crm-aba {
+    padding-inline: 9px;
+    font-size: 12.5px;
+  }
+}
+
 .inbox-conversa-topo {
   display: flex;
   align-items: center;
@@ -814,8 +838,8 @@
     height: auto;
   }
 
-  /* Sem conversa aberta: só a lista, que rola junto com a página. */
-  .inbox[data-aberta='nao'] .inbox-conversa {
+  /* Sem conversa aberta no celular: a lista ocupa a tela inteira e o painel da conversa sai de cena. */
+  .inbox[data-aberta='nao'] .inbox-grade > .inbox-lista:not([hidden]) ~ .inbox-conversa {
     display: none;
   }
 
@@ -1227,12 +1251,26 @@ dl.inbox-ia-recado {
 @media (max-width: 640px) {
   .inbox-ia {
     flex-wrap: wrap;
+    gap: 8px;
   }
 
+  /*
+   * Assumir / Devolver para a IA no celular: ficavam com 28px de altura e recuados à esquerda,
+   * parecendo texto e não botão. Agora dividem a linha inteira, com 44px de altura.
+   */
   .inbox-ia-acoes {
     width: 100%;
-    justify-content: flex-start;
-    padding-left: 27px;
+    justify-content: stretch;
+    padding-left: 0;
+    margin-left: 0;
+    gap: 8px;
+  }
+
+  .inbox-ia-acoes .btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 13.5px;
   }
 }
 

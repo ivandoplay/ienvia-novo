@@ -73,7 +73,7 @@ test.describe('Treinamento', () => {
 
     await page.getByLabel('Nome da empresa ou do profissional').fill('  Flor de Sal Moda e Acessórios ');
     await page.getByLabel('Tom de voz nas conversas').selectOption('descontraido');
-    await expect(barraDeSalvar(page)).toHaveText('Há alterações que ainda não foram salvas.');
+    await expect(barraDeSalvar(page)).toContainText('não salvas');
     // Com alterações por salvar, as instruções mostrariam o treinamento antigo: o botão espera.
     await expect(page.getByRole('button', { name: 'Ver instruções geradas' })).toBeDisabled();
 

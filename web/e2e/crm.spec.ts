@@ -74,7 +74,7 @@ test.describe('CRM da Inbox — Desktop', () => {
     await abrirInbox(page, `/inbox?c=${CONVERSAS_DA_INBOX.ana}`);
 
     // 1. Abre gerenciador de Etiquetas & Respostas e cria tag VIP
-    await page.getByRole('button', { name: 'Etiquetas & /' }).click();
+    await page.getByRole('button', { name: /Etiquetas/ }).click();
     const dlgCat = page.getByRole('dialog');
     await dlgCat.getByPlaceholder(/Nome da nova etiqueta/i).fill('VIP');
     await dlgCat.getByRole('button', { name: 'Criar etiqueta' }).click();

@@ -6,6 +6,8 @@ import {
   normalizarWaveform,
   type AudioEstrategico,
 } from '@ienvia/shared/recursos';
+import { comecarAGravarEmOgg, type GravadorDeVoz } from '@/lib/audio/gravador-de-voz';
+import { prepararAudioDeVoz } from '@/lib/audio/voz-do-whatsapp';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import type { DadosDosAudios } from '@/lib/dados/recursos';
@@ -136,6 +138,8 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
   const [gravando, setGravando] = useState(false);
   const [segundosGravados, setSegundosGravados] = useState(0);
   const gravadorRef = useRef<MediaRecorder | null>(null);
+  /** Gravador que produz OGG/Opus em qualquer navegador (o do WhatsApp). */
+  const gravadorDeVozRef = useRef<GravadorDeVoz | null>(null);
   const pedacosRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -240,6 +244,18 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
+      // Caminho principal: grava já em OGG/Opus (formato de voz do WhatsApp, em qualquer navegador).
+      const gravadorDeVoz = await comecarAGravarEmOgg(stream);
+      if (gravadorDeVoz) {
+        gravadorDeVozRef.current = gravadorDeVoz;
+        setSegundosGravados(0);
+        setGravando(true);
+        timerRef.current = setInterval(() => {
+          setSegundosGravados(gravadorDeVoz.segundos());
+        }, 1000);
+        return;
+      }
+
       const candidatos = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
       const escolhido = candidatos.find((c) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(c));
       const gravador = escolhido ? new MediaRecorder(stream, { mimeType: escolhido }) : new MediaRecorder(stream);
@@ -260,7 +276,11 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
         const extensao = tipo.includes('ogg') ? 'ogg' : tipo.includes('mp4') ? 'm4a' : 'webm';
         const blob = new Blob(pedacosRef.current, { type: tipo });
         if (blob.size > 0) {
-          void enviarAudioParaDeposito(blob, `gravacao.${extensao}`, tipo);
+          // O WhatsApp só mostra "gravado agora" quando o arquivo é OGG/Opus: converte aqui.
+          void (async () => {
+            const pronto = await prepararAudioDeVoz(blob, `gravacao.${extensao}`, /ogg/i.test(tipo));
+            await enviarAudioParaDeposito(pronto.arquivo, pronto.nome, pronto.tipo);
+          })();
         }
       };
 
@@ -277,6 +297,21 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
   }
 
   function pararGravacao() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+    const daBiblioteca = gravadorDeVozRef.current;
+    if (daBiblioteca) {
+      gravadorDeVozRef.current = null;
+      setGravando(false);
+      void (async () => {
+        const arquivo = await daBiblioteca.parar();
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (arquivo && arquivo.size > 0) await enviarAudioParaDeposito(arquivo, 'gravacao.ogg', 'audio/ogg');
+        else setErroModal('A gravação saiu vazia. Tente de novo, falando um pouco mais perto do microfone.');
+      })();
+      return;
+    }
     gravadorRef.current?.stop();
   }
 
@@ -541,7 +576,12 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
                       disabled={enviandoArquivo}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
-                        if (f) void enviarAudioParaDeposito(f, f.name, f.type || 'audio/ogg');
+                        if (f) {
+                          void (async () => {
+                            const pronto = await prepararAudioDeVoz(f, f.name);
+                            await enviarAudioParaDeposito(pronto.arquivo, pronto.nome, pronto.tipo);
+                          })();
+                        }
                         e.target.value = '';
                       }}
                     />
@@ -554,6 +594,11 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
               <div style={{ display: 'grid', gap: 6 }}>
                 <p className="f6-card-sub">
                   Arquivo pronto: <strong>{editando.fileName}</strong> ({formatarDuracaoAudio(editando.durationSec)} · {formatarTamanho(editando.byteSize)})
+                </p>
+                <p className="f6-card-sub f6-formato-audio">
+                  {/^audio\/ogg/.test(editando.contentType)
+                    ? 'Formato de voz do WhatsApp: o cliente recebe como áudio gravado, com play e onda sonora.'
+                    : 'Este arquivo será convertido sozinho para o formato de voz do WhatsApp antes do envio.'}
                 </p>
                 {enderecoDoRecurso(editando.objectKey) ? (
                   <audio controls preload="none" src={enderecoDoRecurso(editando.objectKey) ?? undefined} style={{ width: '100%', height: 36 }} />
@@ -600,11 +645,17 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
             </div>
 
             <div className="campo-bloco">
-              <label htmlFor="aud-transcricao">Transcrição exata do que é falado (obrigatória)</label>
-              <div className="f6-transcricao-acoes">
+              <label htmlFor="aud-transcricao">Transcrição: o que é falado no áudio (obrigatória)</label>
+              <p className="campo-ajuda">
+                É o texto que a IA lê para saber o que o áudio diz — quando mandar o áudio, o que ele responde e o
+                texto que envia se o cliente pedir por escrito. Depois de gravar, o jeito mais rápido é mandar o
+                Gemini ouvir e escrever por você.
+              </p>
+
+              <div className="f6-transcricao-topo">
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-secondary btn-sm f6-transcricao-botao"
                   disabled={transcrevendo || enviandoArquivo || !editando.objectKey}
                   onClick={() => void transcreverSozinho()}
                   title={
@@ -614,17 +665,23 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
                   }
                 >
                   <Icone nome="motorIa" className="icon-15" />
-                  {transcrevendo ? 'Transcrevendo…' : 'Transcrever automaticamente (Gemini)'}
+                  {transcrevendo ? 'Transcrevendo o áudio…' : 'Transcrever com o Gemini'}
                 </button>
-                <small>
-                  Usa a chave do Gemini cadastrada em Motor de IA. Se preferir, digite a transcrição à mão.
-                </small>
+                <span className="f6-transcricao-nota">
+                  {editando.objectKey
+                    ? 'O Gemini ouve o arquivo e preenche a caixa abaixo. Você pode corrigir o texto depois.'
+                    : 'Grave ou suba o áudio primeiro. Aí o Gemini consegue ouvir e escrever por você.'}
+                </span>
               </div>
+
+              <label htmlFor="aud-transcricao" className="f6-transcricao-rotulo">
+                Texto do áudio {editando.transcription.trim() ? '· preenchido' : '· ainda em branco'}
+              </label>
               <textarea
                 id="aud-transcricao"
                 rows={4}
                 className="campo"
-                placeholder="Escreva exatamente o que você fala neste áudio. A IA usa esse texto para decidir quando enviá-lo e responder em texto na Skill S06."
+                placeholder="Escreva exatamente o que você fala neste áudio — ou use o botão acima para o Gemini escrever."
                 value={editando.transcription}
                 onChange={(e) => setEditando((atual) => (atual ? { ...atual, transcription: e.target.value } : atual))}
               />

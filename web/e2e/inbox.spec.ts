@@ -278,7 +278,7 @@ test.describe('Inbox — conversa aberta', () => {
 
     await expect(baloes(page)).toHaveText([/Oi, boa tarde!/, /Vocês entregam no centro\?/]);
     await expect(conversaCom(page, 'Ana Souza')).toContainText('+55 (85) 98888-0001');
-    await expect(conversaCom(page, 'Ana Souza')).toContainText('Chip Vendas');
+    await expect(conversaCom(page, 'Ana Souza')).toContainText('Chip: Vendas');
     await expect(etapaNoTopo(page)).toHaveText('Nova');
 
     await verALista(page, isMobile);
@@ -561,7 +561,7 @@ test.describe('Inbox — resolver e reabrir', () => {
   test('conversa de um chip removido: dá para ler e reabrir, mas não para responder', async ({ page }) => {
     await abrirInbox(page, 'inbox', `/inbox?ver=resolvidas&c=${CONVERSAS_DA_INBOX.gabi}`);
     const conversa = conversaCom(page, 'Gabi Moura');
-    await expect(conversa).toContainText('Chip Número antigo (removido)');
+    await expect(conversa).toContainText('Chip: Número antigo (removido)');
     await expect(baloes(page)).toHaveText([/Oi, ainda atendem neste número\?/]);
 
     await page.getByRole('button', { name: 'Reabrir conversa' }).click();

@@ -1,5 +1,6 @@
 'use client';
 
+import { CampoDeHora } from '@/components/ui/campo-de-hora';
 import { useState, useTransition } from 'react';
 import {
   CADENCIA_PADRAO,
@@ -704,9 +705,13 @@ export function PainelDeCampanhas({ dados }: Props) {
                   <input
                     id="camp-agendar"
                     type="datetime-local"
+                    aria-describedby="camp-agendar-ajuda"
                     value={agendarPara}
                     onChange={(e) => setAgendarPara(e.target.value)}
                   />
+                  <span id="camp-agendar-ajuda" className="campo-ajuda">
+                    Dia e hora no formato do seu aparelho (dia/mês/ano · 24h).
+                  </span>
                 </div>
               </div>
 
@@ -1135,24 +1140,18 @@ export function PainelDeCampanhas({ dados }: Props) {
 
             {cadencia.restrictHours && (
               <div className="f5-grade-3">
-                <div className="campo">
-                  <label htmlFor="cad-ini">Início</label>
-                  <input
-                    id="cad-ini"
-                    type="time"
-                    value={cadencia.windowStart}
-                    onChange={(e) => setCadencia({ ...cadencia, windowStart: e.target.value })}
-                  />
-                </div>
-                <div className="campo">
-                  <label htmlFor="cad-fim">Fim</label>
-                  <input
-                    id="cad-fim"
-                    type="time"
-                    value={cadencia.windowEnd}
-                    onChange={(e) => setCadencia({ ...cadencia, windowEnd: e.target.value })}
-                  />
-                </div>
+                <CampoDeHora
+                  id="cad-ini"
+                  rotulo="Início"
+                  valor={cadencia.windowStart}
+                  aoMudar={(novo) => setCadencia({ ...cadencia, windowStart: novo })}
+                />
+                <CampoDeHora
+                  id="cad-fim"
+                  rotulo="Fim"
+                  valor={cadencia.windowEnd}
+                  aoMudar={(novo) => setCadencia({ ...cadencia, windowEnd: novo })}
+                />
                 <div className="campo">
                   <label>Dias da semana</label>
                   <div className="f5-dias">

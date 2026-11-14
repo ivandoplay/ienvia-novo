@@ -22,7 +22,7 @@ test.describe('Visão geral', () => {
     const funil = page.getByRole('region', { name: 'Funil de conversão' }).getByRole('listitem');
     await expect(funil).toHaveText([/Novas\s*4/, /Com a IA\s*7/, /Passadas pela IA\s*3/, /Com você\s*2/, /Aguardando o cliente\s*1/, /Resolvidas\s*5/]);
 
-    await expect(page.locator('.topbar .status-pill')).toHaveText('2 de 3 conectados');
+    await expect(page.locator('.topbar .status-pill')).toHaveText('2/3 chips');
   });
 
   test('"Esperando você" abre a Inbox já filtrada nas conversas que esperam resposta', async ({ page }) => {

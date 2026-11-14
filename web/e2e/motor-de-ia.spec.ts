@@ -274,7 +274,9 @@ test.describe('Motor de IA', () => {
 
     await cartao(page, 'Google Gemini').getByRole('button', { name: /^Ver modelos/ }).click();
     await expect(cartao(page, 'Google Gemini').getByLabel('Modelos disponíveis: Google Gemini').locator('option')).toHaveText([
-      'Escolher da lista (3 modelos)',
+      'Escolher da lista (5 modelos)',
+      'Gemini 2.0 Flash',
+      'Gemini 2.5 Flash',
       'Gemini 3.5 Flash-Lite',
       'Gemini 3.8 Flash',
       'Gemini 4 Argon',
@@ -328,7 +330,7 @@ test.describe('Motor de IA', () => {
     for (const campo of [principal(page), reserva(page), segundaReserva(page), page.getByLabel('Modelo da NVIDIA'), page.getByLabel('Quanto da conversa a IA relê')]) {
       await expect(campo).toBeDisabled();
     }
-    await expect(page.getByRole('switch', { name: 'Dividir respostas longas em mensagens menores' })).toBeDisabled();
+    await expect(page.getByRole('switch', { name: 'Responder em mensagens separadas, como uma pessoa' })).toBeDisabled();
   });
 
   test('cada empresa tem o seu Motor de IA: a outra conta não vê as chaves nem os ajustes desta', async ({ page }) => {
