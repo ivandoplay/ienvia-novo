@@ -240,6 +240,16 @@ async function rotasDeLogin(req, res, url) {
     return responder(res, 200, usuarioPublico(resCriar.usuario));
   }
 
+  // Trocar a senha de um usuário pelo painel (a chave administrativa está no servidor).
+  if (req.method === 'PUT' && url.pathname.startsWith('/auth/v1/admin/users/')) {
+    if (!ehOServidorDoPainel(req)) return responder(res, 403, { msg: 'Admin access required' });
+    const id = url.pathname.replace('/auth/v1/admin/users/', '');
+    const corpo = await lerCorpo(req);
+    const trocou = contasESuporteDoBanco.trocarSenhaAdmin(id, String(corpo.password ?? ''));
+    if (!trocou) return responder(res, 404, { msg: 'User not found' });
+    return responder(res, 200, { id });
+  }
+
   if (req.method === 'DELETE' && url.pathname.startsWith('/auth/v1/admin/users/')) {
     if (!ehOServidorDoPainel(req)) return responder(res, 403, { msg: 'Admin access required' });
     const id = url.pathname.replace('/auth/v1/admin/users/', '');

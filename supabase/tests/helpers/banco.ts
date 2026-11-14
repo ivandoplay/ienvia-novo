@@ -26,7 +26,9 @@ const AMBIENTE_SUPABASE = `
   create schema auth;
   create table auth.users (
     id uuid primary key,
-    email text
+    email text,
+    -- O Supabase real tem esta coluna; o painel mostra "último acesso" do cliente.
+    last_sign_in_at timestamptz
   );
   create or replace function auth.uid() returns uuid language sql stable as $$
     select coalesce(

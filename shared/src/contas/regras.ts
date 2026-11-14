@@ -20,7 +20,21 @@ export const LIMITES_DE_CONTAS = {
   planoMax: 60,
   notasAdminMax: 4000,
   motivoSuporteMax: 300,
+  avisoSuspensaoMax: 600,
+  carenciaMaxDias: 60,
+  valorMensalMaxCentavos: 100000000,
 } as const;
+
+/** Situação do pagamento de um cliente, calculada a partir de três datas. */
+export type SituacaoDeCobranca = 'em_dia' | 'vencendo' | 'tolerancia' | 'vencida' | 'sem_cobranca';
+
+export const ROTULO_DA_COBRANCA: Record<SituacaoDeCobranca, string> = {
+  em_dia: 'Em dia',
+  vencendo: 'Vence em breve',
+  tolerancia: 'No prazo de tolerância',
+  vencida: 'Vencida',
+  sem_cobranca: 'Sem cobrança',
+};
 
 export interface ConfiguracaoDaMarca {
   nomeWorkspace: string;
@@ -62,6 +76,32 @@ export interface ContaSaasResumo {
   instancesConnected: number;
   contactsCount: number;
   conversationsCount: number;
+  /** O que a conta consumiu no mês corrente (fuso de Brasília). */
+  usage: ContaSaasUso;
+  /** Cobrança combinada com o cliente. */
+  billing: ContaSaasCobranca;
+}
+
+export interface ContaSaasUso {
+  messagesMonth: number;
+  aiRepliesMonth: number;
+  lastMessageAt: string | null;
+  lastSignInAt: string | null;
+  pendingNotices: number;
+}
+
+export interface ContaSaasCobranca {
+  dueDay: number | null;
+  monthlyAmountCents: number | null;
+  graceDays: number;
+  paidUntil: string | null;
+  suspendNotice: string;
+  /** WhatsApp do responsável que recebe o aviso (só dígitos). Vazio = o próprio chip. */
+  ownerWhatsapp: string;
+  /** Calculada no servidor com a data de hoje, em Brasília. */
+  situation: SituacaoDeCobranca;
+  /** Quantos dias faltam (positivo) ou passaram (negativo) até o vencimento. */
+  daysToDue: number | null;
 }
 
 export interface EventoDeAuditoriaSuporte {
@@ -376,4 +416,133 @@ export function sanitizarObjetoParaExportacao<T>(valor: T): T {
     return saida as T;
   }
   return valor;
+}
+
+
+// =============================================================================================
+// Cobrança do cliente: vencimento, tolerância e o texto do aviso de suspensão
+// =============================================================================================
+
+export interface CobrancaValidada {
+  dueDay: number | null;
+  monthlyAmountCents: number | null;
+  graceDays: number;
+  paidUntil: string | null;
+  suspendNotice: string;
+}
+
+/** Datas viajam como 'AAAA-MM-DD' para não escorregar de fuso. */
+const dataIso = (valor: unknown): string | null => {
+  const texto = String(valor ?? '').trim();
+  if (!texto) return null;
+  const achado = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+  if (!achado) return null;
+  const ano = Number(achado[1]);
+  const mes = Number(achado[2]);
+  const dia = Number(achado[3]);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  if (data.getUTCMonth() !== mes - 1 || data.getUTCDate() !== dia) return null;
+  return texto;
+};
+
+export function validarCobrancaDoCliente(entrada: {
+  dueDay?: unknown;
+  monthlyAmountCents?: unknown;
+  graceDays?: unknown;
+  paidUntil?: unknown;
+  suspendNotice?: unknown;
+}): ResultadoValidacao<CobrancaValidada> {
+  const diaBruto = String(entrada.dueDay ?? '').trim();
+  let dueDay: number | null = null;
+  if (diaBruto) {
+    const numero = Number(diaBruto);
+    if (!Number.isInteger(numero) || numero < 1 || numero > 31) {
+      return { ok: false, erro: 'O dia do vencimento vai de 1 a 31.' };
+    }
+    dueDay = numero;
+  }
+
+  const valorBruto = String(entrada.monthlyAmountCents ?? '').trim();
+  let monthlyAmountCents: number | null = null;
+  if (valorBruto) {
+    const numero = Number(valorBruto);
+    if (!Number.isInteger(numero) || numero < 0 || numero > LIMITES_DE_CONTAS.valorMensalMaxCentavos) {
+      return { ok: false, erro: 'O valor mensal não pode ser negativo.' };
+    }
+    monthlyAmountCents = numero;
+  }
+
+  const carencia = Number(entrada.graceDays ?? 3);
+  if (!Number.isInteger(carencia) || carencia < 0 || carencia > LIMITES_DE_CONTAS.carenciaMaxDias) {
+    return { ok: false, erro: `A carência vai de 0 a ${LIMITES_DE_CONTAS.carenciaMaxDias} dias.` };
+  }
+
+  const paidUntil = dataIso(entrada.paidUntil);
+  if (String(entrada.paidUntil ?? '').trim() && !paidUntil) {
+    return { ok: false, erro: 'A data de "pago até" precisa estar no formato AAAA-MM-DD.' };
+  }
+
+  const suspendNotice = textoMultilinha(entrada.suspendNotice);
+  if (suspendNotice.length > LIMITES_DE_CONTAS.avisoSuspensaoMax) {
+    return {
+      ok: false,
+      erro: `O aviso de suspensão pode ter até ${LIMITES_DE_CONTAS.avisoSuspensaoMax} caracteres.`,
+    };
+  }
+
+  return { ok: true, dados: { dueDay, monthlyAmountCents, graceDays: carencia, paidUntil, suspendNotice } };
+}
+
+const UM_DIA = 24 * 60 * 60 * 1000;
+
+const paraUTC = (iso: string): number => {
+  const [ano, mes, dia] = iso.split('-').map(Number);
+  return Date.UTC(ano ?? 1970, (mes ?? 1) - 1, dia ?? 1);
+};
+
+/**
+ * Situação do pagamento hoje.
+ * - sem dia de vencimento e sem "pago até": a conta não é cobrada (sem_cobranca);
+ * - pago até hoje ou depois: em dia (e "vencendo" quando faltam 5 dias ou menos);
+ * - passou do "pago até" mas ainda dentro da carência: tolerancia;
+ * - passou da carência: vencida.
+ */
+export function situacaoDaCobranca(
+  cobranca: { dueDay: number | null; graceDays: number; paidUntil: string | null },
+  hoje: string,
+): { situation: SituacaoDeCobranca; daysToDue: number | null } {
+  if (!cobranca.paidUntil) {
+    if (!cobranca.dueDay) return { situation: 'sem_cobranca', daysToDue: null };
+    // Tem dia combinado mas nunca foi marcado como pago: conta como vencida a partir do dia.
+    return { situation: 'vencida', daysToDue: null };
+  }
+
+  const dias = Math.round((paraUTC(cobranca.paidUntil) - paraUTC(hoje)) / UM_DIA);
+  if (dias > 5) return { situation: 'em_dia', daysToDue: dias };
+  if (dias >= 0) return { situation: 'vencendo', daysToDue: dias };
+  if (-dias <= cobranca.graceDays) return { situation: 'tolerancia', daysToDue: dias };
+  return { situation: 'vencida', daysToDue: dias };
+}
+
+/** Texto que o master vê resumindo a cobrança ("vence hoje", "3 dias atrasado"…). */
+export function descreverPrazoDaCobranca(dias: number | null): string {
+  if (dias === null) return 'sem data de pagamento';
+  if (dias === 0) return 'vence hoje';
+  if (dias === 1) return 'vence amanhã';
+  if (dias > 1) return `faltam ${dias} dias`;
+  if (dias === -1) return '1 dia atrasado';
+  return `${Math.abs(dias)} dias atrasado`;
+}
+
+/** Valor em reais no formato brasileiro: 14900 → "R$ 149,00". */
+export function formatarReais(centavos: number | null): string {
+  if (centavos === null) return '—';
+  return (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Data ISO no formato do Brasil: "2026-12-10" → "10/12/2026". */
+export function formatarDataBr(iso: string | null): string {
+  if (!iso) return '—';
+  const [ano, mes, dia] = iso.slice(0, 10).split('-');
+  return `${dia}/${mes}/${ano}`;
 }

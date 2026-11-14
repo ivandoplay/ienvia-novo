@@ -10,6 +10,14 @@ export const FUNCOES_CONTAS_E_SUPORTE = [
   'update_my_workspace_data_policy',
   'export_my_workspace_snapshot',
   'list_platform_workspaces',
+  'set_workspace_billing',
+  'set_workspace_owner_whatsapp',
+  'mark_workspace_paid',
+  'suspend_platform_workspace',
+  'reactivate_platform_workspace',
+  'reset_platform_workspace',
+  'owner_of_workspace',
+  'log_platform_action',
   'list_platform_support_audit',
   'start_support_session',
   'end_support_session',
@@ -48,6 +56,17 @@ export function criarContasESuporteDoBanco({
   let politicasPorWorkspace = new Map(workspaces.map((w) => [w.id, politicaPadrao(w.id)]));
   let sessoesSuporte = [];
   let auditoria = [];
+  // Cobrança por cliente (o que o master combina): vencimento, valor, carência, pago até e aviso.
+  let cobrancaPorWorkspace = new Map();
+  let avisosDeSuspensao = [];
+  const cobrancaPadrao = () => ({
+    due_day: null,
+    monthly_amount_cents: null,
+    grace_days: 3,
+    paid_until: null,
+    suspend_notice: '',
+    owner_whatsapp: '',
+  });
 
   function reiniciarFase7() {
     usuarios.splice(0, usuarios.length, ...clonar(usuariosIniciais));
@@ -55,6 +74,8 @@ export function criarContasESuporteDoBanco({
     participacoes.splice(0, participacoes.length, ...clonar(participacoesIniciais));
     senhasPorUsuario = new Map(usuarios.map((u) => [u.id, senhaPadrao]));
     politicasPorWorkspace = new Map(workspaces.map((w) => [w.id, politicaPadrao(w.id)]));
+    cobrancaPorWorkspace = new Map();
+    avisosDeSuspensao = [];
     sessoesSuporte = [];
     auditoria = [];
     auditSeq = 1;
@@ -140,6 +161,14 @@ export function criarContasESuporteDoBanco({
     usuarios.push(novo);
     senhasPorUsuario.set(id, String(corpo?.password ?? senhaPadrao));
     return { usuario: novo };
+  }
+
+  /** Troca a senha de um usuário direto pelo admin (é o que o master faz em "Senha nova"). */
+  function trocarSenhaAdmin(userId, novaSenha) {
+    const usuario = usuarios.find((u) => u.id === userId);
+    if (!usuario) return false;
+    senhasPorUsuario.set(userId, novaSenha);
+    return true;
   }
 
   function removerUsuarioAdmin(userId) {
@@ -311,6 +340,7 @@ export function criarContasESuporteDoBanco({
                   user_id: dono.id,
                   email: dono.email,
                   display_name: dono.nome ?? '',
+                  last_sign_in_at: dono.last_sign_in_at ?? null,
                 }
               : null,
             members_count: participacoes.filter((p) => p.workspace_id === w.id && p.status === 'active').length,
@@ -318,6 +348,18 @@ export function criarContasESuporteDoBanco({
             instances_connected: chips.filter((i) => i.status === 'connected').length,
             contacts_count: tabelas.contacts.filter((c) => c.workspace_id === w.id && !c.erased_at).length,
             conversations_count: tabelas.conversations.filter((c) => c.workspace_id === w.id && c.stage !== 'archived').length,
+            due_day: cobrancaPorWorkspace.get(w.id)?.due_day ?? null,
+            monthly_amount_cents: cobrancaPorWorkspace.get(w.id)?.monthly_amount_cents ?? null,
+            grace_days: cobrancaPorWorkspace.get(w.id)?.grace_days ?? 3,
+            paid_until: cobrancaPorWorkspace.get(w.id)?.paid_until ?? null,
+            suspend_notice: cobrancaPorWorkspace.get(w.id)?.suspend_notice ?? '',
+            owner_whatsapp: cobrancaPorWorkspace.get(w.id)?.owner_whatsapp ?? '',
+            messages_month: tabelas.messages.filter((m) => m.workspace_id === w.id).length,
+            ai_replies_month: tabelas.messages.filter(
+              (m) => m.workspace_id === w.id && m.actor_type === 'ai' && m.direction === 'outbound',
+            ).length,
+            last_message_at: tabelas.messages.filter((m) => m.workspace_id === w.id).map((m) => m.created_at ?? m.occurred_at).sort().pop() ?? null,
+            pending_notices: avisosDeSuspensao.filter((a) => a.workspace_id === w.id && a.status === 'pending').length,
           };
         })
         .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
@@ -327,6 +369,153 @@ export function criarContasESuporteDoBanco({
     if (nome === 'list_platform_support_audit') {
       const limite = Math.min(Math.max(Number(corpo?.p_limit ?? 40), 1), 200);
       return responder(res, 200, auditoria.slice(0, limite));
+    }
+
+    if (nome === 'set_workspace_billing') {
+      const atual = cobrancaPorWorkspace.get(corpo.p_workspace_id) ?? cobrancaPadrao();
+      cobrancaPorWorkspace.set(corpo.p_workspace_id, {
+        ...atual,
+        due_day: corpo.p_due_day ?? null,
+        monthly_amount_cents: corpo.p_monthly_amount_cents ?? null,
+        grace_days: Number(corpo.p_grace_days ?? 3),
+        paid_until: corpo.p_paid_until ?? null,
+        suspend_notice: String(corpo.p_suspend_notice ?? '').trim(),
+      });
+      registrarAuditoria({
+        workspaceId: corpo.p_workspace_id,
+        actorUserId: usuario.id,
+        action: 'platform_workspace_billing_updated',
+        details: { due_day: corpo.p_due_day, paid_until: corpo.p_paid_until },
+      });
+      return responder(res, 200, { ok: true });
+    }
+
+    if (nome === 'set_workspace_owner_whatsapp') {
+      const digitos = String(corpo.p_whatsapp ?? '').replace(/\D/g, '');
+      if (digitos && (digitos.length < 10 || digitos.length > 15)) {
+        return erro(400, '22023', 'Invalid whatsapp number');
+      }
+      const atual = cobrancaPorWorkspace.get(corpo.p_workspace_id) ?? cobrancaPadrao();
+      cobrancaPorWorkspace.set(corpo.p_workspace_id, { ...atual, owner_whatsapp: digitos });
+      return responder(res, 200, { ok: true, whatsapp: digitos });
+    }
+
+    if (nome === 'mark_workspace_paid') {
+      const atual = cobrancaPorWorkspace.get(corpo.p_workspace_id) ?? cobrancaPadrao();
+      const hoje = new Date();
+      const base = atual.paid_until && new Date(`${atual.paid_until}T12:00:00Z`) > hoje ? new Date(`${atual.paid_until}T12:00:00Z`) : hoje;
+      base.setUTCMonth(base.getUTCMonth() + 1);
+      const ate = base.toISOString().slice(0, 10);
+      cobrancaPorWorkspace.set(corpo.p_workspace_id, { ...atual, paid_until: ate });
+      registrarAuditoria({
+        workspaceId: corpo.p_workspace_id,
+        actorUserId: usuario.id,
+        action: 'platform_workspace_paid',
+        details: { paid_until: ate },
+      });
+      return responder(res, 200, { ok: true, paid_until: ate });
+    }
+
+    if (nome === 'suspend_platform_workspace') {
+      const ws = workspaces.find((w) => w.id === corpo.p_workspace_id && w.status !== 'deleted');
+      if (!ws) return erro(404, 'P0002', 'Workspace not found');
+      ws.status = 'closed';
+      ws.closed_at = ws.closed_at ?? new Date().toISOString();
+      const chips = tabelas.instances.filter((i) => i.workspace_id === ws.id && i.is_enabled !== false);
+      for (const chip of chips) chip.is_enabled = false;
+      const aviso = String(corpo.p_notice ?? '').trim();
+      const cobranca = cobrancaPorWorkspace.get(ws.id) ?? cobrancaPadrao();
+      let enfileirado = false;
+      if (aviso) {
+        const chip = tabelas.instances.find((i) => i.workspace_id === ws.id && i.status !== 'revoked');
+        avisosDeSuspensao.push({
+          id: `aviso-${avisosDeSuspensao.length + 1}`,
+          workspace_id: ws.id,
+          instance_id: chip?.id ?? null,
+          number_key: cobranca.owner_whatsapp || chip?.logical_number_key || '',
+          body_text: aviso,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        });
+        enfileirado = true;
+      }
+      registrarAuditoria({
+        workspaceId: ws.id,
+        actorUserId: usuario.id,
+        action: 'platform_workspace_suspended',
+        details: { reason: corpo.p_reason, chips_disabled: chips.length, notice_queued: enfileirado },
+      });
+      return responder(res, 200, { ok: true, status: ws.status, chips_disabled: chips.length, notice_queued: enfileirado });
+    }
+
+    if (nome === 'reactivate_platform_workspace') {
+      const ws = workspaces.find((w) => w.id === corpo.p_workspace_id);
+      if (!ws) return erro(404, 'P0002', 'Workspace not found');
+      if (ws.deletion_started_at) return erro(400, '22023', 'Workspace is being deleted');
+      ws.status = 'active';
+      ws.closed_at = null;
+      let cancelados = 0;
+      for (const aviso of avisosDeSuspensao) {
+        if (aviso.workspace_id === ws.id && aviso.status === 'pending') {
+          aviso.status = 'cancelled';
+          cancelados += 1;
+        }
+      }
+      registrarAuditoria({
+        workspaceId: ws.id,
+        actorUserId: usuario.id,
+        action: 'platform_workspace_reactivated',
+        details: { notices_cancelled: cancelados },
+      });
+      return responder(res, 200, { ok: true, status: ws.status, notices_cancelled: cancelados });
+    }
+
+    if (nome === 'reset_platform_workspace') {
+      const ws = workspaces.find((w) => w.id === corpo.p_workspace_id);
+      if (!ws) return erro(404, 'P0002', 'Workspace not found');
+      if (String(corpo.p_confirmation ?? '').trim().toLowerCase() !== ws.name.trim().toLowerCase()) {
+        return erro(400, '22023', 'Confirmation does not match workspace name');
+      }
+      const apagar = (lista) => {
+        const antes = lista.length;
+        for (let i = lista.length - 1; i >= 0; i -= 1) if (lista[i].workspace_id === ws.id) lista.splice(i, 1);
+        return antes - lista.length;
+      };
+      const mensagens = apagar(tabelas.messages);
+      const conversas = apagar(tabelas.conversations);
+      const contatos = apagar(tabelas.contacts);
+      const campanhas = apagar(tabelas.campaigns ?? []);
+      registrarAuditoria({
+        workspaceId: ws.id,
+        actorUserId: usuario.id,
+        action: 'platform_workspace_reset',
+        details: { messages_deleted: mensagens, conversations_deleted: conversas, contacts_deleted: contatos },
+      });
+      return responder(res, 200, {
+        ok: true,
+        messages_deleted: mensagens,
+        conversations_deleted: conversas,
+        contacts_deleted: contatos,
+        campaigns_deleted: campanhas,
+      });
+    }
+
+    if (nome === 'owner_of_workspace') {
+      const donoPart = participacoes.find(
+        (p) => p.workspace_id === corpo.p_workspace_id && p.role === 'owner' && p.status === 'active',
+      );
+      const dono = donoPart ? usuarios.find((u) => u.id === donoPart.user_id) : null;
+      return responder(res, 200, dono ? { user_id: dono.id, email: dono.email, display_name: dono.nome ?? '' } : null);
+    }
+
+    if (nome === 'log_platform_action') {
+      registrarAuditoria({
+        workspaceId: corpo.p_workspace_id,
+        actorUserId: usuario.id,
+        action: corpo.p_action,
+        details: corpo.p_details ?? {},
+      });
+      return responder(res, 200, { ok: true });
     }
 
     if (nome === 'update_platform_workspace') {
@@ -509,5 +698,6 @@ export function criarContasESuporteDoBanco({
     salvarPerfil,
     criarUsuarioAdmin,
     removerUsuarioAdmin,
+    trocarSenhaAdmin,
   };
 }

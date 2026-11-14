@@ -345,3 +345,103 @@
   border-color: #6d322c;
   background: #2a1714;
 }
+
+
+/* ------------------------------------------------------------------------------------------
+   Uso e cobrança do cliente (painel de Clientes SaaS como mesa de administração)
+   ------------------------------------------------------------------------------------------ */
+
+.conta-pill--atencao {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+  background: color-mix(in srgb, var(--warning-soft) 55%, transparent);
+  color: var(--warning-text);
+}
+
+.conta-uso {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.conta-uso strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.conta-uso-alerta {
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
+.conta-cobranca-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.conta-cobranca-prazo {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--bg-card-subtle);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.conta-btn-suspender {
+  color: var(--warning-text);
+}
+
+.senha-nova {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px dashed var(--accent-border);
+  background: var(--accent-soft);
+  text-align: center;
+}
+
+.senha-nova code {
+  font-family: var(--fonte-mono, 'JetBrains Mono', monospace);
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--accent-bright);
+}
+
+@media (max-width: 720px) {
+  .conta-acoes {
+    width: 100%;
+  }
+
+  .conta-acoes .btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
+
+  .conta-uso,
+  .conta-cobranca-linha {
+    font-size: 12px;
+  }
+}
+
+.aviso-painel-fechar {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aviso-painel-fechar:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}

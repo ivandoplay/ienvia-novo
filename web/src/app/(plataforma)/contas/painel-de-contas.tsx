@@ -3,7 +3,16 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
-import { MARCA_PADRAO, type ContaSaasResumo, type EventoDeAuditoriaSuporte } from '@ienvia/shared/contas';
+import {
+  MARCA_PADRAO,
+  ROTULO_DA_COBRANCA,
+  descreverPrazoDaCobranca,
+  formatarDataBr,
+  formatarReais,
+  type ContaSaasResumo,
+  type EventoDeAuditoriaSuporte,
+  type SituacaoDeCobranca,
+} from '@ienvia/shared/contas';
 import { Dialogo } from '@/components/ui/dialogo';
 import type { ModoSuporteAtivo } from '@/lib/sessao';
 import {
@@ -12,7 +21,13 @@ import {
   encerrarModoSuporte,
   entrarEmModoSuporte,
   excluirClienteSaas,
+  marcarClienteComoPago,
+  reativarClienteSaas,
   restaurarClienteSaas,
+  salvarCobrancaDoCliente,
+  suspenderClienteSaas,
+  trocarSenhaDoCliente,
+  zerarClienteSaas,
 } from './acoes';
 
 interface Props {
@@ -34,7 +49,24 @@ const ROTULOS_ACAO: Record<string, string> = {
   conversation_released: 'Devolveu para IA (suporte)',
   workspace_branding_updated: 'Alterou marca (suporte)',
   workspace_data_exported: 'Exportou dados (suporte)',
+  platform_workspace_billing_updated: 'Alterou a cobrança',
+  platform_workspace_paid: 'Marcou mês como pago',
+  platform_workspace_suspended: 'Suspendeu o cliente',
+  platform_workspace_reactivated: 'Reativou o cliente',
+  platform_workspace_reset: 'Zerou os dados do cliente',
+  platform_workspace_password_reset: 'Trocou a senha do responsável',
 };
+
+/** Classe da etiqueta de cobrança por situação. */
+const CLASSE_DA_COBRANCA: Record<SituacaoDeCobranca, string> = {
+  em_dia: 'conta-pill conta-pill--ativa',
+  vencendo: 'conta-pill conta-pill--atencao',
+  tolerancia: 'conta-pill conta-pill--atencao',
+  vencida: 'conta-pill conta-pill--desativada',
+  sem_cobranca: 'conta-pill',
+};
+
+const seNaCobranca = (conta: ContaSaasResumo) => conta.billing.situation !== 'sem_cobranca';
 
 function formatarDataHora(iso: string | null): string {
   if (!iso) return '—';
@@ -85,6 +117,28 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
   const [motivoSuporte, setMotivoSuporte] = useState('');
   const [abrindoSuporte, setAbrindoSuporte] = useState(false);
   const [encerrandoSuporte, setEncerrandoSuporte] = useState(false);
+
+  // Ações rápidas de um cliente: cobrança, pagamento, suspensão, senha e zerar.
+  const [cobrancaAberta, setCobrancaAberta] = useState<string | null>(null);
+  const [cobDia, setCobDia] = useState('');
+  const [cobValor, setCobValor] = useState('');
+  const [cobCarencia, setCobCarencia] = useState('3');
+  const [cobPagoAte, setCobPagoAte] = useState('');
+  const [cobWhatsapp, setCobWhatsapp] = useState('');
+  const [cobAviso, setCobAviso] = useState('');
+  const [salvandoCobranca, setSalvandoCobranca] = useState(false);
+
+  const [suspensoes, setSuspensoes] = useState<{ conta: ContaSaasResumo; motivo: string; aviso: string } | null>(null);
+  const [suspendendo, setSuspendendo] = useState(false);
+
+  const [zerando, setZerando] = useState<{ conta: ContaSaasResumo; confirmacao: string } | null>(null);
+  const [zerandoAgora, setZerandoAgora] = useState(false);
+
+  const [senhaNova, setSenhaNova] = useState<{ conta: string; senha: string } | null>(null);
+  const [trocandoSenha, setTrocandoSenha] = useState<string | null>(null);
+  const [ocupadoId, setOcupadoId] = useState<string | null>(null);
+  // Qual ação está rodando neste cliente ("cobranca", "pago", "suspender", "reativar", "senha", "zerar").
+  const [acaoEmCurso, setAcaoEmCurso] = useState<string | null>(null);
 
   const metricas = useMemo(() => {
     const ativas = contas.filter((c) => c.status === 'active').length;
@@ -151,6 +205,146 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
     setEditChips(conta.maxInstances);
     setEditPlano(conta.planLabel);
     setEditNotas(conta.adminNotes);
+  }
+
+  function abrirCobranca(conta: ContaSaasResumo) {
+    if (cobrancaAberta === conta.id) {
+      setCobrancaAberta(null);
+      return;
+    }
+    setEditandoId(null);
+    setSuporteId(null);
+    setCobrancaAberta(conta.id);
+    setCobDia(conta.billing.dueDay ? String(conta.billing.dueDay) : '');
+    setCobValor(
+      conta.billing.monthlyAmountCents === null ? '' : (conta.billing.monthlyAmountCents / 100).toFixed(2).replace('.', ','),
+    );
+    setCobCarencia(String(conta.billing.graceDays));
+    setCobPagoAte(conta.billing.paidUntil ?? '');
+    setCobWhatsapp(conta.billing.ownerWhatsapp ? formatarWhatsapp(conta.billing.ownerWhatsapp) : '');
+    setCobAviso(
+      conta.billing.suspendNotice ||
+        'Oi! Seu acesso ao painel está suspenso por falta de pagamento. Assim que regularizar, a gente libera na hora.',
+    );
+  }
+
+  async function aoSalvarCobranca(evento: FormEvent, conta: ContaSaasResumo) {
+    evento.preventDefault();
+    setAcaoEmCurso('cobranca');
+    setSalvandoCobranca(true);
+    setAviso(null);
+    const res = await salvarCobrancaDoCliente({
+      workspaceId: conta.id,
+      dueDay: cobDia,
+      monthlyAmountCents: valorEmCentavos(cobValor),
+      graceDays: cobCarencia,
+      paidUntil: cobPagoAte,
+      suspendNotice: cobAviso,
+      ownerWhatsapp: cobWhatsapp,
+    });
+    setAcaoEmCurso(null);
+    setSalvandoCobranca(false);
+    if (!res.ok) {
+      setAviso({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setCobrancaAberta(null);
+    setAviso({ tipo: 'ok', texto: res.mensagem });
+  }
+
+  async function aoMarcarPago(conta: ContaSaasResumo) {
+    setAcaoEmCurso('pago');
+    setOcupadoId(conta.id);
+    setAviso(null);
+    const res = await marcarClienteComoPago(conta.id);
+    setOcupadoId(null);
+    setAcaoEmCurso(null);
+    if (!res.ok) {
+      setAviso({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setAviso({ tipo: 'ok', texto: res.mensagem });
+  }
+
+  async function aoReativar(conta: ContaSaasResumo) {
+    setAcaoEmCurso('reativar');
+    setOcupadoId(conta.id);
+    setAviso(null);
+    const res = await reativarClienteSaas(conta.id);
+    setOcupadoId(null);
+    setAcaoEmCurso(null);
+    if (!res.ok) {
+      setAviso({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setAviso({ tipo: 'ok', texto: res.mensagem });
+    router.refresh();
+  }
+
+  async function aoSuspender(evento: FormEvent) {
+    evento.preventDefault();
+    if (!suspensoes) return;
+    setAcaoEmCurso('suspender');
+    setSuspendendo(true);
+    setAviso(null);
+    const res = await suspenderClienteSaas({
+      workspaceId: suspensoes.conta.id,
+      motivo: suspensoes.motivo,
+      aviso: suspensoes.aviso,
+    });
+    setSuspendendo(false);
+    setAcaoEmCurso(null);
+    if (!res.ok) {
+      setAviso({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setSuspensoes(null);
+    setAviso({ tipo: 'ok', texto: res.mensagem });
+    router.refresh();
+  }
+
+  async function aoTrocarSenha(conta: ContaSaasResumo) {
+    setAcaoEmCurso('senha');
+    setTrocandoSenha(conta.id);
+    setAviso(null);
+    const res = await trocarSenhaDoCliente(conta.id);
+    setTrocandoSenha(null);
+    setAcaoEmCurso(null);
+    if (!res.ok || !res.senha) {
+      setAviso({ tipo: 'erro', texto: res.ok ? 'A senha não foi gerada.' : res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setSenhaNova({ conta: conta.name, senha: res.senha });
+  }
+
+  async function aoZerar(evento: FormEvent) {
+    evento.preventDefault();
+    if (!zerando) return;
+    setAcaoEmCurso('zerar');
+    setZerandoAgora(true);
+    setAviso(null);
+    const res = await zerarClienteSaas({ workspaceId: zerando.conta.id, confirmacao: zerando.confirmacao });
+    setZerandoAgora(false);
+    setAcaoEmCurso(null);
+    if (!res.ok) {
+      setAviso({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setZerando(null);
+    setAviso({ tipo: 'ok', texto: res.mensagem });
+    router.refresh();
   }
 
   function abrirSuportePrompt(contaId: string) {
@@ -297,9 +491,21 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
         </div>
       </div>
 
-      {aviso ? (
-        <div className={aviso.tipo === 'ok' ? 'f7-alert f7-alert--ok' : 'f7-alert f7-alert--erro'} role="status">
-          {aviso.texto}
+      {aviso || acaoEmCurso ? (
+        <div
+          className="aviso-painel"
+          data-tipo={aviso?.tipo ?? 'ok'}
+          role={aviso?.tipo === 'erro' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <span>
+            {acaoEmCurso ? textoDaAcaoEmCurso(acaoEmCurso) : aviso?.texto}
+          </span>
+          {aviso ? (
+            <button type="button" className="aviso-painel-fechar" aria-label="Fechar aviso" onClick={() => setAviso(null)}>
+              Fechar
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -517,6 +723,39 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                         <span className="conta-pill">
                           {conta.instancesConnected}/{conta.instancesTotal} chips · limite {conta.maxInstances}
                         </span>
+                        {seNaCobranca(conta) ? (
+                          <span className={CLASSE_DA_COBRANCA[conta.billing.situation]}>
+                            {ROTULO_DA_COBRANCA[conta.billing.situation]}
+                            {conta.billing.paidUntil ? ` · pago até ${formatarDataBr(conta.billing.paidUntil)}` : ''}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="conta-uso">
+                        <span>
+                          <strong>{conta.usage.messagesMonth.toLocaleString('pt-BR')}</strong> mensagens no mês
+                        </span>
+                        <span>
+                          <strong>{conta.usage.aiRepliesMonth.toLocaleString('pt-BR')}</strong> respostas da IA
+                        </span>
+                        <span>{conta.usage.lastMessageAt ? `Última mensagem: ${formatarDataHora(conta.usage.lastMessageAt)}` : 'Sem movimento ainda'}</span>
+                        <span>{conta.usage.lastSignInAt ? `Último acesso: ${formatarDataHora(conta.usage.lastSignInAt)}` : 'Nunca entrou no painel'}</span>
+                        {conta.usage.pendingNotices > 0 ? (
+                          <span className="conta-uso-alerta">{conta.usage.pendingNotices} aviso(s) de suspensão na fila</span>
+                        ) : null}
+                      </div>
+                      <div className="conta-cobranca-linha">
+                        {seNaCobranca(conta) ? (
+                          <>
+                            <span>
+                              {formatarReais(conta.billing.monthlyAmountCents)} por mês
+                              {conta.billing.dueDay ? ` · vence dia ${conta.billing.dueDay}` : ''}
+                            </span>
+                            <span className="conta-cobranca-prazo">{descreverPrazoDaCobranca(conta.billing.daysToDue)}</span>
+                            <span>Carência de {conta.billing.graceDays} dia(s)</span>
+                          </>
+                        ) : (
+                          <span>Sem cobrança combinada. Use o botão Cobrança para definir vencimento e valor.</span>
+                        )}
                       </div>
                       <div className="conta-sub">
                         Dono:{' '}
@@ -531,6 +770,58 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                     </div>
 
                     <div className="conta-acoes">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        aria-expanded={cobrancaAberta === conta.id}
+                        onClick={() => abrirCobranca(conta)}
+                      >
+                        Cobrança
+                      </button>
+                      {seNaCobranca(conta) && conta.billing.situation !== 'em_dia' ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          disabled={ocupadoId === conta.id}
+                          onClick={() => void aoMarcarPago(conta)}
+                        >
+                          {ocupadoId === conta.id ? 'Salvando…' : 'Marcar mês como pago'}
+                        </button>
+                      ) : null}
+                      {!desativada ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm conta-btn-suspender"
+                          onClick={() =>
+                            setSuspensoes({
+                              conta,
+                              motivo: 'Mensalidade em atraso',
+                              aviso:
+                                conta.billing.suspendNotice ||
+                                'Oi! Seu acesso ao painel está suspenso por falta de pagamento. Assim que regularizar, a gente libera na hora.',
+                            })
+                          }
+                        >
+                          Suspender
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          disabled={ocupadoId === conta.id}
+                          onClick={() => void aoReativar(conta)}
+                        >
+                          {ocupadoId === conta.id ? 'Reativando…' : 'Reativar acesso'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={trocandoSenha === conta.id}
+                        onClick={() => void aoTrocarSenha(conta)}
+                      >
+                        {trocandoSenha === conta.id ? 'Gerando…' : 'Senha nova'}
+                      </button>
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
@@ -563,16 +854,25 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                           {restaurandoId === conta.id ? 'Restaurando…' : 'Desfazer exclusão'}
                         </button>
                       ) : (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm conta-btn-excluir"
-                          onClick={() => {
-                            setExcluindo(conta);
-                            setMotivoExclusao('');
-                          }}
-                        >
-                          Excluir cliente
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setZerando({ conta, confirmacao: '' })}
+                          >
+                            Zerar dados
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm conta-btn-excluir"
+                            onClick={() => {
+                              setExcluindo(conta);
+                              setMotivoExclusao('');
+                            }}
+                          >
+                            Excluir cliente
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -663,6 +963,109 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                     </form>
                   ) : null}
 
+                  {cobrancaAberta === conta.id ? (
+                    <form onSubmit={(e) => aoSalvarCobranca(e, conta)} className="conta-editor">
+                      <div className="f7-form-grid">
+                        <div className="form-group">
+                          <label className="form-label" htmlFor={`cob-dia-${conta.id}`}>
+                            Dia do vencimento
+                          </label>
+                          <input
+                            id={`cob-dia-${conta.id}`}
+                            className="f7-input"
+                            inputMode="numeric"
+                            value={cobDia}
+                            onChange={(e) => setCobDia(e.target.value)}
+                            placeholder="Ex.: 10"
+                            maxLength={2}
+                          />
+                          <p className="form-help">Deixe vazio para não cobrar este cliente.</p>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor={`cob-valor-${conta.id}`}>
+                            Valor por mês (R$)
+                          </label>
+                          <input
+                            id={`cob-valor-${conta.id}`}
+                            className="f7-input"
+                            inputMode="decimal"
+                            value={cobValor}
+                            onChange={(e) => setCobValor(e.target.value)}
+                            placeholder="Ex.: 149,00"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor={`cob-carencia-${conta.id}`}>
+                            Carência depois do vencimento (dias)
+                          </label>
+                          <input
+                            id={`cob-carencia-${conta.id}`}
+                            type="number"
+                            className="f7-input"
+                            min={0}
+                            max={60}
+                            value={cobCarencia}
+                            onChange={(e) => setCobCarencia(e.target.value)}
+                          />
+                          <p className="form-help">Passou da carência, o painel marca como vencida para você suspender.</p>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor={`cob-pago-${conta.id}`}>
+                            Pago até (data)
+                          </label>
+                          <input
+                            id={`cob-pago-${conta.id}`}
+                            type="date"
+                            className="f7-input"
+                            value={cobPagoAte}
+                            onChange={(e) => setCobPagoAte(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group f7-span-2">
+                          <label className="form-label" htmlFor={`cob-whats-${conta.id}`}>
+                            WhatsApp do responsável (recebe o aviso)
+                          </label>
+                          <input
+                            id={`cob-whats-${conta.id}`}
+                            className="f7-input"
+                            inputMode="tel"
+                            value={cobWhatsapp}
+                            onChange={(e) => setCobWhatsapp(e.target.value)}
+                            placeholder="+55 (85) 99999-9999"
+                          />
+                          <p className="form-help">
+                            O aviso de suspensão é enviado para este número. Em branco, sai para o próprio chip do
+                            cliente.
+                          </p>
+                        </div>
+                        <div className="form-group f7-span-2">
+                          <label className="form-label" htmlFor={`cob-aviso-${conta.id}`}>
+                            Aviso enviado ao cliente quando você suspender
+                          </label>
+                          <textarea
+                            id={`cob-aviso-${conta.id}`}
+                            className="f7-textarea"
+                            value={cobAviso}
+                            onChange={(e) => setCobAviso(e.target.value)}
+                            maxLength={600}
+                            rows={3}
+                          />
+                          <p className="form-help">
+                            Sai no WhatsApp pelo primeiro chip que reconectar. Deixe em branco para suspender sem avisar.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="f7-actions">
+                        <button type="submit" className="btn btn-primary btn-sm" disabled={salvandoCobranca}>
+                          {salvandoCobranca ? 'Salvando...' : 'Salvar cobrança'}
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCobrancaAberta(null)}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+
                   {suporteId === conta.id ? (
                     <form onSubmit={(e) => aoEntrarEmSuporte(e, conta.id)} className="conta-editor">
                       <div className="form-group">
@@ -732,6 +1135,130 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
         )}
       </section>
 
+      {suspensoes ? (
+        <Dialogo
+          titulo={`Suspender ${suspensoes.conta.name}?`}
+          aoFechar={() => {
+            if (!suspendendo) setSuspensoes(null);
+          }}
+        >
+          <form onSubmit={(e) => void aoSuspender(e)} style={{ display: 'grid', gap: 12 }}>
+            <p className="panel-desc">
+              O acesso para na hora: campanhas rodando param e os chips ficam desligados. Nada é apagado — e a
+              reativação devolve o acesso. O aviso abaixo fica na fila e sai no WhatsApp pelo primeiro chip que
+              reconectar.
+            </p>
+            <div className="form-group">
+              <label className="form-label" htmlFor="susp-motivo">
+                Motivo da suspensão (fica no histórico)
+              </label>
+              <input
+                id="susp-motivo"
+                className="f7-input"
+                value={suspensoes.motivo}
+                onChange={(e) => setSuspensoes({ ...suspensoes, motivo: e.target.value })}
+                minLength={3}
+                maxLength={300}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="susp-aviso">
+                Aviso no WhatsApp do cliente
+              </label>
+              <textarea
+                id="susp-aviso"
+                className="f7-textarea"
+                rows={3}
+                value={suspensoes.aviso}
+                onChange={(e) => setSuspensoes({ ...suspensoes, aviso: e.target.value })}
+                maxLength={600}
+              />
+              <p className="form-help">Em branco: suspende sem avisar ninguém.</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="submit" className="btn btn-primary" disabled={suspendendo || suspensoes.motivo.trim().length < 3}>
+                {suspendendo ? 'Suspendendo…' : 'Suspender agora'}
+              </button>
+              <button type="button" className="btn btn-secondary" disabled={suspendendo} onClick={() => setSuspensoes(null)}>
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Dialogo>
+      ) : null}
+
+      {zerando ? (
+        <Dialogo
+          titulo={`Zerar os dados de ${zerando.conta.name}?`}
+          aoFechar={() => {
+            if (!zerandoAgora) setZerando(null);
+          }}
+        >
+          <form onSubmit={(e) => void aoZerar(e)} style={{ display: 'grid', gap: 12 }}>
+            <p className="panel-desc">
+              <strong>Não dá para desfazer.</strong> Apaga {zerando.conta.usage.messagesMonth > 0 ? 'todas as mensagens, ' : ''}
+              contatos, conversas e campanhas deste cliente. O login e os chips (desligados) continuam — a conta fica
+              como nova.
+            </p>
+            <div className="form-group">
+              <label className="form-label" htmlFor="zerar-confirmacao">
+                Digite <strong>{zerando.conta.name}</strong> para confirmar
+              </label>
+              <input
+                id="zerar-confirmacao"
+                className="f7-input"
+                value={zerando.confirmacao}
+                onChange={(e) => setZerando({ ...zerando, confirmacao: e.target.value })}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={zerandoAgora || zerando.confirmacao.trim().toLowerCase() !== zerando.conta.name.trim().toLowerCase()}
+              >
+                {zerandoAgora ? 'Apagando…' : 'Zerar os dados'}
+              </button>
+              <button type="button" className="btn btn-secondary" disabled={zerandoAgora} onClick={() => setZerando(null)}>
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Dialogo>
+      ) : null}
+
+      {senhaNova ? (
+        <Dialogo titulo={`Senha nova de ${senhaNova.conta}`} aoFechar={() => setSenhaNova(null)}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <p className="panel-desc">
+              Copie agora e envie para o responsável. Ao fechar esta janela a senha não aparece de novo (o acesso
+              anterior deixou de valer).
+            </p>
+            <p className="senha-nova">
+              <code>{senhaNova.senha}</code>
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(senhaNova.senha);
+                  setAviso({ tipo: 'ok', texto: 'Senha copiada. Envie para o responsável pelo cliente.' });
+                }}
+              >
+                Copiar senha
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setSenhaNova(null)}>
+                Já enviei, fechar
+              </button>
+            </div>
+          </div>
+        </Dialogo>
+      ) : null}
+
       {excluindo ? (
       <Dialogo
         titulo={`Excluir ${excluindo.name}?`}
@@ -783,4 +1310,46 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
       ) : null}
     </div>
   );
+}
+
+
+/** O que dizer enquanto uma ação do cliente está rodando (o botão também muda de texto). */
+function textoDaAcaoEmCurso(acao: string): string {
+  switch (acao) {
+    case 'cobranca':
+      return 'Salvando a cobrança…';
+    case 'pago':
+      return 'Registrando o pagamento…';
+    case 'suspender':
+      return 'Suspendendo o cliente e desligando os chips…';
+    case 'reativar':
+      return 'Devolvendo o acesso…';
+    case 'senha':
+      return 'Gerando a senha nova…';
+    case 'zerar':
+      return 'Apagando os dados do cliente…';
+    default:
+      return 'Trabalhando…';
+  }
+}
+
+/** 5585988880001 → "+55 (85) 98888-0001" (só exibição; o banco guarda os dígitos). */
+function formatarWhatsapp(digitos: string): string {
+  const d = digitos.replace(/\D/g, '');
+  if (d.length < 12) return d ? `+${d}` : '';
+  const ddd = d.slice(2, 4);
+  const corpo = d.slice(4);
+  const meio = corpo.length > 8 ? corpo.slice(0, corpo.length - 4) : corpo.slice(0, 4);
+  const fim = corpo.slice(-4);
+  return `+${d.slice(0, 2)} (${ddd}) ${meio}-${fim}`;
+}
+
+/** "149,00" ou "149.00" → 14900 centavos. Vazio continua vazio (sem valor combinado). */
+function valorEmCentavos(texto: string): string {
+  const limpo = texto.trim().replace(/[^\d,.-]/g, '');
+  if (!limpo) return '';
+  const normalizado = limpo.includes(',') ? limpo.replace(/\./g, '').replace(',', '.') : limpo;
+  const numero = Number(normalizado);
+  if (!Number.isFinite(numero) || numero < 0) return '';
+  return String(Math.round(numero * 100));
 }

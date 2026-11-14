@@ -148,6 +148,13 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
   const resultado = gravado?.result ?? 'desconhecido';
   if (resultado === 'unauthorized') return responder(401, { ok: false, erro: 'não autorizado' });
 
+  if (aviso.tipo === 'conexao' && gravado?.workspace_id) {
+    // Um chip voltou a conectar: é a hora de entregar o aviso de conta suspensa que ficou na fila.
+    opcoes.agendar(async () => {
+      await entregarAvisosDeSuspensao(supabase);
+    });
+  }
+
   if (aviso.tipo === 'conexao' && gravado?.alert_disconnected && gravado.workspace_id) {
     const wsId = gravado.workspace_id;
     const chipNome = gravado.display_name ?? aviso.instancia;
@@ -204,4 +211,52 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
   }
 
   return responder(200, { ok: true, resultado });
+}
+
+
+/**
+ * Entrega os avisos de "conta suspensa" que estão na fila.
+ *
+ * O aviso é escrito pelo master ao suspender o cliente, mas naquele momento o chip está desligado —
+ * então ele fica esperando aqui. Quando um chip volta a conectar (ou no cron de 5 minutos), o aviso
+ * sai por aquele chip. Falhou? Volta para a fila até cinco tentativas; na quinta, fica como falha e
+ * aparece no painel do master.
+ */
+export async function entregarAvisosDeSuspensao(
+  supabase: NonNullable<ReturnType<typeof criarClienteDeServico>>,
+  limite = 5,
+): Promise<void> {
+  const { data, error } = await supabase.rpc('claim_suspension_notices', { p_limit: limite });
+  if (error) {
+    console.error('[aviso de suspensão] não foi possível ler a fila:', error.message);
+    return;
+  }
+
+  for (const aviso of (data ?? []) as Array<{ id: string; instance_id: string | null; number_key: string; body_text: string }>) {
+    const numero = numeroParaEnvio(aviso.number_key ?? '');
+    if (!numero) {
+      await supabase.rpc('finish_suspension_notice', { p_id: aviso.id, p_outcome: 'failed', p_error: 'número de destino inválido' });
+      continue;
+    }
+
+    // O aviso sai pelo chip que acabou de conectar; se ele não existe mais, o número do próprio chip serve.
+    const { data: chip } = await supabase
+      .from('instances')
+      .select('id, display_name, status, is_enabled')
+      .eq('id', aviso.instance_id ?? '00000000-0000-0000-0000-000000000000')
+      .maybeSingle();
+
+    if (!chip || chip.status !== 'connected' || chip.is_enabled !== true) {
+      // Nada a fazer agora: a próxima conexão (ou o cron) tenta de novo sem contar como falha.
+      await supabase.rpc('finish_suspension_notice', { p_id: aviso.id, p_outcome: 'pending', p_error: 'chip ainda não está conectado' });
+      continue;
+    }
+
+    const envio = await enviarTexto(String(chip.display_name), numero, aviso.body_text, { tempoLimite: 20_000 });
+    await supabase.rpc('finish_suspension_notice', {
+      p_id: aviso.id,
+      p_outcome: envio.situacao === 'enviada' ? 'sent' : envio.situacao === 'nao_enviada' ? 'failed' : 'uncertain',
+      p_error: envio.situacao === 'incerta' ? (envio.detalhe ?? 'sem confirmação') : null,
+    });
+  }
 }

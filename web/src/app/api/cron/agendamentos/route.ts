@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { executarCampanhasEFilaSegura } from '@/lib/campanhas/executor';
 import { executarLimpezaDeRetencao } from '@/lib/dados/retencao';
 import { processarAgendamentosVencidos } from '@/lib/evolution/agendados';
+import { entregarAvisosDeSuspensao } from '@/lib/evolution/processar-aviso';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,9 @@ export async function POST(pedido: Request) {
   if (!supabase) {
     return Response.json({ ok: false, erro: 'painel sem configuração de serviço' }, { status: 503 });
   }
+
+  // Os avisos de conta suspensa saem por um chip conectado — o mesmo caminho dos agendamentos.
+  await entregarAvisosDeSuspensao(supabase, 5);
 
   const [resumo, disparos, retencao] = await Promise.all([
     processarAgendamentosVencidos(supabase, 25),

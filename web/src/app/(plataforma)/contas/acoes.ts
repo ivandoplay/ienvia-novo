@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  formatarDataBr,
   validarAtualizacaoDeCliente,
+  validarCobrancaDoCliente,
   validarCriacaoDeCliente,
   validarMotivoSuporte,
   type ContaSaasResumo,
@@ -254,4 +256,263 @@ export async function restaurarClienteSaas(workspaceId: string): Promise<Retorno
     contas: atualizado.contas,
     auditoria: atualizado.auditoria,
   };
+}
+
+// =============================================================================================
+// Cobrança e ações rápidas (o painel de Clientes SaaS como mesa de administração)
+// =============================================================================================
+
+/** Grava vencimento, valor, carência, "pago até" e o texto do aviso de suspensão. */
+export async function salvarCobrancaDoCliente(entrada: {
+  workspaceId: string;
+  dueDay: string;
+  monthlyAmountCents: string;
+  graceDays: string;
+  paidUntil: string;
+  suspendNotice: string;
+  ownerWhatsapp: string;
+}): Promise<RetornoComLista> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+  if (!entrada.workspaceId) return { ok: false, erro: 'Escolha o cliente.' };
+
+  const validado = validarCobrancaDoCliente(entrada);
+  if (!validado.ok) return { ok: false, erro: validado.erro };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc('set_workspace_billing', {
+    p_workspace_id: entrada.workspaceId,
+    p_due_day: validado.dados.dueDay,
+    p_monthly_amount_cents: validado.dados.monthlyAmountCents,
+    p_grace_days: validado.dados.graceDays,
+    p_paid_until: validado.dados.paidUntil,
+    p_suspend_notice: validado.dados.suspendNotice,
+  });
+
+  if (error) {
+    console.error('[contas] falha ao salvar cobrança:', error);
+    return { ok: false, erro: 'Não foi possível salvar a cobrança deste cliente.' };
+  }
+
+  // Só os dígitos interessam; vazio volta a usar o próprio número do chip como destino do aviso.
+  const { error: erroWhats } = await supabase.rpc('set_workspace_owner_whatsapp', {
+    p_workspace_id: entrada.workspaceId,
+    p_whatsapp: String(entrada.ownerWhatsapp ?? '').replace(/\D/g, ''),
+  });
+  if (erroWhats) {
+    console.error('[contas] falha ao guardar o WhatsApp do responsável:', erroWhats);
+    return {
+      ok: false,
+      erro: 'A cobrança foi salva, mas o WhatsApp do responsável não. Confira o número (só dígitos, com 55).',
+    };
+  }
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  return {
+    ok: true,
+    mensagem: 'Cobrança salva. O painel já mostra a nova situação.',
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}
+
+/** Marca o mês como pago e devolve até quando o cliente está quitado. */
+export async function marcarClienteComoPago(workspaceId: string): Promise<RetornoComLista> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+  if (!workspaceId) return { ok: false, erro: 'Escolha o cliente.' };
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('mark_workspace_paid', {
+    p_workspace_id: workspaceId,
+    p_paid_until: null,
+  });
+
+  if (error) {
+    console.error('[contas] falha ao marcar como pago:', error);
+    return { ok: false, erro: 'Não foi possível marcar este mês como pago.' };
+  }
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  const ate = (data as { paid_until?: string } | null)?.paid_until ?? '';
+  return {
+    ok: true,
+    mensagem: ate ? `Pagamento registrado. Cliente em dia até ${formatarDataBr(ate)}.` : 'Pagamento registrado.',
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}
+
+/**
+ * Suspende o cliente: fecha a conta, para as campanhas, desliga os chips e deixa o aviso na fila —
+ * o aviso sai no WhatsApp pelo primeiro chip que voltar a conectar.
+ */
+export async function suspenderClienteSaas(entrada: {
+  workspaceId: string;
+  motivo: string;
+  aviso: string;
+}): Promise<RetornoComLista> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+  if (!entrada.workspaceId) return { ok: false, erro: 'Escolha o cliente.' };
+
+  const motivo = String(entrada.motivo ?? '').trim();
+  if (motivo.length < 3) return { ok: false, erro: 'Escreva o motivo da suspensão (fica no histórico).' };
+  const aviso = String(entrada.aviso ?? '').trim();
+  if (aviso.length > 600) return { ok: false, erro: 'O aviso pode ter até 600 caracteres.' };
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('suspend_platform_workspace', {
+    p_workspace_id: entrada.workspaceId,
+    p_reason: motivo.slice(0, 300),
+    p_notice: aviso,
+  });
+
+  if (error) {
+    console.error('[contas] falha ao suspender cliente:', error);
+    return { ok: false, erro: 'Não foi possível suspender este cliente agora.' };
+  }
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  const detalhe = data as { notice_queued?: boolean; chips_disabled?: number } | null;
+  const partes = ['Cliente suspenso: o acesso parou e as campanhas foram pausadas.'];
+  if (Number(detalhe?.chips_disabled ?? 0) > 0) partes.push(`${detalhe?.chips_disabled} chip(s) desligado(s).`);
+  partes.push(
+    detalhe?.notice_queued
+      ? 'O aviso ficou na fila e sai no WhatsApp assim que um chip reconectar.'
+      : 'Nenhum aviso foi enfileirado (conta sem chip com número).',
+  );
+  return {
+    ok: true,
+    mensagem: partes.join(' '),
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}
+
+/** Devolve o acesso ao cliente e cancela avisos de suspensão que ainda não saíram. */
+export async function reativarClienteSaas(workspaceId: string): Promise<RetornoComLista> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+  if (!workspaceId) return { ok: false, erro: 'Escolha o cliente.' };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc('reactivate_platform_workspace', { p_workspace_id: workspaceId });
+
+  if (error) {
+    console.error('[contas] falha ao reativar cliente:', error);
+    if ((error.message ?? '').includes('being deleted')) {
+      return { ok: false, erro: 'Este cliente está no prazo de exclusão. Use "Desfazer exclusão".' };
+    }
+    return { ok: false, erro: 'Não foi possível reativar este cliente agora.' };
+  }
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  return {
+    ok: true,
+    mensagem: 'Cliente reativado. Ele já pode entrar; os chips ele mesmo religa no painel.',
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}
+
+/** Zera os dados do cliente (mantém login e chips). Exige o nome digitado duas vezes. */
+export async function zerarClienteSaas(entrada: {
+  workspaceId: string;
+  confirmacao: string;
+}): Promise<RetornoComLista> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+  if (!entrada.workspaceId) return { ok: false, erro: 'Escolha o cliente.' };
+  if (String(entrada.confirmacao ?? '').trim().length === 0) {
+    return { ok: false, erro: 'Digite o nome do cliente para confirmar.' };
+  }
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('reset_platform_workspace', {
+    p_workspace_id: entrada.workspaceId,
+    p_confirmation: String(entrada.confirmacao ?? '').trim(),
+  });
+
+  if (error) {
+    console.error('[contas] falha ao zerar cliente:', error);
+    if ((error.message ?? '').includes('Confirmation does not match')) {
+      return { ok: false, erro: 'O nome digitado não é igual ao nome do cliente. Nada foi apagado.' };
+    }
+    return { ok: false, erro: 'Não foi possível zerar esta conta agora.' };
+  }
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  const n = (data ?? {}) as { contacts_deleted?: number; conversations_deleted?: number; messages_deleted?: number };
+  return {
+    ok: true,
+    mensagem: `Conta zerada: ${Number(n.messages_deleted ?? 0)} mensagens, ${Number(n.conversations_deleted ?? 0)} conversas e ${Number(n.contacts_deleted ?? 0)} contatos apagados. O login e os chips continuam.`,
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}
+
+/**
+ * Troca a senha do dono do cliente e devolve a senha nova para o master repassar.
+ * Não mexe em mais nada da conta.
+ */
+export async function trocarSenhaDoCliente(workspaceId: string): Promise<RetornoComLista & { senha?: string }> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+
+  const supabase = await criarClienteServidor();
+  const { data: dono, error: erroDono } = await supabase.rpc('owner_of_workspace', {
+    p_workspace_id: workspaceId,
+  });
+  const userId = (dono as { user_id?: string } | null)?.user_id;
+  if (erroDono || !userId) {
+    console.error('[contas] falha ao localizar o dono do cliente:', erroDono);
+    return { ok: false, erro: 'Este cliente não tem um responsável ativo para trocar a senha.' };
+  }
+
+  const admin = criarClienteDeServico();
+  if (!admin) return { ok: false, erro: 'O painel está sem a chave administrativa para trocar a senha.' };
+
+  const senha = gerarSenhaTemporaria();
+  const { error } = await admin.auth.admin.updateUserById(userId, { password: senha });
+  if (error) {
+    console.error('[contas] falha ao trocar a senha do cliente:', error);
+    return { ok: false, erro: 'Não foi possível trocar a senha agora.' };
+  }
+
+  await supabase.rpc('log_platform_action', {
+    p_workspace_id: workspaceId,
+    p_action: 'platform_workspace_password_reset',
+    p_details: {},
+  });
+
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  return {
+    ok: true,
+    mensagem: 'Senha nova gerada. Copie e envie para o responsável; ela não aparece de novo.',
+    senha,
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}
+
+/** Senha legível por telefone: sem letras que se confundem (O/0, l/1). */
+function gerarSenhaTemporaria(): string {
+  const letras = 'abcdefghijkmnpqrstuvwxyz';
+  const numeros = '23456789';
+  const simbolos = '!@#%&*';
+  const sorteia = (fonte: string) => fonte[Math.floor(Math.random() * fonte.length)];
+  const corpo = Array.from({ length: 8 }, () => sorteia(letras + numeros.toUpperCase())).join('');
+  return `${corpo}${sorteia(numeros)}${sorteia(simbolos)}`;
 }
