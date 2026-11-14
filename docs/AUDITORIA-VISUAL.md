@@ -172,3 +172,42 @@ Tudo abaixo foi medido no painel rodando (Playwright, 412 px e 1440 px) e está 
   **1012/1012**, Playwright **367/367**.
 - Testes que fixavam textos antigos do produto foram atualizados (cabeçalho "Chip: …", pílula "2/3
   chips", lista de modelos do Gemini com 2.0 e 2.5 Flash).
+
+## Clientes SaaS — mesa de administração (12/11, à noite)
+
+Galeria: `web/auditoria-visual/clientes-saas/galeria.html` (celular e computador).
+
+**O que passou a existir**
+- **Cobrança por cliente:** dia de vencimento, valor mensal, carência (padrão 3 dias), "pago até",
+  WhatsApp do responsável que recebe o aviso e o texto do aviso.
+  Situação calculada no servidor, no fuso de Brasília: Em dia · Vence em breve (≤5 dias) ·
+  Tolerância (dentro da carência) · Vencida · Sem cobrança.
+- **Uso do mês no cartão:** mensagens, respostas da IA, última mensagem, último acesso e avisos na fila.
+- **Ações em 1 clique:** Cobrança · Marcar mês como pago · Suspender (com aviso escrito) ·
+  Reativar acesso · Senha nova · Editar · Entrar em suporte · Zerar dados · Excluir.
+- **Bloqueio automático por cliente:** opção que, ligada, suspende no dia seguinte ao fim da carência.
+  Roda na rotina do cron (a cada 5 min), sem pessoa logada; registra no histórico como ação do sistema.
+  Falha de propósito: nada acontece sozinho em cliente que não ligou a opção.
+- **Aviso de suspensão:** fica em `public.suspension_notices` (RLS ligada) e sai pelo primeiro chip que
+  reconectar — pelo próprio chip ou pelo cron. Destino: WhatsApp do responsável; sem ele, o número do chip.
+  Cinco tentativas; depois fica como falha e aparece no cartão.
+- **Zerar dados:** exige digitar o nome do cliente; apaga mensagens, conversas, contatos e campanhas
+  (mantém login, chips e histórico da plataforma). Diferente de "Excluir", que dá 30 dias para desfazer.
+- **Senha nova:** gera senha legível por telefone (sem O/0, l/1), mostra uma vez, permite copiar e vale na hora.
+
+**Detalhes de tela**
+- Data no formato do Brasil (`dd/mm/aaaa`) via `CampoDeData` — o campo nativo pedia `mm/dd/yyyy` em
+  navegador em inglês. Aceita `01012026` e recusa data que não existe.
+- Recado do painel mostra o que está em curso ("Suspendendo o cliente e desligando os chips…") e tem botão Fechar.
+
+**Provas**
+- `shared/test/cobranca-dos-clientes.test.ts` (14 casos), `shared/test/campo-de-data.test.ts` (5).
+- `web/e2e/clientes-saas.spec.ts` (12 provas, celular e computador): cobrança → pago → situação muda,
+  suspender → chips desligam → aviso na fila → reativar cancela, senha antiga deixa de valer,
+  zerar só com o nome certo, e o bloqueio automático rodando pelo cron de verdade.
+- Suíte final: **381 e2e**, **1031 unitários**, `tsc` e `eslint` limpos.
+
+**Pendências conhecidas**
+- Se o cliente mudar o próprio número do WhatsApp, o "número lógico" do chip pode ficar vazio; nesse
+  caso o aviso de suspensão sai pelo número do responsável (se cadastrado) ou não sai — o painel avisa.
+- O master ainda não recebe alerta quando a senha de um cliente é trocada por outra pessoa: só o registro.
