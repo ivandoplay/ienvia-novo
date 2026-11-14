@@ -22,7 +22,10 @@ export function resumoDeConexao(conectadas: number, total: number): { texto: str
   if (total === 0) return { texto: 'Nenhum chip', conectado: false };
   if (conectadas === 0) return { texto: 'Desconectado', conectado: false };
   if (conectadas === total) {
-    return { texto: total === 1 ? 'Conectado' : `${total} chips conectados`, conectado: true };
+    // Curto de propósito: no celular a pílula divide a barra com título, busca e avatar.
+    // A bolinha verde já diz que está conectado, então o texto só informa quantos chips são.
+    return { texto: total === 1 ? 'Conectado' : `${total} chips`, conectado: true };
   }
-  return { texto: `${conectadas} de ${total} conectados`, conectado: true };
+  // Mesma razão: "1 de 2 conectados" chegava cortado como "1 de ..." no celular.
+  return { texto: `${conectadas}/${total} chips`, conectado: true };
 }

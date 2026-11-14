@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const env = Object.fromEntries(readFileSync('/home/user/.env','utf8').split('\n').map(l=>l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const b=await chromium.launch(); const p=await (await b.newContext({viewport:{width:1440,height:900}})).newPage();
+await p.goto('http://127.0.0.1:3100/login',{waitUntil:'networkidle'});
+await p.getByLabel(/usuário|usuario|e-mail|email/i).first().fill(env.TESTE_USUARIO);
+await p.getByLabel(/senha/i).first().fill(env.TESTE_SENHA);
+await p.getByRole('button',{name:/entrar|acessar/i}).first().click(); await p.waitForTimeout(2200);
+await p.goto('http://127.0.0.1:3100/inbox',{waitUntil:'networkidle'}); await p.waitForTimeout(1500);
+console.log('atalhos:', JSON.stringify(await p.evaluate(()=>[...document.querySelectorAll('.inbox-crm-acoes .btn')].map(b=>b.innerText))));
+await b.close();

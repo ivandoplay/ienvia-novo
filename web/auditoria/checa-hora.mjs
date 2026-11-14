@@ -1,0 +1,16 @@
+import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const env = Object.fromEntries(readFileSync('/home/user/.env','utf8').split('\n').map(l=>l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const b = await chromium.launch(); const p = await (await b.newContext({viewport:{width:1440,height:900}, timezoneId:'America/Sao_Paulo'})).newPage();
+await p.goto('http://127.0.0.1:3000/login',{waitUntil:'networkidle'});
+await p.getByLabel(/usuário|usuario|e-mail|email/i).first().fill(env.TESTE_USUARIO);
+await p.getByLabel(/senha/i).first().fill(env.TESTE_SENHA);
+await p.getByRole('button',{name:/entrar|acessar/i}).first().click(); await p.waitForTimeout(2500);
+await p.goto('http://127.0.0.1:3000/visao-geral',{waitUntil:'networkidle'}); await p.waitForTimeout(2500);
+console.log('linha da saudação:', JSON.stringify(await p.locator('.visao-ola-linha').innerText()));
+console.log('html do título:', await p.locator('.visao-ola-titulo').innerHTML());
+console.log('relógio:', await p.locator('.visao-relogio').innerText());
+const hs = await p.evaluate(() => { const s=document.createElement('span'); s.className='so-leitor-de-tela'; document.body.appendChild(s); const r=s.getBoundingClientRect(); const cs=getComputedStyle(s); return {largura:r.width, altura:r.height, clip:cs.clipPath, pos:cs.position, overflow:cs.overflow, whiteSpace:cs.whiteSpace}; });
+console.log('estilo do so-leitor-de-tela:', hs);
+await p.screenshot({path:'/home/user/ienvia/auditoria-visual/visao-ola.png', clip:{x:300,y:100,width:900,height:130}});
+await b.close();

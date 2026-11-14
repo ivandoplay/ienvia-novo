@@ -603,7 +603,7 @@ export function PainelDaInbox({
           <div className="inbox-crm-acoes">
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setModalCatalogos(true)}>
               <Icone nome="etiqueta" className="icon-15" />
-              <span>Etiquetas & /</span>
+              <span>Etiquetas &amp; respostas</span>
             </button>
             {temChipsAtivos ? (
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalNovaConversa(true)}>
@@ -1448,7 +1448,7 @@ function Conversa({
             <p>
               {conversa.contato.temNome && conversa.contato.telefone ? <span>{conversa.contato.telefone}</span> : null}
               <span>
-                Chip {conversa.chip.apelido}
+                Chip: {conversa.chip.apelido}
                 {chipRemovido ? ' (removido)' : ''}
               </span>
             </p>

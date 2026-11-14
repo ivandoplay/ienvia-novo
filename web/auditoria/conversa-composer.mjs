@@ -1,0 +1,20 @@
+import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const BASE='http://127.0.0.1:3100';
+const env = Object.fromEntries(readFileSync('/home/user/.env','utf8').split('\n').map(l=>l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const b=await chromium.launch(); const p=await (await b.newContext({viewport:{width:1440,height:900},locale:'pt-BR'})).newPage();
+await p.goto(`${BASE}/login`,{waitUntil:'networkidle'});
+await p.getByLabel(/usuário|usuario|e-mail|email/i).first().fill(env.TESTE_USUARIO);
+await p.getByLabel(/senha/i).first().fill(env.TESTE_SENHA);
+await p.getByRole('button',{name:/entrar|acessar/i}).first().click(); await p.waitForTimeout(2200);
+await p.goto(`${BASE}/inbox`,{waitUntil:'networkidle'}); await p.waitForTimeout(1200);
+await p.locator('button, [role="button"], li, a').filter({hasText:'Lucas Martins'}).first().click(); await p.waitForTimeout(2500);
+const info = await p.evaluate(`(() => {
+  const painel = document.querySelector('.inbox-conversa, .inbox-chat, [class*="conversa"]');
+  const rodapes = [...document.querySelectorAll('main [class*="escrever"], main [class*="composer"], main textarea')].map(e => ({classe:e.className, tag:e.tagName, visivel:e.getBoundingClientRect().height>0}));
+  const ultimos = [...document.querySelectorAll('main *')].filter(e=>e.childElementCount===0 && e.textContent.trim()).slice(-12).map(e => e.tagName.toLowerCase()+'.'+String(e.className).slice(0,28)+' — '+e.textContent.trim().slice(0,60));
+  return { achouComposer: rodapes, cauda: ultimos };
+})()`);
+console.log(JSON.stringify(info,null,1));
+await p.screenshot({path:'/home/user/ienvia/auditoria-visual/inbox/10-conversa-producao.png'});
+await b.close();

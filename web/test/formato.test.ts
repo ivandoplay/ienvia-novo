@@ -45,10 +45,11 @@ describe('resumoDeConexao (pílula do topo)', () => {
   });
 
   test('todos conectados', () => {
-    expect(resumoDeConexao(3, 3)).toEqual({ texto: '3 chips conectados', conectado: true });
+    expect(resumoDeConexao(3, 3)).toEqual({ texto: '3 chips', conectado: true });
   });
 
   test('parte conectada', () => {
-    expect(resumoDeConexao(2, 3)).toEqual({ texto: '2 de 3 conectados', conectado: true });
+    // Formato curto: no celular a pílula é cortada se o texto for longo.
+    expect(resumoDeConexao(2, 3)).toEqual({ texto: '2/3 chips', conectado: true });
   });
 });

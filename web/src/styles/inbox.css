@@ -361,6 +361,7 @@
 .inbox-conversa-topo {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
@@ -375,8 +376,8 @@
 }
 
 .inbox-conversa-quem {
-  min-width: 0;
-  flex: 1;
+  min-width: 168px;
+  flex: 1 1 200px;
 }
 
 .inbox-conversa-quem h2 {
@@ -408,6 +409,9 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 6px;
+  /* Os botões têm largura própria e não devem esmagar o nome de quem escreveu:
+     sem isto, em tela média o nome virava "M." e o telefone quebrava em 4 linhas. */
+  flex-shrink: 0;
 }
 
 /* O botão "Contato" só existe quando a coluna do contato não cabe na tela. */
@@ -660,11 +664,16 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
+  /* Os botões de recurso (anexo, catálogo, áudio, PIX, agendar) não podem esmagar o campo.
+     Sem quebra de linha, o campo ficava com 26px no celular e 92px no computador. */
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 
 .inbox-escrever-campo {
   min-width: 0;
-  flex: 1;
+  /* Abaixo disso não dá para ler o que se escreve; quando não couber, o campo desce para a linha de baixo. */
+  flex: 1 1 190px;
   max-height: 150px;
   line-height: 1.45;
   resize: none;
