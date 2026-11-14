@@ -103,5 +103,5 @@ as $$
     and w.status = 'active';
 $$;
 
-revoke all on function public.list_my_owner_workspaces() from public;
+revoke all on function public.list_my_owner_workspaces() from public, anon;
 grant execute on function public.list_my_owner_workspaces() to authenticated;

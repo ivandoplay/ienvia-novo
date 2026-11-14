@@ -33,3 +33,8 @@ supabase/.temp/
 supabase/.branches/
 motor/data/
 motor/.runtime/
+# Provas visuais pesadas (prints). Ficam só no GitHub quando fizerem parte de um commit de auditoria.
+web/auditoria-visual/*.zip
+web/auditoria-visual/todas-as-telas/
+auditoria-visual/
+auditoria/
