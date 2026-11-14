@@ -80,11 +80,10 @@ begin
 end;
 $$;
 
--- O motor chama sem sessão de navegador (Authorization: Bearer <access_token> é opcional no caminho
--- de e-mail e senha? Não: aqui a sessão é obrigatória). Concedemos a anon porque o JWT do Supabase
--- Auth já resolve auth.uid(); a checagem de dono continua valendo.
-revoke all on function public.pair_local_executor_by_password(uuid, text, text) from public;
-grant execute on function public.pair_local_executor_by_password(uuid, text, text) to anon, authenticated;
+-- A rota do painel chama esta função com o token DO USUÁRIO (Authorization: Bearer <access_token>),
+-- nunca com a chave de serviço: com service_role o auth.uid() é nulo e a checagem de dono recusaria.
+revoke all on function public.pair_local_executor_by_password(uuid, text, text) from public, anon;
+grant execute on function public.pair_local_executor_by_password(uuid, text, text) to authenticated;
 
 -- Consulta de workspaces para a tela inicial do motor: devolve só id e nome das contas em que a
 -- pessoa é dona. Evita o motor precisar de service_role ou abrir a tabela workspaces.
