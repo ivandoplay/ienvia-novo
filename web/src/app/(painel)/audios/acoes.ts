@@ -10,6 +10,8 @@ import {
   type AudioEstrategico,
 } from '@ienvia/shared/recursos';
 import { DEPOSITO } from '@/lib/inbox/arquivos';
+import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
+import { ErroDeIa, transcreverAudio } from '@/lib/ia/provedores';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { mapearAudioEstrategico } from '@/lib/recursos/mapeamento';
 import { obterSessao } from '@/lib/sessao';
@@ -167,4 +169,86 @@ export async function excluirAudioEstrategico(voiceId: string): Promise<{ ok: tr
 
   atualizarTelas();
   return { ok: true };
+}
+
+/**
+ * Transcreve o áudio que já foi enviado para o depósito, usando a chave do Gemini que o cliente
+ * cadastrou em Motor de IA. Serve para o botão "Transcrever automaticamente" da biblioteca de áudios:
+ * quem não quiser usar a IA continua digitando a transcrição à mão.
+ */
+export async function transcreverAudioEstrategico(dados: {
+  objectKey: string;
+  contentType?: string;
+}): Promise<{ ok: true; texto: string; modelo: string } | { ok: false; erro: string }> {
+  const sessao = await obterSessao();
+  if (!sessao?.workspaceAtivo) return { ok: false, erro: SESSAO_EXPIRADA };
+  if (sessao.workspaceAtivo.papel !== 'owner') return { ok: false, erro: SOMENTE_DONO };
+
+  const workspaceId = sessao.workspaceAtivo.id;
+  const objectKey = String(dados.objectKey || '');
+  if (!objectKey.startsWith(`${workspaceId}/audios/`)) {
+    return { ok: false, erro: 'O áudio ainda não terminou de subir. Grave ou envie o arquivo primeiro.' };
+  }
+
+  // A chave do Gemini é a mesma que o cliente cadastrou no Motor de IA, guardada cifrada no cofre.
+  const cofre = lerChaveDoCofre();
+  if (!cofre) return { ok: false, erro: 'O servidor não conseguiu abrir o cofre de chaves agora.' };
+
+  const servico = criarClienteDeServico();
+  const supabase = await criarClienteServidor();
+  let cifrada: string | null = null;
+
+  if (servico) {
+    const { data } = await servico.rpc('read_workspace_ai_keys_for_simulator', { p_workspace_id: workspaceId });
+    const bruto = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+    const valor = bruto.gemini;
+    cifrada = typeof valor === 'string' && valor ? valor : null;
+  } else {
+    const { data } = await supabase.rpc('read_my_ai_key_ciphertext', { p_workspace_id: workspaceId, p_provider: 'gemini' });
+    cifrada = typeof data === 'string' && data ? data : null;
+  }
+
+  const chave = cifrada ? decifrar(cifrada, contextoDaChaveDeIa(workspaceId, 'gemini'), cofre) : null;
+  if (!chave) {
+    return { ok: false, erro: 'Nenhuma chave do Gemini cadastrada. Abra Motor de IA e cadastre a chave para transcrever sozinho.' };
+  }
+
+  const arquivo = await supabase.storage.from(DEPOSITO).download(objectKey);
+  if (arquivo.error || !arquivo.data) {
+    return { ok: false, erro: 'Não consegui baixar o áudio agora. Tente de novo em instantes.' };
+  }
+
+  const bytes = new Uint8Array(await arquivo.data.arrayBuffer());
+  const tipo = (dados.contentType || arquivo.data.type || 'audio/ogg').split(';')[0] || 'audio/ogg';
+
+  try {
+    const resultado = await transcreverAudio({ chave, audio: bytes, contentType: tipo });
+    return { ok: true, texto: resultado.texto, modelo: resultado.modelo };
+  } catch (erro) {
+    if (erro instanceof ErroDeIa) return { ok: false, erro: traduzirErroDaTranscricao(erro) };
+    return { ok: false, erro: 'Não foi possível transcrever o áudio agora. Tente de novo.' };
+  }
+}
+
+/** Traduz o erro do provedor para uma frase que o dono da conta entende e consegue resolver. */
+function traduzirErroDaTranscricao(erro: ErroDeIa): string {
+  switch (erro.motivo) {
+    case 'chave_invalida':
+      return 'A chave do Gemini cadastrada não foi aceita. Confira em Motor de IA.';
+    case 'sem_credito':
+      return 'A conta do Gemini está sem crédito para transcrever.';
+    case 'limite':
+      return 'O Gemini pediu para esperar um pouco (limite de uso). Tente de novo em alguns minutos.';
+    case 'modelo_inexistente':
+      return 'Nenhum modelo do Gemini disponível para transcrever nesta chave.';
+    case 'bloqueada':
+      return 'O Gemini recusou o conteúdo deste áudio.';
+    case 'tempo':
+      return 'A transcrição demorou demais. Tente um áudio mais curto.';
+    case 'rede':
+    case 'indisponivel':
+      return 'O Gemini não respondeu agora. Tente de novo em instantes.';
+    default:
+      return 'Não foi possível transcrever este áudio. Tente de novo ou digite a transcrição à mão.';
+  }
 }

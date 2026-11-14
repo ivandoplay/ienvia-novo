@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const BASE='http://127.0.0.1:3100';
+const env = Object.fromEntries(readFileSync('/home/user/.env','utf8').split('\n').map(l=>l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const b=await chromium.launch(); const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();
+await p.goto(`${BASE}/login`,{waitUntil:'networkidle'});
+await p.getByLabel(/usuário|usuario|e-mail|email/i).first().fill('ivanjeffersong8@gmail.com');
+await p.getByLabel(/senha/i).first().fill(env.SENHA_DA_COPIA_DE_SEGURANCA ?? '');
+await p.getByRole('button',{name:/entrar|acessar/i}).first().click();
+await p.waitForTimeout(4000);
+const erro = await p.evaluate(()=>[...document.querySelectorAll('[role="alert"],.aviso,.login-erro')].map(e=>e.textContent.trim().slice(0,80)));
+console.log('url:', p.url(), '| erro na tela:', JSON.stringify(erro));
+await b.close();

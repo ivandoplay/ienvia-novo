@@ -144,7 +144,7 @@ if (!process.argv.includes('--limpar')) {
   }
 }
 
-const linhasContato = PESSOAS.map((p, i) => ({
+const linhasContato = PESSOAS.map((p) => ({
   workspace_id: WORKSPACE,
   instance_id: INSTANCIA,
   channel: 'whatsapp',

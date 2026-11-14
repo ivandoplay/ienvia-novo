@@ -578,11 +578,15 @@ export function PainelDeSeguranca({ dados, secaoInicial }: Props) {
                 />
               </div>
 
-              {podeEditar && (
+              {podeEditar ? (
                 <div className="f5-acoes-rodape">
                   <button type="button" className="btn btn-primary" disabled={pendente} onClick={salvarSeguranca}>
                     {pendente ? 'Salvando…' : 'Salvar regras de segurança'}
                   </button>
+                </div>
+              ) : (
+                <div className="f5-aviso-topo f5-aviso-topo--alerta">
+                  <span>Somente o dono da conta altera estes números. Você está vendo a configuração atual.</span>
                 </div>
               )}
             </div>
@@ -761,6 +765,11 @@ export function PainelDeSeguranca({ dados, secaoInicial }: Props) {
                 <button type="button" className="btn btn-primary" disabled={pendente} onClick={salvarSeguranca}>
                   {pendente ? 'Salvando…' : 'Salvar horário e alertas'}
                 </button>
+              </div>
+            )}
+            {!podeEditar && (
+              <div className="f5-aviso-topo f5-aviso-topo--alerta">
+                <span>Somente o dono da conta salva horários e alertas. Você está vendo as regras atuais.</span>
               </div>
             )}
           </div>

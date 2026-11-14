@@ -332,3 +332,16 @@
     grid-column: auto;
   }
 }
+
+/* Botão de excluir cliente: discreto, mas vermelho o bastante para não ser clicado sem querer. */
+.conta-btn-excluir {
+  color: #f2a5a5;
+  border-color: #4a2320;
+  background: #20120f;
+}
+
+.conta-btn-excluir:hover {
+  color: #ffd9d4;
+  border-color: #6d322c;
+  background: #2a1714;
+}

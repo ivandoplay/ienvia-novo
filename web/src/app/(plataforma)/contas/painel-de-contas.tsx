@@ -4,12 +4,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
 import { MARCA_PADRAO, type ContaSaasResumo, type EventoDeAuditoriaSuporte } from '@ienvia/shared/contas';
+import { Dialogo } from '@/components/ui/dialogo';
 import type { ModoSuporteAtivo } from '@/lib/sessao';
 import {
   atualizarClienteSaas,
   criarClienteSaas,
   encerrarModoSuporte,
   entrarEmModoSuporte,
+  excluirClienteSaas,
+  restaurarClienteSaas,
 } from './acoes';
 
 interface Props {
@@ -19,6 +22,8 @@ interface Props {
 }
 
 const ROTULOS_ACAO: Record<string, string> = {
+  platform_workspace_deleted: 'Excluiu cliente',
+  platform_workspace_restored: 'Restaurou cliente',
   support_session_started: 'Iniciou Modo Suporte',
   support_session_ended: 'Encerrou Modo Suporte',
   platform_workspace_created: 'Criou cliente SaaS',
@@ -69,6 +74,12 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
   const [editNotas, setEditNotas] = useState('');
   const [salvandoEdit, setSalvandoEdit] = useState(false);
 
+  // --- Exclusão de cliente ---
+  const [excluindo, setExcluindo] = useState<ContaSaasResumo | null>(null);
+  const [motivoExclusao, setMotivoExclusao] = useState('');
+  const [apagando, setApagando] = useState(false);
+  const [restaurandoId, setRestaurandoId] = useState<string | null>(null);
+
   // --- Modo Suporte ---
   const [suporteId, setSuporteId] = useState<string | null>(null);
   const [motivoSuporte, setMotivoSuporte] = useState('');
@@ -96,6 +107,37 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
       );
     });
   }, [contas, busca, filtroStatus]);
+
+  async function confirmarExclusao(evento: FormEvent) {
+    evento.preventDefault();
+    if (!excluindo || apagando) return;
+    setApagando(true);
+    const res = await excluirClienteSaas({ workspaceId: excluindo.id, motivo: motivoExclusao });
+    setApagando(false);
+    if (!res.ok) {
+      setAviso({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setAviso({ tipo: 'ok', texto: res.mensagem });
+    setExcluindo(null);
+    setMotivoExclusao('');
+  }
+
+  async function desfazerExclusao(conta: ContaSaasResumo) {
+    if (restaurandoId) return;
+    setRestaurandoId(conta.id);
+    const res = await restaurarClienteSaas(conta.id);
+    setRestaurandoId(null);
+    if (!res.ok) {
+      setAviso({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    setContas(res.contas);
+    setAuditoria(res.auditoria);
+    setAviso({ tipo: 'ok', texto: res.mensagem });
+  }
 
   function abrirEdicao(conta: ContaSaasResumo) {
     if (editandoId === conta.id) {
@@ -511,6 +553,27 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                           Entrar em suporte
                         </button>
                       )}
+                      {desativada ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={restaurandoId === conta.id}
+                          onClick={() => void desfazerExclusao(conta)}
+                        >
+                          {restaurandoId === conta.id ? 'Restaurando…' : 'Desfazer exclusão'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm conta-btn-excluir"
+                          onClick={() => {
+                            setExcluindo(conta);
+                            setMotivoExclusao('');
+                          }}
+                        >
+                          Excluir cliente
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -668,6 +731,56 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
           </div>
         )}
       </section>
+
+      {excluindo ? (
+      <Dialogo
+        titulo={`Excluir ${excluindo.name}?`}
+        aoFechar={() => {
+          if (!apagando) {
+            setExcluindo(null);
+            setMotivoExclusao('');
+          }
+        }}
+      >
+        <form onSubmit={(e) => void confirmarExclusao(e)} style={{ display: 'grid', gap: 12 }}>
+          <p className="panel-desc">
+            O cliente perde o acesso na hora: campanhas rodando param e os chips ficam desligados. Os dados
+            (contatos, conversas, áudios) <strong>não</strong> são apagados agora — dá para desfazer por 30 dias.
+          </p>
+          <div className="form-group">
+            <label className="form-label" htmlFor="motivo-exclusao">
+              Motivo da exclusão (fica no histórico)
+            </label>
+            <input
+              id="motivo-exclusao"
+              className="f7-input"
+              value={motivoExclusao}
+              onChange={(e) => setMotivoExclusao(e.target.value)}
+              placeholder="Ex.: teste encerrado, cliente pediu para sair, duplicado…"
+              minLength={3}
+              maxLength={500}
+              required
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="submit" className="btn btn-primary" disabled={apagando || motivoExclusao.trim().length < 3}>
+              {apagando ? 'Excluindo…' : 'Excluir cliente'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={apagando}
+              onClick={() => {
+                setExcluindo(null);
+                setMotivoExclusao('');
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </Dialogo>
+      ) : null}
     </div>
   );
 }

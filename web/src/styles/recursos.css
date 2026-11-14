@@ -486,3 +486,17 @@
     position: static;
   }
 }
+
+/* Botão de transcrição automática, acima da caixa de texto do áudio. */
+.f6-transcricao-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 6px 0 4px;
+}
+
+.f6-transcricao-acoes small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}

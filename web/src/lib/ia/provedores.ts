@@ -276,6 +276,102 @@ async function listarModelosDoGemini(chave: string): Promise<ModeloDisponivel[]>
 }
 
 // ---------------------------------------------------------------------------------------------
+// Transcrição de áudio (Gemini)
+// ---------------------------------------------------------------------------------------------
+
+/** Modelos que aceitam áudio e devolvem texto. O primeiro que existir na chave do cliente é usado. */
+export const MODELOS_DE_TRANSCRICAO = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'] as const;
+
+/** O arquivo enviado é limitado a 16 MB; o pedido inteiro (base64 + prompt) fica abaixo do teto da API. */
+const LIMITE_DO_AUDIO_EM_BYTES = 16 * 1024 * 1024;
+const TEMPO_LIMITE_DA_TRANSCRICAO = 55_000;
+
+const INSTRUCAO_DE_TRANSCRICAO = [
+  'Transcreva o áudio em português do Brasil, exatamente como foi falado, sem resumir e sem comentar.',
+  'Escreva em texto corrido, com pontuação natural. Não use marcadores, títulos, aspas ou negrito.',
+  'Se houver mais de um falante, separe as falas começando com "Falante 1:", "Falante 2:" e assim por diante.',
+  'Se o áudio estiver mudo, com ruído ou impossível de entender, responda apenas: [inaudível]',
+].join(' ');
+
+/** Converte bytes em base64 sem depender de Buffer (o arquivo roda também fora do Node). */
+function bytesParaBase64(bytes: Uint8Array): string {
+  let binario = '';
+  const passo = 0x8000;
+  for (let i = 0; i < bytes.length; i += passo) {
+    binario += String.fromCharCode(...bytes.subarray(i, i + passo));
+  }
+  return btoa(binario);
+}
+
+/**
+ * Manda o áudio para o Gemini e devolve a transcrição.
+ * A chave do cliente nunca sai daqui: só vai para o endereço oficial do Gemini (ou o de teste local).
+ */
+export async function transcreverAudio(pedido: {
+  chave: string;
+  audio: Uint8Array;
+  contentType: string;
+  modelo?: string;
+}): Promise<{ texto: string; modelo: string }> {
+  if (!pedido.chave) throw new ErroDeIa('gemini', 'chave_invalida', 'Nenhuma chave do Gemini cadastrada.');
+  if (pedido.audio.byteLength === 0) throw new ErroDeIa('gemini', 'recusada', 'O arquivo de áudio chegou vazio.');
+  if (pedido.audio.byteLength > LIMITE_DO_AUDIO_EM_BYTES) {
+    throw new ErroDeIa('gemini', 'recusada', 'O áudio passa de 16 MB. Corte em partes menores.');
+  }
+  const base64 = bytesParaBase64(pedido.audio);
+
+  const preferido = pedido.modelo ? nomeDoModeloGemini(pedido.modelo) : null;
+  const candidatos = preferido ? [preferido] : [...MODELOS_DE_TRANSCRICAO];
+  const corpo = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { inline_data: { mime_type: pedido.contentType, data: base64 } },
+          { text: INSTRUCAO_DE_TRANSCRICAO },
+        ],
+      },
+    ],
+    generationConfig: { temperature: 0, maxOutputTokens: 2048 },
+  };
+
+  let ultimoErro: ErroDeIa | null = null;
+  for (const modelo of candidatos) {
+    const { status, dados } = await chamar(
+      'gemini',
+      `${enderecoDoProvedor('gemini')}/v1beta/models/${modelo}:generateContent`,
+      { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': pedido.chave }, body: JSON.stringify(corpo) },
+      TEMPO_LIMITE_DA_TRANSCRICAO,
+    );
+
+    if (status < 200 || status >= 300) {
+      const erro = erroDoGemini(status, dados, modelo);
+      ultimoErro = erro;
+      // Modelo que não existe nesta chave: tenta o próximo da lista.
+      if (erro.motivo === 'modelo_inexistente') continue;
+      throw erro;
+    }
+
+    const candidatosDeSaida = objeto(dados)?.candidates;
+    const primeira = Array.isArray(candidatosDeSaida) ? objeto(candidatosDeSaida[0]) : null;
+    const partes = objeto(primeira?.content)?.parts;
+    const dito = (Array.isArray(partes) ? partes : [])
+      .map((parte) => texto(objeto(parte)?.text))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const bloqueio = texto(objeto(objeto(dados)?.promptFeedback)?.blockReason);
+    if (bloqueio) throw new ErroDeIa('gemini', 'bloqueada', `O Gemini recusou o áudio (${bloqueio}).`, status);
+    if (!dito) throw new ErroDeIa('gemini', 'resposta_vazia', 'O Gemini respondeu sem transcrição.', status);
+
+    return { texto: dito, modelo };
+  }
+
+  throw ultimoErro ?? new ErroDeIa('gemini', 'modelo_inexistente', 'Nenhum modelo de transcrição disponível nesta chave.');
+}
+
+// ---------------------------------------------------------------------------------------------
 // OpenRouter (formato "chat completions", igual ao da OpenAI)
 // ---------------------------------------------------------------------------------------------
 

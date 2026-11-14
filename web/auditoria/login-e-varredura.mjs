@@ -150,7 +150,6 @@ async function main() {
     await pagina.screenshot({ path: `${SAIDA}/${String(indice + 2).padStart(2, '0')}-${tela.nome}-dobra.png` });
 
     const medidas = await pagina.evaluate(MEDIDAS);
-    const titulo = await pagina.title();
     const texto = (await pagina.locator('main').innerText().catch(() => '')).slice(0, 400);
 
     if (medidas.estourou > 2) registrar(tela.nome, 'rolagem lateral', `${medidas.estourou}px além da janela (documento ${medidas.larguraDocumento}px em janela de ${medidas.larguraJanela}px)`);

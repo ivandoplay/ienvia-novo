@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const BASE='http://127.0.0.1:3100';
+const env = Object.fromEntries(readFileSync('/home/user/.env','utf8').split('\n').map(l=>l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const b=await chromium.launch();
+const p=await (await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,locale:'pt-BR'})).newPage();
+await p.goto(`${BASE}/login`,{waitUntil:'networkidle'});
+await p.getByLabel(/usuário|usuario|e-mail|email/i).first().fill(env.TESTE_USUARIO);
+await p.getByLabel(/senha/i).first().fill(env.TESTE_SENHA);
+await p.getByRole('button',{name:/entrar|acessar/i}).first().click(); await p.waitForTimeout(2500);
+await p.goto(`${BASE}/seguranca`,{waitUntil:'networkidle'}); await p.waitForTimeout(2000);
+await p.screenshot({path:'/home/user/ienvia/auditoria-visual/final/celular-seguranca.png'});
+const abas = await p.evaluate(`(() => [...document.querySelectorAll('[role="tab"], .f5-aba')].map(e=>{const r=e.getBoundingClientRect(); return {txt:e.textContent.trim().slice(0,22), w:Math.round(r.width), h:Math.round(r.height), visivel:r.width>0&&r.height>0};}))()`);
+console.log(JSON.stringify(abas));
+await b.close();

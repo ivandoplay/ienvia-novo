@@ -255,3 +255,64 @@ describe('Fase 7 — configurações, clientes SaaS, Modo Suporte e limpeza de r
     });
   });
 });
+
+describe('Exclusão de cliente pelo administrador da plataforma', () => {
+  test('ninguém além do master exclui; a exclusão bloqueia na hora e pode ser desfeita', async () => {
+    for (const quem of [DONA_A, INTRUSO, ATENDENTE_A]) {
+      await banco.comoUsuario(quem, async () => {
+        expect(
+          await banco.esperarErro(() =>
+            banco.db.query(`select public.delete_platform_workspace('${LOJA_A}', 'teste')`),
+          ),
+        ).toMatch(/Platform master required/);
+        expect(
+          await banco.esperarErro(() => banco.db.query(`select public.restore_platform_workspace('${LOJA_A}')`)),
+        ).toMatch(/Platform master required/);
+      });
+    }
+
+    await banco.comoUsuario(MASTER, async () => {
+      // Motivo é obrigatório para o histórico.
+      expect(await banco.esperarErro(() => banco.db.query(`select public.delete_platform_workspace('${LOJA_B}', '')`))).toMatch(
+        /Invalid reason|reason/i,
+      );
+
+      const excluida = await banco.db.query<{
+        res: { status: string; deletion_started_at: string | null; desfazivel_ate: string; contacts: number };
+      }>(`select public.delete_platform_workspace('${LOJA_B}', 'Cliente pediu para sair') as res`);
+      const res = excluida.rows[0]?.res;
+      expect(res?.status).toBe('closed');
+      expect(res?.deletion_started_at).not.toBeNull();
+      expect(typeof res?.contacts).toBe('number');
+
+      // A tabela é lida pelo retorno da função: o master não tem SELECT direto em workspaces dentro de RLS.
+      const empresa = await banco.db.query<{ res: { name: string; status: string } }>(
+        `select public.update_platform_workspace('${LOJA_B}', 'Loja B', 'closed', 2, 'Padrão', '') as res`,
+      );
+      expect(empresa.rows[0]?.res.status).toBe('closed');
+      expect(empresa.rows[0]?.deletion_started_at).not.toBeNull();
+
+      // Chips do cliente saem de operação e campanhas rodando param.
+      const chips = await banco.db.query<{ ligados: number }>(
+        `select count(*)::int as ligados from public.instances where workspace_id = '${LOJA_B}' and is_enabled`,
+      );
+      expect(chips.rows[0]?.ligados).toBe(0);
+
+      // O histórico da plataforma mostra a exclusão e o motivo (a tabela privada não é legível pelo master).
+      const lista = await banco.db.query<{ items: Array<{ action: string; details?: { reason?: string } }> }>(
+        `select public.list_platform_support_audit(50) as items`,
+      );
+      const eventos = lista.rows[0]?.items ?? [];
+      const exclusao = eventos.find((e) => e.action === 'platform_workspace_deleted') as
+        | { action: string; details?: { reason?: string } }
+        | undefined;
+      expect(exclusao).toBeTruthy();
+      expect(exclusao?.details?.reason).toBe('Cliente pediu para sair');
+
+      const restaurada = await banco.db.query<{ res: { status: string; restored: boolean } }>(
+        `select public.restore_platform_workspace('${LOJA_B}') as res`,
+      );
+      expect(restaurada.rows[0]?.res).toMatchObject({ status: 'active', restored: true });
+    });
+  });
+});

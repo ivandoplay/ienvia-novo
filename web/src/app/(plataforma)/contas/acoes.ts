@@ -186,3 +186,72 @@ export async function encerrarModoSuporte(): Promise<RetornoComLista> {
     auditoria: atualizado.auditoria,
   };
 }
+
+/**
+ * Exclui um cliente do SaaS. O cliente perde o acesso na hora (campanhas param, chips desligam) e o
+ * pedido de exclusão fica registrado; o dono da plataforma pode desfazer por 30 dias.
+ */
+export async function excluirClienteSaas(entrada: {
+  workspaceId: string;
+  motivo: string;
+}): Promise<RetornoComLista> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+  if (!entrada.workspaceId) return { ok: false, erro: 'Escolha o cliente que vai ser excluído.' };
+
+  const motivo = String(entrada.motivo ?? '').trim();
+  if (motivo.length < 3) return { ok: false, erro: 'Escreva o motivo da exclusão (aparece no histórico).' };
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('delete_platform_workspace', {
+    p_workspace_id: entrada.workspaceId,
+    p_motivo: motivo.slice(0, 500),
+  });
+
+  if (error) {
+    console.error('[contas] falha ao excluir cliente:', error);
+    const msg = error.message ?? '';
+    if (msg.includes('Workspace not found')) return { ok: false, erro: 'Este cliente não existe mais.' };
+    return { ok: false, erro: 'Não foi possível excluir este cliente agora.' };
+  }
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  const nome = (data as { name?: string } | null)?.name ?? 'Cliente';
+  return {
+    ok: true,
+    mensagem: `${nome} foi excluído. O acesso já está bloqueado e dá para desfazer por 30 dias.`,
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}
+
+/** Desfaz uma exclusão feita por engano, enquanto o prazo de 30 dias não venceu. */
+export async function restaurarClienteSaas(workspaceId: string): Promise<RetornoComLista> {
+  const sessao = await obterSessao();
+  if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
+  if (!workspaceId) return { ok: false, erro: 'Escolha o cliente que vai ser restaurado.' };
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('restore_platform_workspace', { p_workspace_id: workspaceId });
+
+  if (error) {
+    console.error('[contas] falha ao restaurar cliente:', error);
+    if ((error.message ?? '').includes('Deletion window expired')) {
+      return { ok: false, erro: 'O prazo de 30 dias para desfazer esta exclusão já passou.' };
+    }
+    return { ok: false, erro: 'Não foi possível restaurar este cliente agora.' };
+  }
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/contas');
+  const atualizado = await carregarContasSaas();
+  const nome = (data as { name?: string } | null)?.name ?? 'Cliente';
+  return {
+    ok: true,
+    mensagem: `${nome} voltou a ficar ativo.`,
+    contas: atualizado.contas,
+    auditoria: atualizado.auditoria,
+  };
+}

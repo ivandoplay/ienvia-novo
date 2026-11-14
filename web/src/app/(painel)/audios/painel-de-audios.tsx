@@ -14,6 +14,7 @@ import {
   excluirAudioEstrategico,
   prepararUploadAudioEstrategico,
   salvarAudioEstrategico,
+  transcreverAudioEstrategico,
 } from './acoes';
 
 interface AudioRascunho {
@@ -127,6 +128,8 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
   const [editando, setEditando] = useState<AudioRascunho | null>(null);
   const [erroModal, setErroModal] = useState<string | null>(null);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  // Transcrição automática pela chave do Gemini cadastrada em Motor de IA.
+  const [transcrevendo, setTranscrevendo] = useState(false);
   const [confirmarExclusao, setConfirmarExclusao] = useState<AudioEstrategico | null>(null);
 
   // Gravador no navegador
@@ -160,6 +163,23 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
       );
     });
   }, [audios, busca, filtroIa]);
+
+  async function transcreverSozinho() {
+    if (!editando?.objectKey || transcrevendo) return;
+    setErroModal(null);
+    setTranscrevendo(true);
+    const resultado = await transcreverAudioEstrategico({
+      objectKey: editando.objectKey,
+      contentType: editando.contentType,
+    });
+    setTranscrevendo(false);
+    if (!resultado.ok) {
+      setErroModal(resultado.erro);
+      return;
+    }
+    const texto = resultado.texto.trim();
+    setEditando((atual) => (atual ? { ...atual, transcription: texto } : atual));
+  }
 
   async function enviarAudioParaDeposito(blob: Blob, nomeOriginal: string, tipoMime: string) {
     if (!editando) return;
@@ -581,13 +601,32 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
 
             <div className="campo-bloco">
               <label htmlFor="aud-transcricao">Transcrição exata do que é falado (obrigatória)</label>
+              <div className="f6-transcricao-acoes">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={transcrevendo || enviandoArquivo || !editando.objectKey}
+                  onClick={() => void transcreverSozinho()}
+                  title={
+                    editando.objectKey
+                      ? 'Ouve o áudio e escreve a transcrição usando a chave do Gemini cadastrada em Motor de IA'
+                      : 'Grave ou envie o áudio primeiro'
+                  }
+                >
+                  <Icone nome="motorIa" className="icon-15" />
+                  {transcrevendo ? 'Transcrevendo…' : 'Transcrever automaticamente (Gemini)'}
+                </button>
+                <small>
+                  Usa a chave do Gemini cadastrada em Motor de IA. Se preferir, digite a transcrição à mão.
+                </small>
+              </div>
               <textarea
                 id="aud-transcricao"
                 rows={4}
                 className="campo"
                 placeholder="Escreva exatamente o que você fala neste áudio. A IA usa esse texto para decidir quando enviá-lo e responder em texto na Skill S06."
                 value={editando.transcription}
-                onChange={(e) => setEditando({ ...editando, transcription: e.target.value })}
+                onChange={(e) => setEditando((atual) => (atual ? { ...atual, transcription: e.target.value } : atual))}
               />
             </div>
 
