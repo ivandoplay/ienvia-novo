@@ -31,6 +31,9 @@ export async function POST(pedido: Request) {
     return Response.json({ ok: false, erro: 'painel sem configuração de serviço' }, { status: 503 });
   }
 
+  // Bloqueio automático: cliente que passou da carência e ligou a opção é suspenso aqui.
+  const { data: bloqueio } = await supabase.rpc('suspend_overdue_workspaces', { p_limit: 20 });
+
   // Os avisos de conta suspensa saem por um chip conectado — o mesmo caminho dos agendamentos.
   await entregarAvisosDeSuspensao(supabase, 5);
 
@@ -39,5 +42,5 @@ export async function POST(pedido: Request) {
     executarCampanhasEFilaSegura(supabase, chegouEm, 48_000),
     executarLimpezaDeRetencao(supabase, 30),
   ]);
-  return Response.json({ ok: true, ...resumo, disparos, retencao });
+  return Response.json({ ok: true, ...resumo, disparos, retencao, bloqueio });
 }

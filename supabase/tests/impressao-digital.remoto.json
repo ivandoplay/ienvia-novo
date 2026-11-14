@@ -1,16 +1,16 @@
 {
   "categorias": {
     "colunas": {
-      "itens": 624,
-      "md5": "f48c6f3ae273a5d0abedc647ac16851a"
+      "itens": 625,
+      "md5": "9db2ced04881975a348a04c343af1493"
     },
     "deposito": {
       "itens": 4,
       "md5": "f697288d0636e569f349b9df5579a799"
     },
     "funcoes": {
-      "itens": 203,
-      "md5": "4cf7ba5bd790345baf0a02685b69a0e7"
+      "itens": 204,
+      "md5": "2116833bab06d9b52d4fddd8bb912192"
     },
     "gatilhos": {
       "itens": 26,
@@ -25,8 +25,8 @@
       "md5": "4f92ec1b1838543f578ff7a458d9cf17"
     },
     "permissoes_funcao": {
-      "itens": 609,
-      "md5": "3c1f6b6884a87ee1f0eb97fb8601cfbb"
+      "itens": 612,
+      "md5": "24fc4edb2bf6f3c28e55fb3f27b6f474"
     },
     "permissoes_tabela": {
       "itens": 417,

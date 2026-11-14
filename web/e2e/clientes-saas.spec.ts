@@ -177,6 +177,49 @@ test.describe('Clientes SaaS — mesa de administração', () => {
     await expect(page.getByText('Zerou os dados do cliente — Clínica do Teste')).toBeVisible();
   });
 
+  test('bloqueio automático: só suspende o cliente que ligou a opção e passou da carência', async ({ page }) => {
+    await entrar(page, 'master@exemplo.com');
+    await page.goto('/contas');
+
+    await criarCliente(page, 'Clínica Atrasada', 'clinica_atrasada');
+    const cartao = page.locator('.conta-card', { hasText: 'Clínica Atrasada' }).first();
+
+    // Cobrança vencida há muito tempo (pago até 01/01/2026) + carência de 3 dias + bloqueio automático ligado.
+    await cartao.getByRole('button', { name: 'Cobrança' }).click();
+    const formulario = cartao.locator('.conta-editor');
+    await formulario.getByLabel('Dia do vencimento').fill('10');
+    await formulario.getByLabel('Carência depois do vencimento (dias)').fill('3');
+    // A data é digitada como no Brasil: dia, mês e ano.
+    await formulario.getByLabel('Pago até (data)').fill('01/01/2026');
+    await formulario.getByLabel(/Suspender sozinho quando passar da carência/).check();
+    await formulario.getByRole('button', { name: 'Salvar cobrança' }).click();
+
+    await expect(page.getByText('Cobrança salva. O painel já mostra a nova situação.')).toBeVisible();
+    await expect(cartao).toContainText('Vencida');
+    await expect(cartao).toContainText('Suspende sozinho no atraso');
+    await expect(cartao).toContainText('Ativa'); // ainda não rodou a rotina
+
+    // A rotina do cron (o mesmo caminho do relógio de produção) suspende o cliente atrasado.
+    const resposta = await page.request.post('http://127.0.0.1:3100/api/cron/agendamentos', {
+      headers: { 'x-ienvia-cron': 'segredo-do-cron-de-teste' },
+    });
+    // O cron é a rotina do relógio de produção: aqui ela roda de verdade, contra o banco de teste.
+    expect(resposta.ok()).toBe(true);
+    const corpo = (await resposta.json()) as { bloqueio?: { suspended?: Array<{ name?: string }> } };
+    expect(corpo.bloqueio?.suspended?.map((c) => c.name)).toContain('Clínica Atrasada');
+
+    await page.reload();
+    await expect(page.locator('.conta-card', { hasText: 'Clínica Atrasada' })).toContainText('Desativada');
+    // O histórico registra que foi o sistema, e não uma pessoa.
+    await expect(
+      page.getByText('Suspendeu o cliente (automático, mensalidade vencida) — Clínica Atrasada').first(),
+    ).toBeVisible();
+
+    // Cliente em dia NÃO é suspenso, mesmo com a opção ligada.
+    await page.reload();
+    await expect(page.locator('.conta-card', { hasText: 'Loja da Maria' })).toContainText('Ativa');
+  });
+
   test('print das telas novas no celular e no computador', async ({ page }, info) => {
     mkdirSync(PASTA, { recursive: true });
     await entrar(page, 'master@exemplo.com');
@@ -188,6 +231,9 @@ test.describe('Clientes SaaS — mesa de administração', () => {
     await formulario.getByLabel('Dia do vencimento').fill('10');
     await formulario.getByLabel('Valor por mês (R$)').fill('149,00');
     await formulario.getByLabel('WhatsApp do responsável (recebe o aviso)').fill('+55 (85) 99999-9999');
+    await formulario.getByLabel(/Suspender sozinho quando passar da carência/).check();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${PASTA}/${info.project.name}-00-cobranca.png`, fullPage: true });
     await formulario.getByRole('button', { name: 'Salvar cobrança' }).click();
     await expect(cartao).toContainText('Vencida');
     await cartao.getByRole('button', { name: 'Marcar mês como pago' }).click();

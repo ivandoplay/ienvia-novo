@@ -98,6 +98,8 @@ export interface ContaSaasCobranca {
   suspendNotice: string;
   /** WhatsApp do responsável que recebe o aviso (só dígitos). Vazio = o próprio chip. */
   ownerWhatsapp: string;
+  /** Suspender sozinho quando passar da carência (o master liga por cliente). */
+  autoSuspend: boolean;
   /** Calculada no servidor com a data de hoje, em Brasília. */
   situation: SituacaoDeCobranca;
   /** Quantos dias faltam (positivo) ou passaram (negativo) até o vencimento. */

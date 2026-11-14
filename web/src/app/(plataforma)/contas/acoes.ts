@@ -271,6 +271,7 @@ export async function salvarCobrancaDoCliente(entrada: {
   paidUntil: string;
   suspendNotice: string;
   ownerWhatsapp: string;
+  autoSuspend: boolean;
 }): Promise<RetornoComLista> {
   const sessao = await obterSessao();
   if (!sessao?.ehMaster) return { ok: false, erro: SOMENTE_MASTER };
@@ -287,6 +288,7 @@ export async function salvarCobrancaDoCliente(entrada: {
     p_grace_days: validado.dados.graceDays,
     p_paid_until: validado.dados.paidUntil,
     p_suspend_notice: validado.dados.suspendNotice,
+    p_auto_suspend: entrada.autoSuspend === true,
   });
 
   if (error) {

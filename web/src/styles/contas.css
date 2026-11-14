@@ -445,3 +445,36 @@
 .aviso-painel-fechar:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
+
+.cobranca-auto {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-subtle);
+  cursor: pointer;
+}
+
+.cobranca-auto input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.cobranca-auto strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+
+.cobranca-auto small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}

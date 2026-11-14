@@ -28,6 +28,8 @@ alter table private.workspace_admin_meta
     check (char_length(suspend_notice) <= 600),
   -- Para quem o aviso vai: o WhatsApp pessoal do responsável (só dígitos, com DDI).
   -- Vazio = o aviso sai para o próprio número do chip (a conversa "com você mesmo").
+  -- Bloqueio automático: só acontece no cliente em que o master ligar esta opção.
+  add column if not exists auto_suspend boolean not null default false,
   add column if not exists owner_whatsapp text not null default ''
     check (owner_whatsapp = '' or owner_whatsapp ~ '^[0-9]{10,15}$');
 
@@ -102,6 +104,7 @@ begin
       'paid_until', meta.paid_until,
       'suspend_notice', coalesce(meta.suspend_notice, ''),
       'owner_whatsapp', coalesce(meta.owner_whatsapp, ''),
+      'auto_suspend', coalesce(meta.auto_suspend, false),
       -- Uso do mês corrente (fuso do Brasil, para "mês" bater com o calendário do cliente)
       'messages_month', (
         select count(*)::int from public.messages m
@@ -183,7 +186,8 @@ create or replace function public.set_workspace_billing(
   p_monthly_amount_cents integer,
   p_grace_days integer,
   p_paid_until date,
-  p_suspend_notice text
+  p_suspend_notice text,
+  p_auto_suspend boolean default false
 )
 returns jsonb
 language plpgsql
@@ -217,11 +221,11 @@ begin
   end if;
 
   insert into private.workspace_admin_meta (
-    workspace_id, due_day, monthly_amount_cents, grace_days, paid_until, suspend_notice
+    workspace_id, due_day, monthly_amount_cents, grace_days, paid_until, suspend_notice, auto_suspend
   )
   values (
     p_workspace_id, p_due_day, p_monthly_amount_cents, p_grace_days, p_paid_until,
-    btrim(coalesce(p_suspend_notice, ''))
+    btrim(coalesce(p_suspend_notice, '')), coalesce(p_auto_suspend, false)
   )
   on conflict (workspace_id) do update set
     due_day = excluded.due_day,
@@ -229,6 +233,7 @@ begin
     grace_days = excluded.grace_days,
     paid_until = excluded.paid_until,
     suspend_notice = excluded.suspend_notice,
+    auto_suspend = excluded.auto_suspend,
     updated_at = now();
 
   insert into private.audit_events (workspace_id, actor_user_id, actor_kind, action, target_type, target_id, details)
@@ -246,8 +251,10 @@ begin
 end;
 $$;
 
-revoke all on function public.set_workspace_billing(uuid, integer, integer, integer, date, text) from public, anon;
-grant execute on function public.set_workspace_billing(uuid, integer, integer, integer, date, text) to authenticated;
+-- A assinatura antiga (sem o bloqueio automático) deixa de existir.
+drop function if exists public.set_workspace_billing(uuid, integer, integer, integer, date, text);
+revoke all on function public.set_workspace_billing(uuid, integer, integer, integer, date, text, boolean) from public, anon;
+grant execute on function public.set_workspace_billing(uuid, integer, integer, integer, date, text, boolean) to authenticated;
 
 -- =============================================================================================
 -- 5. Marcar como pago: soma um mês a partir do vencimento atual (ou de hoje, se atrasado)
@@ -570,6 +577,90 @@ $$;
 
 revoke all on function public.claim_suspension_notices(integer) from public, anon, authenticated;
 grant execute on function public.claim_suspension_notices(integer) to service_role;
+
+-- =============================================================================================
+-- 10b. Bloqueio automático: quem passou da carência e ligou a opção é suspenso sozinho
+-- =============================================================================================
+
+create or replace function public.suspend_overdue_workspaces(p_limit integer default 20)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_limite int := greatest(1, least(coalesce(p_limit, 20), 100));
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_alvo record;
+  v_suspensos jsonb := '[]'::jsonb;
+  v_aviso text;
+  v_chips int;
+  v_avisos int;
+begin
+  if coalesce(current_setting('role', true), '') <> 'service_role' then
+    raise exception 'Service role required' using errcode = '42501';
+  end if;
+
+  for v_alvo in
+    select w.id, w.name, meta.suspend_notice, meta.grace_days, meta.paid_until
+    from public.workspaces w
+    join private.workspace_admin_meta meta on meta.workspace_id = w.id
+    where w.status = 'active'
+      and meta.auto_suspend is true
+      and meta.paid_until is not null
+      -- Passou do dia pago + carência: é atraso de verdade, não "vence hoje".
+      and (meta.paid_until + meta.grace_days) < v_hoje
+    order by meta.paid_until asc
+    limit v_limite
+    for update of w skip locked
+  loop
+    update public.workspaces
+    set status = 'closed', closed_at = coalesce(closed_at, now())
+    where id = v_alvo.id;
+
+    update public.campaigns set status = 'paused'
+    where workspace_id = v_alvo.id and status = 'running';
+
+    update public.instances set is_enabled = false
+    where workspace_id = v_alvo.id and is_enabled is distinct from false;
+    get diagnostics v_chips = row_count;
+
+    v_avisos := 0;
+    v_aviso := btrim(coalesce(v_alvo.suspend_notice, ''));
+    if char_length(v_aviso) > 0 then
+      insert into public.suspension_notices (workspace_id, instance_id, number_key, body_text)
+      select v_alvo.id, i.id,
+             coalesce(nullif(meta.owner_whatsapp, ''), nullif(i.logical_number_key, ''), ''),
+             v_aviso
+      from public.instances i
+      left join private.workspace_admin_meta meta on meta.workspace_id = v_alvo.id
+      where i.workspace_id = v_alvo.id and i.status <> 'revoked'
+      order by i.created_at asc
+      limit 1;
+      get diagnostics v_avisos = row_count;
+    end if;
+
+    insert into private.audit_events (workspace_id, actor_user_id, actor_kind, action, target_type, target_id, details)
+    values (
+      v_alvo.id, null, 'service', 'platform_workspace_auto_suspended', 'workspace', v_alvo.id::text,
+      jsonb_build_object(
+        'paid_until', v_alvo.paid_until,
+        'grace_days', v_alvo.grace_days,
+        'reason', 'mensalidade vencida',
+        'chips_disabled', v_chips,
+        'notice_queued', v_avisos > 0
+      )
+    );
+
+    v_suspensos := v_suspensos || jsonb_build_object('id', v_alvo.id, 'name', v_alvo.name);
+  end loop;
+
+  return jsonb_build_object('suspended', v_suspensos);
+end;
+$$;
+
+revoke all on function public.suspend_overdue_workspaces(integer) from public, anon, authenticated;
+grant execute on function public.suspend_overdue_workspaces(integer) to service_role;
 
 -- =============================================================================================
 -- 11. Fechamento de cada aviso: enviado, falhou ou segue na fila

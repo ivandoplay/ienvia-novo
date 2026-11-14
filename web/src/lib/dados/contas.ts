@@ -35,6 +35,7 @@ interface ContaBruta {
   paid_until: string | null;
   suspend_notice: string;
   owner_whatsapp: string;
+  auto_suspend: boolean;
   messages_month: number;
   ai_replies_month: number;
   last_message_at: string | null;
@@ -126,6 +127,7 @@ export async function carregarContasSaas(): Promise<DadosDeContasSaas> {
         paidUntil: item.paid_until ?? null,
         suspendNotice: item.suspend_notice ?? '',
         ownerWhatsapp: item.owner_whatsapp ?? '',
+        autoSuspend: item.auto_suspend === true,
       };
       const { situation, daysToDue } = situacaoDaCobranca(cobranca, hojeEmBrasilia());
       return { ...cobranca, situation, daysToDue };

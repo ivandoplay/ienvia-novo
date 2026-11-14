@@ -13,6 +13,7 @@ import {
   type EventoDeAuditoriaSuporte,
   type SituacaoDeCobranca,
 } from '@ienvia/shared/contas';
+import { CampoDeData } from '@/components/ui/campo-de-data';
 import { Dialogo } from '@/components/ui/dialogo';
 import type { ModoSuporteAtivo } from '@/lib/sessao';
 import {
@@ -55,6 +56,7 @@ const ROTULOS_ACAO: Record<string, string> = {
   platform_workspace_reactivated: 'Reativou o cliente',
   platform_workspace_reset: 'Zerou os dados do cliente',
   platform_workspace_password_reset: 'Trocou a senha do responsável',
+  platform_workspace_auto_suspended: 'Suspendeu o cliente (automático, mensalidade vencida)',
 };
 
 /** Classe da etiqueta de cobrança por situação. */
@@ -125,6 +127,7 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
   const [cobCarencia, setCobCarencia] = useState('3');
   const [cobPagoAte, setCobPagoAte] = useState('');
   const [cobWhatsapp, setCobWhatsapp] = useState('');
+  const [cobAuto, setCobAuto] = useState(false);
   const [cobAviso, setCobAviso] = useState('');
   const [salvandoCobranca, setSalvandoCobranca] = useState(false);
 
@@ -222,6 +225,7 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
     setCobCarencia(String(conta.billing.graceDays));
     setCobPagoAte(conta.billing.paidUntil ?? '');
     setCobWhatsapp(conta.billing.ownerWhatsapp ? formatarWhatsapp(conta.billing.ownerWhatsapp) : '');
+    setCobAuto(conta.billing.autoSuspend);
     setCobAviso(
       conta.billing.suspendNotice ||
         'Oi! Seu acesso ao painel está suspenso por falta de pagamento. Assim que regularizar, a gente libera na hora.',
@@ -241,6 +245,7 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
       paidUntil: cobPagoAte,
       suspendNotice: cobAviso,
       ownerWhatsapp: cobWhatsapp,
+      autoSuspend: cobAuto,
     });
     setAcaoEmCurso(null);
     setSalvandoCobranca(false);
@@ -752,6 +757,9 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                             </span>
                             <span className="conta-cobranca-prazo">{descreverPrazoDaCobranca(conta.billing.daysToDue)}</span>
                             <span>Carência de {conta.billing.graceDays} dia(s)</span>
+                            <span>
+                              {conta.billing.autoSuspend ? 'Suspende sozinho no atraso' : 'Suspensão manual'}
+                            </span>
                           </>
                         ) : (
                           <span>Sem cobrança combinada. Use o botão Cobrança para definir vencimento e valor.</span>
@@ -1007,20 +1015,18 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                             value={cobCarencia}
                             onChange={(e) => setCobCarencia(e.target.value)}
                           />
-                          <p className="form-help">Passou da carência, o painel marca como vencida para você suspender.</p>
+                          <p className="form-help">
+                            Depois desse prazo o painel marca como vencida — e, se a opção de suspender sozinho
+                            estiver ligada, é nesta hora que o cliente é suspenso.
+                          </p>
                         </div>
-                        <div className="form-group">
-                          <label className="form-label" htmlFor={`cob-pago-${conta.id}`}>
-                            Pago até (data)
-                          </label>
-                          <input
-                            id={`cob-pago-${conta.id}`}
-                            type="date"
-                            className="f7-input"
-                            value={cobPagoAte}
-                            onChange={(e) => setCobPagoAte(e.target.value)}
-                          />
-                        </div>
+                        <CampoDeData
+                          id={`cob-pago-${conta.id}`}
+                          rotulo="Pago até (data)"
+                          valor={cobPagoAte}
+                          aoMudar={setCobPagoAte}
+                          ajuda="Dia, mês e ano. Ex.: 10/12/2026."
+                        />
                         <div className="form-group f7-span-2">
                           <label className="form-label" htmlFor={`cob-whats-${conta.id}`}>
                             WhatsApp do responsável (recebe o aviso)
@@ -1037,6 +1043,24 @@ export function PainelDeContas({ contasIniciais, auditoriaInicial, modoSuporte }
                             O aviso de suspensão é enviado para este número. Em branco, sai para o próprio chip do
                             cliente.
                           </p>
+                        </div>
+                        <div className="form-group f7-span-2">
+                          <label className="cobranca-auto" htmlFor={`cob-auto-${conta.id}`}>
+                            <input
+                              id={`cob-auto-${conta.id}`}
+                              type="checkbox"
+                              checked={cobAuto}
+                              onChange={(e) => setCobAuto(e.target.checked)}
+                            />
+                            <span>
+                              <strong>Suspender sozinho quando passar da carência</strong>
+                              <small>
+                                 Ligado: no dia seguinte ao fim da carência, o cliente é suspenso automaticamente (chips
+                                 desligados e o aviso acima na fila). Desligado: o painel só marca como vencida e você
+                                 decide.
+                              </small>
+                            </span>
+                          </label>
                         </div>
                         <div className="form-group f7-span-2">
                           <label className="form-label" htmlFor={`cob-aviso-${conta.id}`}>

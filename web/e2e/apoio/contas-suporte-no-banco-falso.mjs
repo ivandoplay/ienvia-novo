@@ -18,6 +18,7 @@ export const FUNCOES_CONTAS_E_SUPORTE = [
   'reset_platform_workspace',
   'owner_of_workspace',
   'log_platform_action',
+  'suspend_overdue_workspaces',
   'list_platform_support_audit',
   'start_support_session',
   'end_support_session',
@@ -26,7 +27,8 @@ export const FUNCOES_CONTAS_E_SUPORTE = [
   'restore_platform_workspace',
 ];
 
-export const FUNCOES_SERVIDOR_FASE7 = ['provision_platform_workspace'];
+// RPCs chamadas pelo servidor do painel (chave de serviço): o relógio/cron e a criação de cliente.
+export const FUNCOES_SERVIDOR_FASE7 = ['provision_platform_workspace', 'suspend_overdue_workspaces'];
 
 const clonar = (valor) => JSON.parse(JSON.stringify(valor));
 
@@ -66,6 +68,7 @@ export function criarContasESuporteDoBanco({
     paid_until: null,
     suspend_notice: '',
     owner_whatsapp: '',
+    auto_suspend: false,
   });
 
   function reiniciarFase7() {
@@ -179,8 +182,48 @@ export function criarContasESuporteDoBanco({
     return true;
   }
 
+
+  /** Regra do bloqueio automático (roda no cron, sem pessoa logada): suspende quem passou da carência. */
+  function suspenderAtrasados(res) {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const suspensos = [];
+    for (const w of workspaces) {
+      const cobranca = cobrancaPorWorkspace.get(w.id);
+      if (!cobranca || cobranca.auto_suspend !== true) continue;
+      if (w.status !== 'active' || !cobranca.paid_until) continue;
+      const limite = new Date(`${cobranca.paid_until}T12:00:00Z`);
+      limite.setUTCDate(limite.getUTCDate() + Number(cobranca.grace_days ?? 3));
+      if (limite.toISOString().slice(0, 10) >= hoje) continue;
+      w.status = 'closed';
+      w.closed_at = w.closed_at ?? new Date().toISOString();
+      for (const chip of tabelas.instances) if (chip.workspace_id === w.id) chip.is_enabled = false;
+      if (cobranca.suspend_notice) {
+        const chip = tabelas.instances.find((i) => i.workspace_id === w.id && i.status !== 'revoked');
+        avisosDeSuspensao.push({
+          id: `aviso-auto-${avisosDeSuspensao.length + 1}`,
+          workspace_id: w.id,
+          instance_id: chip?.id ?? null,
+          number_key: cobranca.owner_whatsapp || chip?.logical_number_key || '',
+          body_text: cobranca.suspend_notice,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        });
+      }
+      registrarAuditoria({
+        workspaceId: w.id,
+        actorUserId: null,
+        action: 'platform_workspace_auto_suspended',
+        details: { paid_until: cobranca.paid_until, grace_days: cobranca.grace_days },
+      });
+      suspensos.push({ id: w.id, name: w.name });
+    }
+    return responder(res, 200, { suspended: suspensos });
+  }
+
   function acoesDoServidor(res, nome, corpo) {
     const erro = (status, code, message) => responder(res, status, { code, details: null, hint: null, message });
+    if (nome === 'suspend_overdue_workspaces') return suspenderAtrasados(res);
+
     if (nome === 'provision_platform_workspace') {
       const actor = usuarios.find((u) => u.id === corpo.p_actor_user_id);
       if (!actor?.master) return erro(403, '42501', 'Platform master required');
@@ -354,6 +397,7 @@ export function criarContasESuporteDoBanco({
             paid_until: cobrancaPorWorkspace.get(w.id)?.paid_until ?? null,
             suspend_notice: cobrancaPorWorkspace.get(w.id)?.suspend_notice ?? '',
             owner_whatsapp: cobrancaPorWorkspace.get(w.id)?.owner_whatsapp ?? '',
+            auto_suspend: cobrancaPorWorkspace.get(w.id)?.auto_suspend === true,
             messages_month: tabelas.messages.filter((m) => m.workspace_id === w.id).length,
             ai_replies_month: tabelas.messages.filter(
               (m) => m.workspace_id === w.id && m.actor_type === 'ai' && m.direction === 'outbound',
@@ -380,6 +424,7 @@ export function criarContasESuporteDoBanco({
         grace_days: Number(corpo.p_grace_days ?? 3),
         paid_until: corpo.p_paid_until ?? null,
         suspend_notice: String(corpo.p_suspend_notice ?? '').trim(),
+        auto_suspend: corpo.p_auto_suspend === true,
       });
       registrarAuditoria({
         workspaceId: corpo.p_workspace_id,
