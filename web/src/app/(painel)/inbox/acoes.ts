@@ -20,7 +20,7 @@ import {
 import { mapearAudiosEstrategicos, mapearCatalogo } from '@/lib/recursos/mapeamento';
 import { trazerArquivoDaMensagem } from '@/lib/inbox/buscar-arquivo';
 import { conferirEnsino, descreverEnsino, explicarRecusaDoEnsino, lerResultadoDoEnsino } from '@/lib/ia/ensino';
-import { ehChaveDeEnvio, numeroParaEnvio, validarTexto, type SituacaoDoEnvio } from '@/lib/inbox/regras';
+import { ETAPAS_DO_KANBAN, ehChaveDeEnvio, numeroParaEnvio, validarTexto, type SituacaoDoEnvio } from '@/lib/inbox/regras';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { obterSessao } from '@/lib/sessao';
 import { enderecoDoDepositoParaONavegador } from '@/lib/supabase/deposito';
@@ -112,7 +112,13 @@ interface InicioDoEnvio {
  * conexão que caiu e a pessoa tentou de novo), o banco reconhece a chave e devolve a mensagem que já
  * existe: a Evolution só é chamada uma vez por chave.
  */
-export async function enviarMensagem(dados: { conversaId: string; texto: string; chave: string }): Promise<ResultadoDoEnvio> {
+export async function enviarMensagem(dados: {
+  conversaId: string;
+  texto: string;
+  chave: string;
+  /** A mensagem que está sendo respondida (citação), quando a pessoa usou "Responder citando". */
+  respondendoA?: string | null;
+}): Promise<ResultadoDoEnvio> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
 
@@ -124,11 +130,14 @@ export async function enviarMensagem(dados: { conversaId: string; texto: string;
   const { supabase, workspaceId } = contexto;
 
   // 1) O banco guarda a mensagem como "enviando" (e recusa se a conversa ou o chip não permitem).
+  const citada = ehIdentificador(dados?.respondendoA) ? dados.respondendoA : null;
   const inicio = await supabase.rpc('start_my_text_message', {
     p_workspace_id: workspaceId,
     p_conversation_id: dados.conversaId,
     p_body_text: texto,
     p_idempotency_key: dados.chave,
+    // Sem citação vai `null` explícito: a função só tem uma versão (a de 4 argumentos foi removida).
+    p_reply_to_message_id: citada,
   });
   if (inicio.error || !inicio.data) {
     const mensagem = inicio.error?.message ?? '';
@@ -1087,4 +1096,241 @@ export async function enviarItemCatalogoNaConversa(dados: {
   }
 
   return { ok: true };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Gestão fina da conversa: silenciar, transferir, automação das etapas,       */
+/* busca dentro das mensagens, lembretes e mensagens agendadas                */
+/* -------------------------------------------------------------------------- */
+
+function traduzirErroDeGestao(mensagem: string): string {
+  if (/conversation_closed|Conversation is not active/.test(mensagem)) return 'Esta conversa está resolvida. Reabra a conversa primeiro.';
+  if (/Teammate not in workspace/.test(mensagem)) return 'Essa pessoa não participa mais da empresa. Atualize a página.';
+  if (/Conversation not found/.test(mensagem)) return 'Esta conversa não existe mais. Atualize a página.';
+  if (/Workspace membership required/.test(mensagem)) return 'Você não participa mais desta empresa.';
+  if (/Invalid crm_stage|Unsupported CRM stage/.test(mensagem)) return 'Escolha uma etapa do funil.';
+  if (/Tag not found/.test(mensagem)) return 'Essa etiqueta não existe mais. Atualize a página.';
+  if (/Search term too short/.test(mensagem)) return 'Escreva pelo menos 2 letras para procurar.';
+  if (/Search term too long/.test(mensagem)) return 'O que procurar vai até 80 letras.';
+  return traduzirErroCrm(mensagem);
+}
+
+/**
+ * "Silenciar conversa" / "Voltar a avisar".
+ *
+ * Silenciada, a conversa continua na lista e pode ser lida normalmente, mas não soma nas não lidas
+ * nem toca aviso — o `count_my_unread_messages` do banco já ignora as silenciadas.
+ */
+export async function silenciarConversa(dados: { conversaId: string; silenciar: boolean }): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados?.conversaId)) return { ok: false, erro: 'Esta conversa não existe mais. Atualize a página.' };
+
+  const { error } = await contexto.supabase.rpc('bulk_update_my_conversations', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_ids: [dados.conversaId],
+    p_action: dados.silenciar ? 'mute' : 'unmute',
+    p_payload: {},
+  });
+  if (error) {
+    if (!/Workspace membership required/.test(error.message)) console.error('[inbox] não foi possível silenciar:', error);
+    return { ok: false, erro: traduzirErroDeGestao(error.message) };
+  }
+  atualizarTelas();
+  return { ok: true };
+}
+
+/** Quem participa da empresa — os destinos do "Transferir". */
+export async function lerEquipe(): Promise<{ ok: true; pessoas: Array<{ id: string; nome: string; papel: string; eu: boolean }> } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  const { data, error } = await contexto.supabase.rpc('read_my_workspace_people', { p_workspace_id: contexto.workspaceId });
+  if (error) return { ok: false, erro: traduzirErroDeGestao(error.message) };
+  const pessoas = (((data as { people?: Array<Record<string, unknown>> } | null)?.people ?? []) as Array<Record<string, unknown>>)
+    .filter((pessoa) => typeof pessoa.id === 'string')
+    .map((pessoa) => ({
+      id: pessoa.id as string,
+      nome: typeof pessoa.name === 'string' && pessoa.name.trim() ? pessoa.name.trim() : 'Atendente',
+      papel: pessoa.role === 'owner' ? 'Dono' : pessoa.role === 'admin' ? 'Administrador' : 'Atendente',
+      eu: pessoa.eu === true,
+    }));
+  return { ok: true, pessoas };
+}
+
+/**
+ * "Transferir" para alguém da equipe (`pessoaId`) ou "Devolver para a fila" (`pessoaId: null`).
+ * Ao transferir, a conversa passa a ser de quem recebeu e a IA sai de cena nela; devolvendo para a
+ * fila, ela volta a ficar sem dono e a automação pode voltar a atender.
+ */
+export async function transferirConversa(dados: { conversaId: string; pessoaId: string | null; rotulo?: string | null }): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados?.conversaId)) return { ok: false, erro: 'Esta conversa não existe mais. Atualize a página.' };
+  const pessoaId = dados.pessoaId === null || dados.pessoaId === undefined ? null : dados.pessoaId;
+  if (pessoaId !== null && !ehIdentificador(pessoaId)) return { ok: false, erro: 'Escolha quem vai atender a conversa.' };
+
+  const { error } = await contexto.supabase.rpc('assign_my_conversation', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_id: dados.conversaId,
+    p_user_id: pessoaId,
+    p_label: pessoaId ? (dados.rotulo?.trim() || null) : null,
+  });
+  if (error) {
+    if (!/Workspace membership|conversation_closed|Conversation not found/.test(error.message)) {
+      console.error('[inbox] não foi possível transferir a conversa:', error);
+    }
+    return { ok: false, erro: traduzirErroDeGestao(error.message) };
+  }
+  atualizarTelas();
+  return { ok: true };
+}
+
+/** Uma etapa do funil com o que acontece sozinho quando o negócio entra nela. */
+export interface AutomacaoDaEtapa {
+  etapa: string;
+  ligarEtiqueta: boolean;
+  etiquetaId: string | null;
+  ligarMensagem: boolean;
+  texto: string;
+}
+
+/** "Automação das etapas": guarda (ou desliga) o que acontece ao entrar em cada etapa do funil. */
+export async function salvarAutomacaoDaEtapa(dados: AutomacaoDaEtapa): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  const etapa = ETAPAS_DO_KANBAN.find((item) => item.valor === dados?.etapa)?.valor;
+  if (!etapa) return { ok: false, erro: 'Escolha uma etapa do funil.' };
+  if (dados.ligarEtiqueta && !ehIdentificador(dados.etiquetaId)) return { ok: false, erro: 'Escolha a etiqueta que o contato vai ganhar.' };
+  const texto = (dados.texto ?? '').trim();
+  if (dados.ligarMensagem && !texto) return { ok: false, erro: 'Escreva a mensagem que o cliente vai receber.' };
+  if (texto.length > 1000) return { ok: false, erro: 'A mensagem da automação vai até 1.000 letras.' };
+
+  const { error } = await contexto.supabase.rpc('save_my_stage_automation', {
+    p_workspace_id: contexto.workspaceId,
+    p_stage: etapa,
+    p_enable_tag: dados.ligarEtiqueta === true,
+    p_tag_id: dados.ligarEtiqueta ? dados.etiquetaId : null,
+    p_enable_message: dados.ligarMensagem === true,
+    p_message_template: texto || null,
+  });
+  if (error) {
+    if (!/Workspace membership|Tag not found|Invalid/.test(error.message)) {
+      console.error('[inbox] não foi possível salvar a automação da etapa:', error);
+    }
+    return { ok: false, erro: traduzirErroDeGestao(error.message) };
+  }
+  atualizarTelas();
+  return { ok: true };
+}
+
+/** O que a automação faria nesta conversa se ela entrasse nesta etapa agora (prévia, sem enviar nada). */
+export async function preverAutomacaoDaEtapa(dados: {
+  conversaId: string;
+  etapa: string;
+}): Promise<{ ok: true; etiquetaId: string | null; mensagem: string | null } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados?.conversaId)) return { ok: false, erro: 'Esta conversa não existe mais. Atualize a página.' };
+  const etapa = ETAPAS_DO_KANBAN.find((item) => item.valor === dados?.etapa)?.valor;
+  if (!etapa) return { ok: false, erro: 'Escolha uma etapa do funil.' };
+
+  const { data, error } = await contexto.supabase.rpc('plan_my_stage_automation', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_id: dados.conversaId,
+    p_stage: etapa,
+  });
+  if (error || !data) return { ok: false, erro: traduzirErroDeGestao(error?.message ?? '') };
+  const plano = data as { tag_id?: string | null; message?: string | null };
+  return { ok: true, etiquetaId: plano.tag_id ?? null, mensagem: plano.message ?? null };
+}
+
+/** "Procurar nesta conversa": devolve onde o termo aparece nas mensagens desta conversa. */
+export async function procurarNaConversa(dados: {
+  conversaId: string;
+  termo: string;
+}): Promise<{ ok: true; achados: Array<{ mensagemId: string; texto: string; recebida: boolean; quando: string }> } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados?.conversaId)) return { ok: false, erro: 'Esta conversa não existe mais. Atualize a página.' };
+  const termo = (dados.termo ?? '').trim();
+  if (termo.length < 2) return { ok: false, erro: 'Escreva pelo menos 2 letras para procurar.' };
+  if (termo.length > 80) return { ok: false, erro: 'O que procurar vai até 80 letras.' };
+
+  const { data, error } = await contexto.supabase.rpc('search_my_conversation_messages', {
+    p_workspace_id: contexto.workspaceId,
+    p_conversation_id: dados.conversaId,
+    p_term: termo,
+  });
+  if (error || !data) return { ok: false, erro: traduzirErroDeGestao(error?.message ?? '') };
+  const linhas = ((data as { messages?: Array<Record<string, unknown>> | null }).messages ?? []) as Array<Record<string, unknown>>;
+  return {
+    ok: true,
+    achados: linhas
+      .filter((linha) => typeof linha.id === 'string')
+      .map((linha) => ({
+        mensagemId: linha.id as string,
+        texto: typeof linha.body_text === 'string' ? linha.body_text : '',
+        recebida: linha.direction === 'inbound',
+        quando: typeof linha.occurred_at === 'string' ? linha.occurred_at : '',
+      })),
+  };
+}
+
+/** Muda o texto de uma mensagem que ainda não saiu ("Editar" na lista de agendadas). */
+export async function editarMensagemAgendada(dados: { agendamentoId: string; texto: string }): Promise<Resultado> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados?.agendamentoId)) return { ok: false, erro: 'Agendamento inválido.' };
+  const texto = validarTexto(dados?.texto);
+  if (!texto) return { ok: false, erro: 'Escreva a mensagem (até 4.096 letras).' };
+
+  const { error } = await contexto.supabase.rpc('update_my_scheduled_message', {
+    p_workspace_id: contexto.workspaceId,
+    p_scheduled_id: dados.agendamentoId,
+    p_body_text: texto,
+  });
+  if (error) {
+    if (!/Workspace membership|not found|already/.test(error.message)) console.error('[inbox] não foi possível editar o agendamento:', error);
+    return { ok: false, erro: traduzirErroDeGestao(error.message) };
+  }
+  atualizarTelas();
+  return { ok: true };
+}
+
+/**
+ * Lembretes em lote: marca (ou tira) o combinado de retorno de várias conversas de uma vez.
+ * `quandoIso: null` limpa o lembrete — é o "Já resolvi" da aba Lembretes.
+ */
+export async function lembrarEmLote(dados: {
+  conversaIds: string[];
+  quandoIso: string | null;
+}): Promise<{ ok: true; atualizadas: number } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  const ids = (dados?.conversaIds ?? []).filter((id) => ehIdentificador(id));
+  if (ids.length === 0) return { ok: false, erro: 'Selecione ao menos uma conversa.' };
+  if (ids.length > 100) return { ok: false, erro: 'Marque no máximo 100 conversas por vez.' };
+
+  let quando: string | null = null;
+  if (dados.quandoIso !== null) {
+    const data = new Date(dados.quandoIso);
+    if (Number.isNaN(data.getTime())) return { ok: false, erro: 'Escolha uma data e hora válidas.' };
+    quando = data.toISOString();
+  }
+
+  let atualizadas = 0;
+  for (const conversaId of ids) {
+    const { error } = await contexto.supabase.rpc('update_my_conversation_crm', {
+      p_workspace_id: contexto.workspaceId,
+      p_conversation_id: conversaId,
+      p_patch: quando === null ? { clear_follow_up: true } : { follow_up_at: quando },
+    });
+    if (error) {
+      if (atualizadas === 0) return { ok: false, erro: traduzirErroDeGestao(error.message) };
+      break;
+    }
+    atualizadas += 1;
+  }
+  atualizarTelas();
+  return { ok: true, atualizadas };
 }

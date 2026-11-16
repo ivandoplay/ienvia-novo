@@ -281,6 +281,7 @@ describe('etapas', () => {
 describe('CRM na Inbox', () => {
   test('visão arquivadas mapeia para "archived" e helpers de aba/etapa/negócio têm fallbacks seguros', () => {
     expect(visaoNoBanco(lerVisao('arquivadas'))).toBe('archived');
+    expect(visaoNoBanco(lerVisao('lembretes'))).toBe('reminders');
     expect(lerAbaDoCrm('contatos')).toBe('contatos');
     expect(lerAbaDoCrm('kanban')).toBe('kanban');
     expect(lerAbaDoCrm('desconhecida')).toBe('conversas');

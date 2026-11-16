@@ -12,9 +12,12 @@ export const VISOES = [
   { valor: 'esperando', noBanco: 'waiting', rotulo: 'Esperando você' },
   { valor: 'resolvidas', noBanco: 'resolved', rotulo: 'Resolvidas' },
   { valor: 'arquivadas', noBanco: 'archived', rotulo: 'Arquivadas' },
+  /** Vencidos: o combinado com o cliente já passou da hora e a conversa continua aberta. */
+  { valor: 'lembretes', noBanco: 'reminders', rotulo: 'Lembretes' },
 ] as const;
 
 export type Visao = (typeof VISOES)[number]['valor'];
+
 
 export const ABAS_DO_CRM = [
   { valor: 'conversas', rotulo: 'Conversas' },
@@ -415,9 +418,6 @@ export function atalhoDeHorario(tipo: '1h' | '3h' | 'amanha', agora: Date = new 
 /* Gestão fina da conversa (24/11/2026): espera, silêncio, janela de 24 h,     */
 /* busca dentro das mensagens e resumo da citação                             */
 /* ========================================================================== */
-
-/** A aba "Lembretes" é uma visão a mais da lista (o banco chama de `reminders`). */
-export const VISAO_DE_LEMBRETES = { valor: 'lembretes', noBanco: 'reminders', rotulo: 'Lembretes' } as const;
 
 /**
  * Há quanto tempo o cliente espera resposta, em três tons:

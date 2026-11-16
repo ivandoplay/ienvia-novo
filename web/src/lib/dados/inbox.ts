@@ -14,6 +14,15 @@ import {
 import {
   MENSAGENS_POR_VEZ,
   autorDoEnvio,
+  esperaEmTexto,
+  janelaDaConversa,
+  primeiroNome,
+  resumoDaCitacao,
+  tomDaEspera,
+  trechoDaBusca,
+  type JanelaDeConversa,
+  type TomDaEspera,
+  type TrechoDaBusca,
   carimboParaNomeDeArquivo,
   dataCurta,
   diaDaConversa,
@@ -85,6 +94,13 @@ export interface ConversaDaLista {
   iaIgnorada: boolean;
   bloqueado: boolean;
   agendadasPendentes: number;
+  /** A conversa está silenciada (não soma nas não lidas nem toca aviso). */
+  silenciada: boolean;
+  /** Quem atendeu / assumiu a conversa ("" quando é a fila). */
+  atendente: string;
+  /** Há quanto tempo o cliente espera resposta ("esperando há 12 min") e o tom da espera. */
+  espera: string | null;
+  tomDaEspera: TomDaEspera | null;
   etiquetas: EtiquetaDoCrm[];
   naoLidas: number;
   previa: string;
@@ -97,8 +113,16 @@ export interface ListaDaInbox {
   conversas: ConversaDaLista[];
   temMais: boolean;
   /** Totais dos filtros, já respeitando o chip escolhido. `null` quando a leitura falhou. */
-  contagens: { naoLidas: number; esperando: number; arquivadas?: number } | null;
+  contagens: ContagensDaInbox | null;
   falhou: boolean;
+}
+
+/** Totais dos filtros. Silenciadas não entram nas não lidas. */
+export interface ContagensDaInbox {
+  naoLidas: number;
+  esperando: number;
+  arquivadas: number;
+  lembretes: number;
 }
 
 export interface FiltrosDaInbox {
@@ -129,6 +153,10 @@ interface LinhaDeConversa {
   unread_count: number;
   last_message_at: string | null;
   last_message_preview: string | null;
+  last_inbound_at?: string | null;
+  is_muted?: boolean | null;
+  assigned_label?: string | null;
+  assigned_user_id?: string | null;
   activity_at: string | null;
   instance_id: string;
   instance_name: string | null;
@@ -145,6 +173,7 @@ interface RespostaDaInbox {
   has_more?: boolean;
   counts?: { unread?: number; waiting?: number } | null;
   archived_count?: number | null;
+  reminders_count?: number | null;
 }
 
 const numero = (valor: unknown): number => {
@@ -200,7 +229,8 @@ export async function carregarInbox(workspaceId: string, filtros: FiltrosDaInbox
       ? {
           naoLidas: numero(resposta.counts.unread),
           esperando: numero(resposta.counts.waiting),
-          arquivadas: typeof resposta.archived_count === 'number' ? resposta.archived_count : 0,
+          arquivadas: numero(resposta.archived_count),
+          lembretes: numero(resposta.reminders_count),
         }
       : null,
     conversas: (resposta.conversations ?? []).map((linha) => {
@@ -220,6 +250,10 @@ export async function carregarInbox(workspaceId: string, filtros: FiltrosDaInbox
         iaIgnorada: linha.ai_ignored === true,
         bloqueado: linha.is_blocked === true,
         agendadasPendentes: numero(linha.scheduled_count),
+        silenciada: linha.is_muted === true,
+        atendente: primeiroNome(linha.assigned_label),
+        espera: esperaEmTexto(linha.last_inbound_at, agora),
+        tomDaEspera: tomDaEspera(linha.last_inbound_at, agora),
         etiquetas: lerEtiquetas(linha.tags),
         naoLidas: numero(linha.unread_count),
         previa: linha.last_message_preview ?? '',
@@ -229,6 +263,177 @@ export async function carregarInbox(workspaceId: string, filtros: FiltrosDaInbox
       };
     }),
   };
+}
+
+/** Alguém que participa da empresa: destino do "Transferir". */
+export interface PessoaDoWorkspace {
+  id: string;
+  nome: string;
+  papel: string;
+  /** `true` quando é quem está logado (a tela mostra "Você"). */
+  eu: boolean;
+}
+
+interface RespostaDePessoas {
+  people?: Array<{ id?: string; name?: string | null; role?: string | null; eu?: boolean | null }> | null;
+}
+
+export async function carregarPessoas(workspaceId: string): Promise<PessoaDoWorkspace[]> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('read_my_workspace_people', { p_workspace_id: workspaceId });
+  if (error || !data) {
+    if (error) console.error('[inbox] não foi possível ler a equipe:', error);
+    return [];
+  }
+  return ((data as RespostaDePessoas).people ?? [])
+    .filter((pessoa) => typeof pessoa?.id === 'string')
+    .map((pessoa) => ({
+      id: pessoa.id as string,
+      nome: (pessoa.name ?? '').trim() || 'Atendente',
+      papel: pessoa.role === 'owner' ? 'Dono' : pessoa.role === 'admin' ? 'Administrador' : 'Atendente',
+      eu: pessoa.eu === true,
+    }));
+}
+
+/** O que acontece sozinho quando um negócio entra numa etapa do funil. */
+export interface AutomacaoDeEtapa {
+  etapa: string;
+  /** Etiqueta que o contato ganha ao entrar na etapa (quando ligada). */
+  etiquetaId: string | null;
+  etiquetaNome: string;
+  /** Mensagem que o cliente recebe ao entrar na etapa (quando ligada). */
+  texto: string;
+  ligarEtiqueta: boolean;
+  ligarMensagem: boolean;
+}
+
+const ETAPAS_VALIDAS = ['novo', 'qualificando', 'em_atendimento', 'proposta', 'concluido'];
+
+export async function carregarAutomacoesDeEtapa(workspaceId: string): Promise<AutomacaoDeEtapa[]> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('read_my_stage_automations', { p_workspace_id: workspaceId });
+  if (error) {
+    console.error('[inbox] não foi possível ler a automação das etapas:', error);
+    return [];
+  }
+  // A função devolve uma lista de linhas (não um objeto com uma chave).
+  const linhas = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
+  const porEtapa = new Map<string, AutomacaoDeEtapa>();
+  for (const linha of linhas) {
+    const etapa = typeof linha.stage === 'string' ? linha.stage : '';
+    if (!ETAPAS_VALIDAS.includes(etapa)) continue;
+    porEtapa.set(etapa, {
+      etapa,
+      etiquetaId: typeof linha.tag_id === 'string' ? linha.tag_id : null,
+      etiquetaNome: typeof linha.tag_name === 'string' ? linha.tag_name : '',
+      texto: typeof linha.message_template === 'string' ? linha.message_template : '',
+      ligarEtiqueta: linha.enable_tag === true,
+      ligarMensagem: linha.enable_message === true,
+    });
+  }
+  // Toda etapa aparece na tela, mesmo a que nunca foi configurada.
+  return ETAPAS_VALIDAS.map(
+    (etapa) =>
+      porEtapa.get(etapa) ?? { etapa, etiquetaId: null, etiquetaNome: '', texto: '', ligarEtiqueta: false, ligarMensagem: false },
+  );
+}
+
+interface LinhaDeAchado {
+  id?: string;
+  message_id?: string;
+  conversation_id?: string;
+  direction?: string;
+  actor_type?: string;
+  body_text?: string | null;
+  occurred_at?: string;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  attachment?: LinhaDeArquivo | null;
+}
+
+/** Procura um termo dentro das mensagens de uma conversa. */
+export async function buscarNaConversa(
+  workspaceId: string,
+  conversaId: string,
+  termo: string,
+  agora: Date = new Date(),
+): Promise<AchadoNaConversa[]> {
+  const limpo = termo.trim();
+  if (limpo.length < 2) return [];
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('search_my_conversation_messages', {
+    p_workspace_id: workspaceId,
+    p_conversation_id: conversaId,
+    p_term: limpo,
+  });
+  if (error || !data) {
+    if (error) console.error('[inbox] não foi possível procurar na conversa:', error);
+    return [];
+  }
+  const linhas = ((data as { messages?: LinhaDeAchado[] | null }).messages ?? []).filter((linha) => typeof linha?.id === 'string');
+  return linhas.flatMap((linha) => {
+    const trecho = trechoDaBusca(linha.body_text ?? '', limpo);
+    if (!trecho) return [];
+    const recebida = linha.direction === 'inbound';
+    return [
+      {
+        mensagemId: linha.id as string,
+        recebida,
+        autor: recebida ? null : 'Você',
+        quando: formatarDataHoraCurta(linha.occurred_at),
+        dia: diaDaConversa(linha.occurred_at ?? new Date().toISOString(), agora),
+        trecho,
+      },
+    ];
+  });
+}
+
+/** Um achado da busca nas mensagens de todas as conversas (com o contato de onde veio). */
+export interface AchadoNasConversas {
+  mensagemId: string;
+  conversaId: string;
+  contatoNome: string;
+  recebida: boolean;
+  quando: string;
+  dia: string;
+  trecho: TrechoDaBusca;
+}
+
+export async function buscarNasMensagens(
+  workspaceId: string,
+  termo: string,
+  agora: Date = new Date(),
+): Promise<AchadoNasConversas[]> {
+  const limpo = termo.trim();
+  if (limpo.length < 2) return [];
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc('search_my_workspace_messages', {
+    p_workspace_id: workspaceId,
+    p_term: limpo,
+  });
+  if (error || !data) {
+    if (error) console.error('[inbox] não foi possível procurar nas mensagens:', error);
+    return [];
+  }
+  const linhas = ((data as { hits?: LinhaDeAchado[] | null }).hits ?? []).filter(
+    (linha) => typeof linha?.message_id === 'string' && typeof linha.conversation_id === 'string',
+  );
+  return linhas.flatMap((linha) => {
+    const trecho = trechoDaBusca(linha.body_text ?? '', limpo);
+    if (!trecho) return [];
+    const recebida = linha.direction === 'inbound';
+    return [
+      {
+        mensagemId: linha.message_id as string,
+        conversaId: linha.conversation_id as string,
+        contatoNome: nomeDoContato(linha.contact_name, linha.contact_phone),
+        recebida,
+        quando: formatarDataHoraCurta(linha.occurred_at),
+        dia: diaDaConversa(linha.occurred_at ?? new Date().toISOString(), agora),
+        trecho,
+      },
+    ];
+  });
 }
 
 /** O arquivo (foto, áudio, vídeo, documento ou figurinha) de uma mensagem, pronto para a tela. */
@@ -264,6 +469,18 @@ export interface MensagemDaConversa {
   /** Só para as que saíram do nosso lado. */
   autor: string | null;
   situacao: SituacaoDoEnvio | null;
+  /** A mensagem que esta responde ("Cliente: O frete é R$ 10,00"), quando é uma resposta citando. */
+  citacao: string | null;
+}
+
+/** Onde está o que foi procurado dentro da conversa. */
+export interface AchadoNaConversa {
+  mensagemId: string;
+  recebida: boolean;
+  autor: string | null;
+  quando: string;
+  dia: string;
+  trecho: TrechoDaBusca;
 }
 
 export interface ConversaAberta {
@@ -278,6 +495,16 @@ export interface ConversaAberta {
   retornoInput: string;
   retornoLabel: string;
   naoLidas: number;
+  /** Silenciada: a conversa não soma nas não lidas nem toca aviso. */
+  silenciada: boolean;
+  /** Quem atendeu / assumiu ("" = fila da equipe). */
+  atendente: string;
+  atendenteId: string | null;
+  /** Quando o cliente falou pela última vez, o tom da espera e a janela de 24 h do WhatsApp. */
+  ultimaDoClienteEm: string | null;
+  espera: string | null;
+  tomDaEspera: TomDaEspera | null;
+  janela: JanelaDeConversa | null;
   contato: {
     id: string;
     nome: string;
@@ -319,6 +546,8 @@ interface LinhaDeMensagem {
   from_panel: boolean;
   mine: boolean;
   attachment: LinhaDeArquivo | null;
+  reply_to_message_id?: string | null;
+  reply_to?: { id: string; body_text: string | null; direction: string; actor_type: string } | null;
 }
 
 interface LinhaDeArquivo {
@@ -329,7 +558,8 @@ interface LinhaDeArquivo {
   duration_seconds: number | null;
   width: number | null;
   height: number | null;
-  is_voice: boolean;
+  /** Deixou de existir na rodada de 24/11: o tipo vem de `kind` + `duration_seconds`. */
+  is_voice?: boolean;
   object_key: string;
   status: string;
 }
@@ -364,7 +594,7 @@ function lerArquivo(linha: LinhaDeArquivo | null | undefined, mensagem: LinhaDeM
   return {
     tipo,
     situacao: situacao === 'guardado' && !disponivel ? 'falhou' : situacao,
-    descricao: nomeDoTipo(tipo, linha.is_voice === true),
+    descricao: nomeDoTipo(tipo, linha.is_voice === true || (tipo === 'audio' && linha.duration_seconds !== null)),
     endereco: disponivel ? enderecoDoArquivo(linha.object_key) : null,
     enderecoParaBaixar: disponivel ? enderecoDoArquivo(linha.object_key, nomeAoBaixar(linha, tipo, mensagem.occurred_at)) : null,
     nome: tipo === 'document' ? linha.file_name?.trim() || 'Documento' : null,
@@ -386,6 +616,10 @@ interface RespostaDaConversa {
     is_pinned?: boolean | null;
     follow_up_at?: string | null;
     unread_count: number;
+    is_muted?: boolean | null;
+    assigned_label?: string | null;
+    assigned_user_id?: string | null;
+    last_inbound_at?: string | null;
     created_at: string;
     contact: {
       id?: string | null;
@@ -458,6 +692,13 @@ export async function carregarConversa(
       retornoInput: paraInputDateTimeLocal(conversa.follow_up_at),
       retornoLabel: formatarDataHoraCurta(conversa.follow_up_at),
       naoLidas: numero(conversa.unread_count),
+      silenciada: conversa.is_muted === true,
+      atendente: conversa.assigned_label?.trim() ?? '',
+      atendenteId: conversa.assigned_user_id ?? null,
+      ultimaDoClienteEm: conversa.last_inbound_at ?? null,
+      espera: esperaEmTexto(conversa.last_inbound_at, agora),
+      tomDaEspera: tomDaEspera(conversa.last_inbound_at, agora),
+      janela: janelaDaConversa(conversa.last_inbound_at, agora),
       desde: dataCurta(conversa.created_at),
       contato: {
         id: conversa.contact.id ?? '',
@@ -516,6 +757,13 @@ export async function carregarConversa(
           dia: diaDaConversa(linha.occurred_at, agora),
           autor: recebida ? null : autorDoEnvio({ autor: linha.actor_type, doPainel: linha.from_panel, minha: linha.mine }),
           situacao: recebida ? null : situacaoDoEnvio(linha.status, linha.created_at, agora),
+          citacao: linha.reply_to
+            ? resumoDaCitacao({
+                texto: linha.reply_to.body_text,
+                recebida: linha.reply_to.direction === 'inbound',
+                arquivo: null,
+              })
+            : null,
         };
       }),
     },
