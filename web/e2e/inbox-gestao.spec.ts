@@ -17,7 +17,6 @@ const SUPABASE = 'http://127.0.0.1:54399';
 const EVOLUTION = 'http://127.0.0.1:54398';
 const COLEGA = 'colega@zapia.local';
 /** O rótulo que o banco grava em `assigned_label` vem do perfil de cada pessoa. */
-const NOME_DA_DONA = 'Dona da Inbox';
 const NOME_DO_COLEGA = 'Caio Colega';
 /** Na lista (espaço curto) o chip mostra só o primeiro nome de quem atende. */
 const COLEGA_NA_LISTA = 'Caio';
