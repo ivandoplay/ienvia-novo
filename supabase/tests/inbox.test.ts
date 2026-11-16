@@ -106,13 +106,18 @@ interface Aberta {
   messages: Array<{ body_text: string | null; direction: string; status: string; from_panel: boolean; mine: boolean; attachment: Record<string, unknown> | null }>;
   has_more: boolean;
 }
+/**
+ * A conversa aberta. Desde a gestão fina da Inbox (24/11), quando a conversa não é desta empresa a
+ * função devolve os campos vazios em vez de `null` — o painel trata os dois casos do mesmo jeito.
+ */
 async function abrir(conversa: string, limite: number | null = null, empresa = LOJA_A): Promise<Aberta | null> {
   const { rows } = await banco.db.query<{ r: Aberta | null }>('select public.read_my_conversation($1,$2,$3) as r', [
     empresa,
     conversa,
     limite,
   ]);
-  return rows[0]!.r;
+  const r = rows[0]!.r as (Aberta & { conversation?: unknown }) | null;
+  return r && r.conversation === null ? null : r;
 }
 
 const versao = async (empresa = LOJA_A) =>
@@ -259,9 +264,9 @@ describe('conversa aberta', () => {
         instance: { id: CHIP_A, display_name: 'Chip da Loja A', status: 'connected', engine: 'evolution' },
       });
       expect(aberta?.messages).toMatchObject([
-        { body_text: 'Oi, tem pizza?', direction: 'inbound', status: 'received', from_panel: false, mine: false, attachment: null },
+        { body_text: 'Oi, tem pizza?', direction: 'inbound', status: 'received', from_panel: false, mine: null, attachment: null },
         { body_text: 'Temos sim!', direction: 'outbound', status: 'sent', from_panel: true, mine: true },
-        { body_text: 'Respondi pelo celular', direction: 'outbound', from_panel: false, mine: false },
+        { body_text: 'Respondi pelo celular', direction: 'outbound', from_panel: false, mine: null },
         { body_text: 'Da atendente', direction: 'outbound', status: 'failed', from_panel: true, mine: false },
       ]);
       expect(aberta?.has_more).toBe(false);
@@ -290,6 +295,7 @@ describe('conversa aberta', () => {
   test('conversa de outra empresa não abre', async () => {
     await banco.comoUsuario(DONA_A, async () => {
       expect(await abrir(CONVERSA_B)).toBeNull();
+      // Perguntando pela empresa B sem ser de lá, a função recusa (a trava vem antes de olhar a conversa).
       expect(await banco.esperarErro(() => abrir(CONVERSA_B, null, LOJA_B))).toMatch(/Workspace membership required/);
     });
   });

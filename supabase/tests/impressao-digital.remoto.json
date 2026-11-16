@@ -1,48 +1,48 @@
 {
   "categorias": {
     "colunas": {
-      "itens": 625,
-      "md5": "9db2ced04881975a348a04c343af1493"
+      "itens": 634,
+      "md5": "fe6e40eebfe8b7202cd3ced1a1f75149"
     },
     "deposito": {
       "itens": 4,
       "md5": "f697288d0636e569f349b9df5579a799"
     },
     "funcoes": {
-      "itens": 206,
-      "md5": "80e7a4d6d46e8ef92fea7ae225057be8"
+      "itens": 216,
+      "md5": "894f9cff9bddc9e0be0b54ebf0b58731"
     },
     "gatilhos": {
       "itens": 26,
       "md5": "3ba71bc02204a45ff8002650af0c3e5f"
     },
     "indices": {
-      "itens": 175,
-      "md5": "bd8ca7fda6c873b77b888fcfec510125"
+      "itens": 177,
+      "md5": "01bb62cd50c8887822e3fc113459f833"
     },
     "permissoes_coluna": {
       "itens": 32,
       "md5": "4f92ec1b1838543f578ff7a458d9cf17"
     },
     "permissoes_funcao": {
-      "itens": 618,
-      "md5": "64bbd22701cfbdd44a02576d2ce631e1"
+      "itens": 648,
+      "md5": "d72e3d77720c85506d879292a8fd35cf"
     },
     "permissoes_tabela": {
-      "itens": 417,
-      "md5": "1c80eea954eaecb23a967c6c5f02e293"
+      "itens": 431,
+      "md5": "94babbf2c1632cc2e9b5115adddd17db"
     },
     "politicas": {
-      "itens": 52,
-      "md5": "c4e9f967be74b58f2b8179ee6adc05fe"
+      "itens": 53,
+      "md5": "cb022942cc6fbbccddfcea0996137c23"
     },
     "restricoes": {
-      "itens": 435,
-      "md5": "4b7bfc2293c9f3dc73f833d777df25e8"
+      "itens": 440,
+      "md5": "df94991b71ec28e6e1bafaa71cea44e6"
     },
     "rls_ligado": {
-      "itens": 54,
-      "md5": "4c394f37036d2f5f9d2c76c71919cd87"
+      "itens": 55,
+      "md5": "0a9e8b84461cc3fea3d0b76c367b4f7d"
     }
   }
 }
