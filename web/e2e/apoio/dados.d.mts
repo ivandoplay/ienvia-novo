@@ -11,3 +11,5 @@ export declare const CHIP_VENDAS: string;
 export declare const CHIP_SUPORTE: string;
 export declare const CHIP_ANTIGO: string;
 export declare const CONVERSAS_DA_INBOX: Record<'ana' | 'bruno' | 'semNome' | 'carla' | 'diego' | 'elisa' | 'fabio' | 'gabi' | 'helena', string>;
+
+export declare const USUARIOS: Array<{ id: string; email: string; nome: string; master: boolean }>;

@@ -761,10 +761,12 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
   const [buscaNasMensagens, setBuscaNasMensagens] = useState(false);
   const idLembreteLote = useId();
   /**
-   * Aviso da lista (lote, lembretes). Ele guarda a "chave" do momento em que foi criado (busca, visão e
-   * modo de seleção): mudou alguma coisa, o aviso antigo simplesmente deixa de aparecer — sem efeito.
+   * Aviso da lista (lote, lembretes). Ele guarda a "chave" do momento em que foi criado (busca e visão):
+   * mudou alguma coisa, o aviso antigo simplesmente deixa de aparecer — sem efeito.
+   * O modo de seleção fica de fora: "Lembrete marcado em 2 conversas." é justamente o aviso de que o
+   * lote acabou, e ele precisa continuar na tela depois que a barra de seleção sai.
    */
-  const chaveDoAviso = `${filtros.busca ?? ''}|${filtros.visao}|${modoLote ? 'lote' : 'normal'}`;
+  const chaveDoAviso = `${filtros.busca ?? ''}|${filtros.visao}`;
   const [avisoDaLista, setAvisoDaLista] = useState<{ aviso: Aviso; chave: string } | null>(null);
   const avisoVisivel = avisoDaLista && avisoDaLista.chave === chaveDoAviso ? avisoDaLista.aviso : null;
   const avisarLista = (aviso: Aviso) => setAvisoDaLista({ aviso, chave: chaveDoAviso });
@@ -1852,24 +1854,33 @@ function Conversa({
                     <Icone nome={conversa.silenciada ? 'olho' : 'bloqueado'} className="icon-15" />
                     <span>{conversa.silenciada ? 'Voltar a avisar' : 'Silenciar conversa'}</span>
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm inbox-acao-extra"
-                    disabled={ocupado !== null || conversa.etapa === 'archived'}
-                    onClick={() => void abrirTransferencia()}
-                  >
-                    <Icone nome="pessoa" className="icon-15" />
-                    <span>Transferir</span>
-                  </button>
+                  {/* Transferir é do dono da conta: é ele quem responde pela equipe (o banco confere de novo). */}
+                  {ehDono ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm inbox-acao-extra"
+                      disabled={ocupado !== null || conversa.etapa === 'archived'}
+                      onClick={() => void abrirTransferencia()}
+                    >
+                      <Icone nome="pessoa" className="icon-15" />
+                      <span>Transferir</span>
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm inbox-acao-extra"
                     disabled={ocupado !== null}
                     onClick={() => setLembrando(true)}
+                    title={conversa.retornoLabel ? `Lembretes — combinado para ${conversa.retornoLabel}` : 'Lembretes'}
                   >
                     <Icone nome="calendario" className="icon-15" />
                     <span>Lembretes</span>
-                    {conversa.retornoLabel ? <span className="inbox-acao-extra-marca">{conversa.retornoLabel}</span> : null}
+                    {/* A data do combinado fica visível, mas fora do nome do botão (o leitor de tela lê pelo title). */}
+                    {conversa.retornoLabel ? (
+                      <span className="inbox-acao-extra-marca" aria-hidden="true">
+                        {conversa.retornoLabel}
+                      </span>
+                    ) : null}
                   </button>
               </>
             </MenuMais>

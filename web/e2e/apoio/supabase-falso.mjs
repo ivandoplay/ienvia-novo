@@ -638,6 +638,11 @@ function acoesDaInbox(res, usuario, nome, corpo) {
         waiting: (conversa) => ETAPAS_QUE_ESPERAM.includes(conversa.stage),
         resolved: (conversa) => conversa.stage === 'resolved',
         archived: (conversa) => conversa.stage === 'archived',
+        // Vencidos: o combinado já passou da hora e a conversa continua aberta.
+        reminders: (conversa) =>
+          Boolean(conversa.follow_up_at) &&
+          String(conversa.follow_up_at) <= new Date().toISOString() &&
+          !['resolved', 'archived'].includes(conversa.stage),
       };
       const filtro = filtros[corpo.p_view ?? 'open'];
       if (!filtro) return erro(400, '22023', 'Unsupported inbox view');
@@ -688,6 +693,11 @@ function acoesDaInbox(res, usuario, nome, corpo) {
         follow_up_at: conversa.follow_up_at ?? null,
         unread_count: conversa.unread_count ?? 0,
         automation_paused: conversa.automation_paused ?? false,
+        // Rodada de 24/11: silenciada, quem atende e quando o cliente falou pela última vez.
+        is_muted: Boolean(conversa.is_muted),
+        assigned_label: conversa.assigned_label ?? null,
+        assigned_user_id: conversa.assigned_user_id ?? null,
+        last_inbound_at: crmDoBanco.ultimaDoCliente(conversa),
         created_at: conversa.created_at,
         last_message_at: conversa.last_message_at ?? null,
         contact: crmDoBanco.enriquecerContatoNaConversa(conversa, contato),
@@ -700,6 +710,7 @@ function acoesDaInbox(res, usuario, nome, corpo) {
         .reverse()
         .map((mensagem) => {
           const ficha = fichaDoArquivo(mensagem.id);
+          const citacao = crmDoBanco.citacaoDaMensagem(conversa, mensagem.id);
           return {
             id: mensagem.id,
             direction: mensagem.direction,
@@ -710,6 +721,8 @@ function acoesDaInbox(res, usuario, nome, corpo) {
             created_at: mensagem.created_at,
             from_panel: Boolean(mensagem.sent_by),
             mine: mensagem.sent_by === usuario.id,
+            reply_to_message_id: citacao.reply_to_message_id,
+            reply_to: citacao.reply_to,
             attachment: ficha
               ? {
                   kind: ficha.kind,
@@ -769,6 +782,8 @@ function acoesDaInbox(res, usuario, nome, corpo) {
       actor_type: 'human',
       status: 'sending',
       body_text: texto,
+      // "Responder citando": o vínculo com a mensagem citada.
+      reply_to_message_id: corpo.p_reply_to_message_id ?? null,
       occurred_at: agora,
       created_at: agora,
       sent_by: usuario.id,
@@ -1386,7 +1401,10 @@ async function rotasDoDeposito(req, res, url) {
 /** Só para os testes: põe as conversas da Empresa da Inbox de volta no começo. */
 function reiniciarInbox() {
   const inbox = criarInbox();
-  for (const tabela of ['instances', 'contacts', 'conversations', 'messages', 'message_attachments']) {
+  // Primeiro o CRM esvazia o que é dele (etiquetas, vínculos, lembretes, automações); só depois as
+  // tabelas voltam ao cenário — ao contrário, as etiquetas do cenário seriam apagadas junto.
+  crmDoBanco.limparWorkspace(WORKSPACE_INBOX);
+  for (const tabela of ['instances', 'contacts', 'conversations', 'messages', 'message_attachments', 'crm_tags']) {
     tabelas[tabela] = [...tabelas[tabela].filter((linha) => linha.workspace_id !== WORKSPACE_INBOX), ...inbox[tabela]];
   }
   for (const caminho of [...deposito.keys()]) if (caminho.startsWith(`${WORKSPACE_INBOX}/`)) deposito.delete(caminho);
@@ -1395,7 +1413,6 @@ function reiniciarInbox() {
   avisosRecebidos.clear();
   subidasQueVaoFalhar = 0;
   pausasDaIa.delete(WORKSPACE_INBOX);
-  crmDoBanco.limparWorkspace(WORKSPACE_INBOX);
   anotarMudanca(WORKSPACE_INBOX);
 }
 
@@ -1687,6 +1704,72 @@ const servidor = http.createServer(async (req, res) => {
       const ok = receberMensagem(url.searchParams.get('conversa'), url.searchParams.get('texto') ?? 'Mensagem de teste');
       return responder(res, ok ? 200 : 404, { ok });
     }
+    if (url.pathname === '/controle/conversas') {
+      // Só para os testes: as conversas como estão guardadas (dá para filtrar pela empresa).
+      const workspace = url.searchParams.get('workspace');
+      return responder(
+        res,
+        200,
+        tabelas.conversations
+          .filter((c) => !workspace || c.workspace_id === workspace)
+          .map(({ id, workspace_id, stage, is_muted, assigned_user_id, assigned_label, follow_up_at, crm_stage, unread_count }) => ({
+            id,
+            workspace_id,
+            stage,
+            is_muted: Boolean(is_muted),
+            assigned_user_id: assigned_user_id ?? null,
+            assigned_label: assigned_label ?? null,
+            follow_up_at: follow_up_at ?? null,
+            crm_stage: crm_stage ?? 'novo',
+            unread_count: unread_count ?? 0,
+          })),
+      );
+    }
+    if (url.pathname === '/controle/seguir-conversa' && req.method === 'POST') {
+      // Só para os testes: muda a hora do combinado de retorno e/ou a da última mensagem do cliente.
+      const corpo = await lerCorpo(req);
+      const conversa = tabelas.conversations.find((c) => c.id === corpo.conversa);
+      if (!conversa) return responder(res, 404, { ok: false });
+      if ('quando' in corpo) conversa.follow_up_at = corpo.quando;
+      if ('ultimaDoCliente' in corpo) conversa.ultima_do_cliente_de_teste = corpo.ultimaDoCliente;
+      return responder(res, 200, { ok: true });
+    }
+    if (url.pathname === '/controle/plantar-mensagem' && req.method === 'POST') {
+      // Só para os testes: cria uma mensagem na conversa, com a hora que o teste quiser.
+      const corpo = await lerCorpo(req);
+      const conversa = tabelas.conversations.find((c) => c.id === corpo.conversa);
+      if (!conversa) return responder(res, 404, { ok: false });
+      const mensagem = {
+        id: crypto.randomUUID(),
+        workspace_id: conversa.workspace_id,
+        conversation_id: conversa.id,
+        direction: corpo.direcao ?? 'inbound',
+        actor_type: corpo.direcao === 'outbound' ? 'user' : 'contact',
+        status: 'delivered',
+        body_text: corpo.texto,
+        occurred_at: corpo.quando ?? new Date().toISOString(),
+        created_at: corpo.quando ?? new Date().toISOString(),
+        sent_by: corpo.direcao === 'outbound' ? (usuarioDaRequisicao(req)?.id ?? null) : null,
+        reply_to_message_id: corpo.replyTo ?? null,
+      };
+      tabelas.messages.push(mensagem);
+      conversa.last_message_at = mensagem.occurred_at;
+      conversa.last_message_preview = mensagem.body_text;
+      conversa.activity_at = mensagem.occurred_at;
+      return responder(res, 200, { id: mensagem.id });
+    }
+    if (url.pathname === '/controle/limpar-conversa' && req.method === 'POST') {
+      // Só para os testes: apaga as mensagens de uma conversa.
+      const corpo = await lerCorpo(req);
+      const antes = tabelas.messages.length;
+      tabelas.messages = tabelas.messages.filter((m) => m.conversation_id !== corpo.conversa);
+      return responder(res, 200, { apagadas: antes - tabelas.messages.length });
+    }
+    if (url.pathname === '/controle/automacoes') {
+      // Só para os testes: a automação das etapas como está guardada.
+      const workspace = url.searchParams.get('workspace');
+      return responder(res, 200, tabelas.crm_stage_automations.filter((a) => !workspace || a.workspace_id === workspace));
+    }
     if (url.pathname === '/controle/mensagens') {
       // Só para os testes: as mensagens de uma conversa, do jeito que estão guardadas.
       const conversa = url.searchParams.get('conversa');
@@ -1695,13 +1778,14 @@ const servidor = http.createServer(async (req, res) => {
         200,
         tabelas.messages
           .filter((mensagem) => mensagem.conversation_id === conversa)
-          .map(({ id, body_text, status, direction, provider_message_id }) => {
+          .map(({ id, body_text, status, direction, provider_message_id, reply_to_message_id }) => {
             const ficha = fichaDoArquivo(id);
             return {
               body_text,
               status,
               direction,
               provider_message_id,
+              reply_to_message_id: reply_to_message_id ?? null,
               arquivo: ficha
                 ? { tipo: ficha.kind, situacao: ficha.storage_status, nome: ficha.file_name, conteudo: ficha.content_type, tamanho: ficha.byte_size, caminho: ficha.object_key, guardado: deposito.has(ficha.object_key) }
                 : null,

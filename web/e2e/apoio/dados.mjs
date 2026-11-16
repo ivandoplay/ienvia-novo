@@ -442,7 +442,15 @@ export function criarInbox() {
     [150, 'painel', 'Nossa fachada nova', { tipo: 'image', conteudo: 'image/png', dados: fachada, largura: 480, altura: 360, nomeNoDeposito: 'fachada.png' }],
   ]);
 
-  return { instances, contacts, conversations, messages, message_attachments, arquivos };
+  // As etiquetas da Empresa da Inbox nascem com o cenário (o dono escolhe uma delas na
+  // "Automação das etapas" e o CRM usa na ficha do contato).
+  const crm_tags = [
+    daInbox({ id: 'd0000000-0000-4000-8000-000000000101', name: 'VIP', color: '#22c55e', created_at: '2026-01-01T09:00:00Z' }),
+    daInbox({ id: 'd0000000-0000-4000-8000-000000000102', name: 'Orçamento enviado', color: '#f59e0b', created_at: '2026-01-01T09:05:00Z' }),
+    daInbox({ id: 'd0000000-0000-4000-8000-000000000103', name: 'Cliente novo', color: '#3b82f6', created_at: '2026-01-01T09:10:00Z' }),
+  ];
+
+  return { instances, contacts, conversations, messages, message_attachments, arquivos, crm_tags };
 }
 
 /** Linhas de cada tabela. A "Loja da Maria" tem movimento; a "Outra Empresa" está vazia. */
@@ -483,5 +491,7 @@ export function criarTabelas() {
       daLoja({ id: 'p-apagado', erased_at: '2026-01-01T00:00:00Z' }),
       ...inbox.contacts,
     ],
+    // As etiquetas da Empresa da Inbox (o CRM da Loja cria as dele pelos testes).
+    crm_tags: [...inbox.crm_tags],
   };
 }

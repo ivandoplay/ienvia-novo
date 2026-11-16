@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { USUARIOS } from './dados.mjs';
 
 export const FUNCOES_DO_CRM = [
   'read_my_crm_catalogs',
@@ -20,6 +21,15 @@ export const FUNCOES_DO_CRM = [
   'schedule_my_message',
   'cancel_my_scheduled_message',
   'delete_my_contact_and_conversation',
+  // Rodada de 24/11 (gestão fina da conversa).
+  'read_my_workspace_people',
+  'assign_my_conversation',
+  'read_my_stage_automations',
+  'save_my_stage_automation',
+  'plan_my_stage_automation',
+  'search_my_conversation_messages',
+  'search_my_workspace_messages',
+  'update_my_scheduled_message',
 ];
 
 const ETAPAS_ABERTAS = ['new', 'ai', 'waiting_human', 'human', 'waiting_customer'];
@@ -41,7 +51,15 @@ function nucleoTelefone(tel) {
 }
 
 export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudanca, deposito }) {
-  for (const nome of ['crm_tags', 'contact_tags', 'conversation_notes', 'quick_replies', 'scheduled_messages']) {
+  for (const nome of [
+    'crm_tags',
+    'contact_tags',
+    'conversation_notes',
+    'quick_replies',
+    'scheduled_messages',
+    // Rodada de 24/11.
+    'crm_stage_automations',
+  ]) {
     tabelas[nome] ??= [];
   }
 
@@ -82,9 +100,44 @@ export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudan
       contact_phone: contato?.phone_e164 ?? null,
       ai_ignored: Boolean(contato?.ai_ignored),
       is_blocked: Boolean(contato?.is_blocked),
+      // Rodada de 24/11: silenciada, quem atende e quando o cliente falou pela última vez.
+      is_muted: Boolean(conversa.is_muted),
+      assigned_label: conversa.assigned_label ?? null,
+      assigned_user_id: conversa.assigned_user_id ?? null,
+      last_inbound_at: ultimaDoCliente(conversa),
       scheduled_count: agPendentes,
       tags: contato?.id ? tagsDoContato(conversa.workspace_id, contato.id) : [],
     };
+  }
+
+  /**
+   * A citação de uma mensagem ("responder citando"), do jeito que `read_my_conversation` devolve:
+   * `reply_to_message_id` e o `reply_to` com o texto da mensagem citada.
+   */
+  function citacaoDaMensagem(conversa, mensagemId) {
+    const mensagem = tabelas.messages.find(
+      (m) => m.workspace_id === conversa.workspace_id && m.conversation_id === conversa.id && m.id === mensagemId,
+    );
+    const citada = mensagem?.reply_to_message_id
+      ? tabelas.messages.find((m) => m.workspace_id === mensagem.workspace_id && m.id === mensagem.reply_to_message_id)
+      : null;
+    return {
+      reply_to_message_id: mensagem?.reply_to_message_id ?? null,
+      reply_to: citada
+        ? { id: citada.id, body_text: citada.body_text, direction: citada.direction, actor_type: citada.actor_type }
+        : null,
+    };
+  }
+
+  /** Quando o cliente falou pela última vez nesta conversa (o `last_inbound_at` do banco de verdade). */
+  function ultimaDoCliente(conversa) {
+    // O teste pode fixar a hora ("a última mensagem do cliente foi há 26 h").
+    if (conversa.ultima_do_cliente_de_teste) return conversa.ultima_do_cliente_de_teste;
+    const entradas = tabelas.messages.filter(
+      (m) => m.workspace_id === conversa.workspace_id && m.conversation_id === conversa.id && m.direction === 'inbound',
+    );
+    if (entradas.length === 0) return null;
+    return entradas.map((m) => m.occurred_at).sort((a, b) => String(b).localeCompare(String(a)))[0] ?? null;
   }
 
   function enriquecerContatoNaConversa(conversa, contato) {
@@ -134,7 +187,14 @@ export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudan
   }
 
   function limparWorkspace(workspaceId) {
-    for (const nome of ['crm_tags', 'contact_tags', 'conversation_notes', 'quick_replies', 'scheduled_messages']) {
+    for (const nome of [
+      'crm_tags',
+      'contact_tags',
+      'conversation_notes',
+      'quick_replies',
+      'scheduled_messages',
+      'crm_stage_automations',
+    ]) {
       tabelas[nome] = tabelas[nome].filter((l) => l.workspace_id !== workspaceId);
     }
   }
@@ -201,6 +261,9 @@ export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudan
           waiting: (c) => ETAPAS_QUE_ESPERAM.includes(c.stage),
           resolved: (c) => c.stage === 'resolved',
           archived: (c) => c.stage === 'archived',
+          // Vencidos: o combinado já passou da hora e a conversa continua aberta.
+          reminders: (c) =>
+            Boolean(c.follow_up_at) && String(c.follow_up_at) <= new Date().toISOString() && !['resolved', 'archived'].includes(c.stage),
         };
         const fn = filtros[corpo.p_view ?? 'open'];
         if (!fn) return erro(400, '22023', 'Unsupported inbox view');
@@ -222,7 +285,165 @@ export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudan
           waiting: doChip.filter((c) => ETAPAS_QUE_ESPERAM.includes(c.stage)).length,
         },
         archived_count: doChip.filter((c) => c.stage === 'archived').length,
+        reminders_count: doChip.filter(
+          (c) =>
+            Boolean(c.follow_up_at) && String(c.follow_up_at) <= new Date().toISOString() && !['resolved', 'archived'].includes(c.stage),
+        ).length,
       });
+    }
+
+
+    /* ---- Rodada de 24/11: gestão fina da conversa ---- */
+
+    if (nome === 'read_my_workspace_people') {
+      // O nome vem do perfil da pessoa (aqui, da lista de usuários do cenário), como no banco de verdade.
+      const people = participacoes
+        .filter((p) => p.workspace_id === workspaceId && p.status === 'active')
+        .map((p) => {
+          const pessoa = USUARIOS.find((u) => u.id === p.user_id);
+          return {
+            id: p.user_id,
+            name: (pessoa?.nome || '').trim() || String(pessoa?.email ?? 'atendente@zapia.local').split('@')[0],
+            role: p.role,
+            eu: p.user_id === usuario.id,
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return responder(res, 200, { people });
+    }
+
+    if (nome === 'assign_my_conversation') {
+      const conv = daEmpresa('conversations').find((c) => c.id === corpo.p_conversation_id);
+      if (!conv) return erro(400, 'P0002', 'Conversation not found');
+      if (conv.stage === 'archived') return erro(400, 'P0001', 'conversation_closed');
+      if (corpo.p_user_id) {
+        const membro = participacoes.find(
+          (p) => p.workspace_id === workspaceId && p.user_id === corpo.p_user_id && p.status === 'active',
+        );
+        if (!membro) return erro(400, '22023', 'Teammate not in workspace');
+        const pessoa = USUARIOS.find((u) => u.id === corpo.p_user_id);
+        conv.assigned_user_id = corpo.p_user_id;
+        conv.assigned_label = String(corpo.p_label ?? '').trim() || (pessoa?.nome || '').trim() || 'Atendente';
+        if (['new', 'ai', 'waiting_human'].includes(conv.stage)) conv.stage = 'human';
+        conv.automation_paused = true;
+        conv.ai_pause_reason = 'claimed';
+      } else {
+        // Devolver para a fila: sem dono, e a automação pode voltar a atender.
+        conv.assigned_user_id = null;
+        conv.assigned_label = null;
+      }
+      anotarMudanca(workspaceId);
+      return responder(res, 200, {
+        assigned_user_id: conv.assigned_user_id ?? null,
+        assigned_label: conv.assigned_label ?? null,
+        stage: conv.stage,
+      });
+    }
+
+    if (nome === 'read_my_stage_automations') {
+      return responder(res, 200, daEmpresa('crm_stage_automations'));
+    }
+
+    if (nome === 'save_my_stage_automation') {
+      const etapa = String(corpo.p_stage ?? '').trim();
+      if (!ETAPAS_KANBAN.has(etapa)) return erro(400, '22023', 'Invalid crm_stage');
+      if (corpo.p_enable_tag && !daEmpresa('crm_tags').some((t) => t.id === corpo.p_tag_id)) {
+        return erro(404, 'P0002', 'Tag not found');
+      }
+      const existente = daEmpresa('crm_stage_automations').find((a) => a.stage === etapa);
+      const linha = {
+        workspace_id: workspaceId,
+        stage: etapa,
+        tag_id: corpo.p_enable_tag ? (corpo.p_tag_id ?? null) : null,
+        enable_tag: Boolean(corpo.p_enable_tag),
+        message_template: String(corpo.p_message_template ?? '').trim() || null,
+        enable_message: Boolean(corpo.p_enable_message),
+        updated_at: new Date().toISOString(),
+      };
+      if (existente) Object.assign(existente, linha);
+      else tabelas.crm_stage_automations.push(linha);
+      anotarMudanca(workspaceId);
+      return responder(res, 200, linha);
+    }
+
+    if (nome === 'plan_my_stage_automation') {
+      const regra = daEmpresa('crm_stage_automations').find((a) => a.stage === corpo.p_stage);
+      if (!regra) return responder(res, 200, { tag_id: null, message: null });
+      const conv = daEmpresa('conversations').find((c) => c.id === corpo.p_conversation_id);
+      const nome = conv ? (contatoDe(conv).display_name ?? '').trim() : '';
+      return responder(res, 200, {
+        tag_id: regra.enable_tag ? regra.tag_id : null,
+        message:
+          regra.enable_message && regra.message_template
+            ? String(regra.message_template).split('{{nome}}').join(nome)
+            : null,
+      });
+    }
+
+    if (nome === 'search_my_conversation_messages') {
+      const termo = String(corpo.p_term ?? '').trim();
+      if (termo.length < 2) return erro(400, '22023', 'Search term too short');
+      if (termo.length > 80) return erro(400, '22023', 'Search term too long');
+      const proc = termo.toLowerCase();
+      const limite = Math.min(Math.max(Number(corpo.p_limit ?? 50), 1), 100);
+      const messages = daEmpresa('messages')
+        .filter((m) => m.conversation_id === corpo.p_conversation_id)
+        .filter((m) => String(m.body_text ?? '').toLowerCase().includes(proc))
+        .sort((a, b) => String(b.occurred_at).localeCompare(String(a.occurred_at)))
+        .slice(0, limite)
+        .map((m) => ({
+          id: m.id,
+          direction: m.direction,
+          actor_type: m.actor_type,
+          body_text: m.body_text,
+          occurred_at: m.occurred_at,
+          reply_to_message_id: m.reply_to_message_id ?? null,
+        }));
+      return responder(res, 200, { term: termo, messages });
+    }
+
+    if (nome === 'search_my_workspace_messages') {
+      const termo = String(corpo.p_term ?? '').trim();
+      if (termo.length < 2) return erro(400, '22023', 'Search term too short');
+      if (termo.length > 80) return erro(400, '22023', 'Search term too long');
+      const proc = termo.toLowerCase();
+      const limite = Math.min(Math.max(Number(corpo.p_limit ?? 60), 1), 100);
+      const hits = daEmpresa('messages')
+        .filter((m) => String(m.body_text ?? '').toLowerCase().includes(proc))
+        .filter((m) => {
+          const conv = daEmpresa('conversations').find((c) => c.id === m.conversation_id);
+          return conv && conv.stage !== 'archived';
+        })
+        .sort((a, b) => String(b.occurred_at).localeCompare(String(a.occurred_at)))
+        .slice(0, limite)
+        .map((m) => {
+          const conv = daEmpresa('conversations').find((c) => c.id === m.conversation_id);
+          const ct = contatoDe(conv ?? {});
+          return {
+            message_id: m.id,
+            conversation_id: m.conversation_id,
+            direction: m.direction,
+            actor_type: m.actor_type,
+            body_text: m.body_text,
+            occurred_at: m.occurred_at,
+            contact_id: ct.id ?? null,
+            contact_name: ct.display_name ?? null,
+            contact_phone: ct.phone_e164 ?? null,
+            conversation_stage: conv?.stage ?? null,
+          };
+        });
+      return responder(res, 200, { term: termo, hits });
+    }
+
+    if (nome === 'update_my_scheduled_message') {
+      const item = daEmpresa('scheduled_messages').find((s) => s.id === corpo.p_scheduled_id);
+      if (!item) return erro(400, 'P0002', 'Scheduled message not found');
+      if (item.status !== 'pending') return erro(400, 'P0001', 'Scheduled message already sent');
+      const texto = String(corpo.p_body_text ?? '').trim();
+      if (!texto || texto.length > 4096) return erro(400, '22023', 'Invalid message text');
+      item.body_text = texto;
+      anotarMudanca(workspaceId);
+      return responder(res, 200, { id: item.id, body_text: item.body_text, status: item.status });
     }
 
     if (nome === 'read_my_contacts_directory') {
@@ -525,6 +746,13 @@ export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudan
       if (p.deal_lost_reason !== undefined) conv.deal_lost_reason = String(p.deal_lost_reason ?? '').trim() || null;
       if (p.is_pinned !== undefined) conv.is_pinned = Boolean(p.is_pinned);
       if (p.follow_up_at !== undefined) conv.follow_up_at = p.follow_up_at;
+      // "Lembretes": marcar (`follow_up_at`) e tirar (`clear_follow_up`).
+      if (p.clear_follow_up === true) conv.follow_up_at = null;
+      if (p.archive === true) {
+        conv.stage = 'archived';
+        conv.automation_paused = true;
+      }
+      if (p.unarchive === true && conv.stage === 'archived') conv.stage = 'human';
       if (p.stage !== undefined && ['resolved', 'archived', 'human'].includes(p.stage)) conv.stage = p.stage;
       anotarMudanca(workspaceId);
       return responder(res, 200, { id: conv.id, crm_stage: conv.crm_stage ?? 'novo' });
@@ -545,7 +773,28 @@ export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudan
           c.stage = 'archived';
           c.unread_count = 0;
         }
+        if (corpo.p_action === 'mute') c.is_muted = true;
+        if (corpo.p_action === 'unmute') c.is_muted = false;
+        if (corpo.p_action === 'reopen' && ['resolved', 'archived'].includes(c.stage)) c.stage = 'human';
+        if (corpo.p_action === 'pause_ai') {
+          c.automation_paused = true;
+          c.ai_pause_reason = 'claimed';
+        }
+        if (corpo.p_action === 'resume_ai' && !['resolved', 'archived'].includes(c.stage)) {
+          c.automation_paused = false;
+          c.ai_pause_reason = null;
+        }
         if (corpo.p_action === 'set_crm_stage' && ETAPAS_KANBAN.has(p.crm_stage)) c.crm_stage = p.crm_stage;
+      }
+      if (corpo.p_action === 'add_tag') {
+        const tag = daEmpresa('crm_tags').find((t) => t.id === p.tag_id);
+        if (!tag) return erro(404, 'P0002', 'Tag not found');
+        for (const c of convs) {
+          const jaTem = tabelas.contact_tags.some(
+            (ct) => ct.workspace_id === workspaceId && ct.contact_id === c.contact_id && ct.tag_id === tag.id,
+          );
+          if (!jaTem) tabelas.contact_tags.push({ workspace_id: workspaceId, contact_id: c.contact_id, tag_id: tag.id });
+        }
       }
       anotarMudanca(workspaceId);
       return responder(res, 200, { updated: convs.length });
@@ -682,6 +931,8 @@ export function criarCrmDoBanco({ tabelas, participacoes, responder, anotarMudan
     enriquecerConversaParaLista,
     enriquecerContatoNaConversa,
     extrasDaConversa,
+    citacaoDaMensagem,
+    ultimaDoCliente,
     limparWorkspace,
     acoesDoCrm,
   };
