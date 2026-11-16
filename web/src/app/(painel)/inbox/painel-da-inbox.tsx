@@ -770,6 +770,8 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
   const [avisoDaLista, setAvisoDaLista] = useState<{ aviso: Aviso; chave: string } | null>(null);
   const avisoVisivel = avisoDaLista && avisoDaLista.chave === chaveDoAviso ? avisoDaLista.aviso : null;
   const avisarLista = (aviso: Aviso) => setAvisoDaLista({ aviso, chave: chaveDoAviso });
+  /** Quantas mensagens não lidas a lista está mostrando (o número ao lado do título). */
+  const naoLidasNaLista = lista.conversas.reduce((soma, item) => soma + item.naoLidas, 0);
 
   const ir = (mudancas: Partial<FiltrosDaInbox>) =>
     enderecoDaInbox({ ...filtros, limite: null, conversaId, ...mudancas });
@@ -973,7 +975,25 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
       </div>
 
       <div className="inbox-lista-cabecalho">
-        <h2 id={idTitulo}>{filtros.busca ? 'Resultado da busca' : 'Fila de atendimento'}</h2>
+        <h2 id={idTitulo}>
+          {filtros.busca ? 'Resultado da busca' : 'Fila de atendimento'}
+          {naoLidasNaLista > 0 ? (
+            <>
+              {' '}
+              {/* O número é visual: quem usa leitor de tela escuta a frase logo abaixo, e o nome da região continua só "Fila de atendimento". */}
+              <span
+                className="inbox-titulo-contador"
+                aria-hidden="true"
+                title={`${plural(naoLidasNaLista, 'mensagem não lida', 'mensagens não lidas')} na lista`}
+              >
+                {naoLidasNaLista > 99 ? '99+' : naoLidasNaLista}
+              </span>
+            </>
+          ) : null}
+        </h2>
+        {naoLidasNaLista > 0 ? (
+          <span className="so-leitor-de-tela">{plural(naoLidasNaLista, 'mensagem não lida', 'mensagens não lidas')} na lista</span>
+        ) : null}
         <div className="inbox-lista-cabecalho-dir">
           {lista.falhou ? null : (
             <span>
@@ -1248,6 +1268,8 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
                     scroll={false}
                   >
                     {conteudoItem}
+                    {/* A conversa aberta ganha um traço na lateral: na lista longa dá para ver onde se está. */}
+                    {item.id === conversaId ? <span className="linha-check" aria-hidden="true" /> : null}
                   </Link>
                 )}
               </li>

@@ -219,6 +219,33 @@ test.describe('silenciar conversa', () => {
 });
 
 /* ---------------------------------------------------------------------------------------------- */
+/* Lista: contador no título e a conversa aberta marcada                                            */
+/* ---------------------------------------------------------------------------------------------- */
+
+test.describe('lista de conversas', () => {
+  test('o título soma as não lidas e a conversa aberta fica marcada', async ({ page }) => {
+    // Sem conversa aberta: as 4 mensagens não lidas do cenário (Ana 2, Bruno 1 e Carla 1).
+    await abrirInbox(page);
+    await expect(nomesNaLista(page).first()).toBeVisible();
+    const contador = page.locator('.inbox-titulo-contador');
+    await expect(contador).toHaveText('4');
+    await expect(contador).toHaveAttribute('title', /4 mensagens não lidas na lista/);
+
+    // Abrir uma conversa marca a dela como lida: o contador diminui sozinho.
+    await abrirConversa(page, 'Ana');
+
+    // E a conversa aberta ganha o traço na lista. No celular a lista fica escondida com a conversa
+    // aberta, mas continua no DOM — por isso o seletor é por classe, e não por papel.
+    const aberta = page.locator('.inbox-item[aria-current="true"]');
+    await expect(aberta).toContainText('Ana');
+    await expect(page.locator('.linha-check')).toHaveCount(1);
+    await expect(aberta.locator('.linha-check')).toHaveCount(1);
+
+    await voltarParaALista(page);
+    await expect(contador).toHaveText('2');
+  });
+});
+
 /* Transferir                                                                                     */
 /* ---------------------------------------------------------------------------------------------- */
 
