@@ -52,13 +52,10 @@ create policy crm_stage_automations_owner_read on public.crm_stage_automations
   for select using (private.is_workspace_member(workspace_id));
 -- No Supabase o `alter default privileges` já dá DELETE/INSERT/SELECT/UPDATE em tabela nova para
 -- authenticated e service_role. Aqui a tabela nasce fechada e só a leitura é liberada.
-revoke all on public.crm_stage_automations from anon, authenticated, service_role;
-grant select on public.crm_stage_automations to authenticated;
-grant select on public.crm_stage_automations to service_role;
--- O resto (insert/update/delete) fica como o Supabase entrega em tabela nova, para quem já é de dentro:
--- a tabela tem RLS ligada e nenhuma política de escrita, então ninguém escreve por aqui — só pelas funções.
-grant insert, update, delete, truncate, references, trigger on public.crm_stage_automations to authenticated;
-grant insert, update, delete, truncate, references, trigger on public.crm_stage_automations to service_role;
+-- No Supabase, tabela nova já nasce com INSERT/SELECT/UPDATE/DELETE para authenticated e service_role;
+-- aqui a única diferença é o anon, que não pode nem ler. A tabela tem RLS ligada e só a política de
+-- LEITURA, então ninguém escreve por aqui: a escrita é só pelas funções.
+revoke all on public.crm_stage_automations from anon;
 
 -- 4) As funções, do jeito que estão no banco publicado.
 CREATE OR REPLACE FUNCTION public.assign_my_conversation(p_workspace_id uuid, p_conversation_id uuid, p_user_id uuid, p_label text DEFAULT NULL::text)
@@ -764,107 +761,9 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.start_my_text_message(p_workspace_id uuid, p_conversation_id uuid, p_body_text text, p_idempotency_key text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_actor uuid := auth.uid();
-  v_body text := btrim(coalesce(p_body_text, ''));
-  v_conversation public.conversations%rowtype;
-  v_instance public.instances%rowtype;
-  v_contact public.contacts%rowtype;
-  v_message public.messages%rowtype;
-  v_command_id uuid;
-begin
-  if v_actor is null or not private.is_workspace_member(p_workspace_id) then
-    raise exception 'Workspace membership required' using errcode = '42501';
-  end if;
-  if char_length(v_body) not between 1 and 4096 then
-    raise exception 'Invalid message text' using errcode = '22023';
-  end if;
-  if p_idempotency_key is null or p_idempotency_key !~ '^[a-zA-Z0-9_-]{16,80}$' then
-    raise exception 'Invalid idempotency key' using errcode = '22023';
-  end if;
-
-  select c.* into v_conversation
-  from public.conversations c
-  where c.workspace_id = p_workspace_id and c.id = p_conversation_id
-  for update;
-  if not found then raise exception 'Conversation not found' using errcode = 'P0002'; end if;
-
-  select m.* into v_message
-  from public.messages m
-  where m.workspace_id = p_workspace_id and m.idempotency_key = p_idempotency_key;
-  if found then
-    return jsonb_build_object('message_id', v_message.id, 'status', v_message.status, 'already_exists', true,
-      'body_text', v_message.body_text);
-  end if;
-
-  if v_conversation.stage in ('resolved','archived') then
-    raise exception 'conversation_closed' using errcode = 'P0001';
-  end if;
-
-  select i.* into v_instance
-  from public.instances i
-  where i.workspace_id = p_workspace_id and i.id = v_conversation.instance_id;
-  if not found or v_instance.status = 'revoked'
-    or not (
-      (v_instance.engine = 'evolution' and v_instance.provider_instance_name is not null)
-      or (v_instance.engine = 'baileys' and v_instance.local_executor_id is not null)
-    ) then
-    raise exception 'instance_unavailable' using errcode = 'P0001';
-  end if;
-  if v_instance.status <> 'connected' then
-    raise exception 'instance_not_connected' using errcode = 'P0001';
-  end if;
-
-  select ct.* into v_contact
-  from public.contacts ct
-  where ct.workspace_id = p_workspace_id and ct.id = v_conversation.contact_id;
-  if not found or v_contact.erased_at is not null or v_contact.external_user_id is null
-    or v_contact.external_user_id !~ '^[1-9][0-9]{5,19}@s[.]whatsapp[.]net$' then
-    raise exception 'contact_unreachable' using errcode = 'P0001';
-  end if;
-
-  insert into public.messages(workspace_id,conversation_id,instance_id,idempotency_key,direction,
-    source_engine,actor_type,status,body_text,occurred_at,sent_by)
-  values (p_workspace_id,p_conversation_id,v_instance.id,p_idempotency_key,'outbound',
-    v_instance.engine,'human','sending',v_body,now(),v_actor)
-  returning * into v_message;
-
-  if v_instance.engine = 'baileys' then
-    insert into public.local_motor_commands(
-      workspace_id, executor_id, instance_id, command_type, payload, message_id
-    )
-    values (
-      p_workspace_id,
-      v_instance.local_executor_id,
-      v_instance.id,
-      'send_text',
-      jsonb_build_object('recipient', v_contact.external_user_id, 'body_text', v_body),
-      v_message.id
-    )
-    returning id into v_command_id;
-
-    return jsonb_build_object(
-      'message_id', v_message.id,
-      'status', v_message.status,
-      'already_exists', false,
-      'engine', 'baileys',
-      'command_id', v_command_id,
-      'recipient', v_contact.external_user_id,
-      'body_text', v_body
-    );
-  end if;
-
-  return jsonb_build_object('message_id', v_message.id, 'status', v_message.status, 'already_exists', false,
-    'provider_instance_name', v_instance.provider_instance_name,
-    'recipient', v_contact.external_user_id, 'body_text', v_body);
-end;
-$function$;
+-- A versão sem citação existia em paralelo no banco publicado e deixava o envio ambíguo pelo
+-- PostgREST (PGRST203). Fica só a de baixo, que aceita a citação com valor padrão nulo.
+drop function if exists public.start_my_text_message(uuid, uuid, text, text);
 
 CREATE OR REPLACE FUNCTION public.start_my_text_message(p_workspace_id uuid, p_conversation_id uuid, p_body_text text, p_idempotency_key text, p_reply_to_message_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb

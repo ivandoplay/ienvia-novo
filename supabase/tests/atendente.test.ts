@@ -1120,6 +1120,7 @@ describe('ler a conversa: como a IA está nela', () => {
   test('do começo ao repasse', async () => {
     await banco.comoUsuario(ATENDENTE_A, async () => {
       await prepararIa();
+      // A faixa da IA na conversa aberta não traz mais `working` (quem decide é o painel, pelo relógio).
       expect(await lerIa()).toEqual({
         chip_enabled: true,
         workspace_paused: false,
@@ -1128,15 +1129,14 @@ describe('ler a conversa: como a IA está nela', () => {
         pause_reason: null,
         handoff_at: null,
         handoff_note: null,
-        working: false,
       });
 
       const { vez } = await vezEmAndamento('WA-IN-1');
-      expect(await lerIa()).toMatchObject({ working: true, locked: false });
+      expect(await lerIa()).toMatchObject({ locked: false });
 
       await fecharVez(vez, 'handoff', { recado: 'Quer falar com o responsável' });
       const repassada = await lerIa();
-      expect(repassada).toMatchObject({ working: false, locked: false, pause_reason: 'handoff', handoff_note: 'Quer falar com o responsável' });
+      expect(repassada).toMatchObject({ locked: false, pause_reason: 'handoff', handoff_note: 'Quer falar com o responsável' });
       expect(repassada.paused_until).toBeTruthy();
       expect(repassada.handoff_at).toBeTruthy();
 

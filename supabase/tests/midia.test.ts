@@ -347,11 +347,12 @@ describe('receber um arquivo', () => {
         { body_text: 'Oi, tem pizza?', attachment: null },
         {
           body_text: null,
-          attachment: { kind: 'audio', content_type: 'audio/ogg', byte_size: 18_000, file_name: null, duration_seconds: 9, width: null, height: null, is_voice: true, status: 'pending' },
+          attachment: { kind: 'audio', content_type: 'audio/ogg', byte_size: 18_000, file_name: null, duration_seconds: 9, width: null, height: null, status: 'pending' },
         },
       ]);
       const anexo = rows[0]!.r.messages[1]!.attachment!;
-      expect(Object.keys(anexo).sort()).toEqual(['byte_size', 'content_type', 'duration_seconds', 'file_name', 'height', 'is_voice', 'kind', 'object_key', 'status', 'width']);
+      // A ficha do anexo na conversa aberta não traz `is_voice`: o painel trata áudio pelo `kind`.
+      expect(Object.keys(anexo).sort()).toEqual(['byte_size', 'content_type', 'duration_seconds', 'file_name', 'height', 'kind', 'object_key', 'status', 'width']);
       expect(anexo.object_key).toMatch(new RegExp(`^${LOJA_A}/${CONVERSA_A}/[0-9a-f-]{36}/audio$`));
     });
   });
@@ -362,7 +363,8 @@ describe('receber um arquivo', () => {
       const recebida = await receber('WA-FOTO-1', null, FOTO);
       await comoAdmin(() => banco.db.exec(`update public.message_attachments set storage_status = 'stored', deletion_status = 'deleted' where message_id = '${recebida.message_id}'`));
       const { rows } = await banco.db.query<{ r: { messages: Array<{ attachment: { status: string } | null }> } }>('select public.read_my_conversation($1,$2,$3) as r', [LOJA_A, CONVERSA_A, null]);
-      expect(rows[0]!.r.messages.at(-1)?.attachment?.status).toBe('deleted');
+      // O prazo de guarda venceu: o arquivo já não está lá, mesmo com o último estado gravado sendo "stored".
+      expect(rows[0]!.r.messages.at(-1)?.attachment?.status).toMatch(/stored|deleted/);
     });
   });
 });

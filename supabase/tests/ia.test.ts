@@ -55,7 +55,8 @@ const PADROES = {
   fallback_provider: 'none',
   second_fallback_provider: 'none',
   gemini_model: 'gemini-3.5-flash-lite',
-  openrouter_model: 'deepseek/deepseek-chat',
+  // Desde 23/11 o padrão do OpenRouter é o roteador gratuito (migração 20261123120000).
+  openrouter_model: 'openrouter/free',
   nvidia_model: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
   temperature: 0.35,
   max_history_messages: 20,

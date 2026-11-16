@@ -48,6 +48,8 @@ const MODELOS_DO_GEMINI = [
 ];
 
 const MODELOS_DO_OPENROUTER = [
+  // Desde 23/11 o painel manda este por padrão: é o roteador gratuito do OpenRouter.
+  { id: 'openrouter/free', name: 'OpenRouter: Free Models Router', pricing: { prompt: '0', completion: '0' }, architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] } },
   { id: 'deepseek/deepseek-chat', name: 'DeepSeek: DeepSeek V3', pricing: { prompt: '0.0000003', completion: '0.0000012' }, architecture: { input_modalities: ['text'], output_modalities: ['text'] } },
   { id: 'google/gemma-4-26b-a4b-it:free', name: 'Google: Gemma 4 26B (free)', pricing: { prompt: '0', completion: '0' }, architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] } },
   { id: 'anthropic/claude-sonnet-5', name: 'Anthropic: Claude Sonnet 5', pricing: { prompt: '0.000003', completion: '0.000015' }, architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] } },

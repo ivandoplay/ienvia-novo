@@ -419,6 +419,8 @@ describe('teste de conexão e lista de modelos', () => {
       { id: 'anthropic/claude-sonnet-5', nome: 'Anthropic: Claude Sonnet 5', gratuito: false },
       { id: 'deepseek/deepseek-chat', nome: 'DeepSeek: DeepSeek V3', gratuito: false },
       { id: 'google/gemma-4-26b-a4b-it:free', nome: 'Google: Gemma 4 26B (free)', gratuito: true },
+      // O roteador gratuito, que é o padrão do Motor de IA desde 23/11.
+      { id: 'openrouter/free', nome: 'OpenRouter: Free Models Router', gratuito: true },
     ];
     expect(await listarModelos('openrouter', null)).toEqual(esperado);
     expect(await listarModelos('openrouter', CHAVE_OPENROUTER_DE_TESTE)).toEqual(esperado);

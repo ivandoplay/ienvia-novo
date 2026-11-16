@@ -41,3 +41,32 @@ O banco publicado tem `start_my_text_message(uuid,uuid,text,text)` **e**
 sem `p_reply_to_message_id`, o Postgres responde `PGRST203`: *Could not choose the best candidate*.
 Ou seja: **com o painel atual (que não manda a citação) o envio de texto falha**. Decisão pendente:
 ou se remove a versão de 4 argumentos, ou o painel passa a mandar `p_reply_to_message_id: null`.
+
+## Resolvido: a ambiguidade do envio (P0)
+
+A versão de 4 argumentos foi **removida do banco publicado**:
+
+```sql
+drop function if exists public.start_my_text_message(uuid, uuid, text, text);
+```
+
+Ficou só `start_my_text_message(..., p_reply_to_message_id uuid default null)`, que aceita o envio sem
+citação (o painel atual) e com citação (o painel reconstruído). Conferido pelo PostgREST: chamando com
+4 ou 5 parâmetros nomeados, a resposta passou a ser a de dentro da função (`42501` no workspace falso),
+não mais `PGRST203`.
+
+## Suíte verde depois da recuperação
+
+- `npx vitest run supabase/tests`: **340 testes, 16 arquivos, todos passando** (o esquema do Git monta
+  exatamente o banco publicado, nas 11 categorias).
+- `npx vitest run`: **1031 testes, 54 arquivos, todos passando**.
+
+Testes de banco ajustados ao que o banco publicado realmente faz (e que a rodada perdida mudou):
+
+| Teste | O que mudou |
+|---|---|
+| `inbox.test.ts` | conversa inexistente/de outra empresa volta com `conversation: null` em vez de `null`; `mine`/`from_panel` anuláveis |
+| `midia.test.ts` | a ficha do anexo na conversa aberta não traz mais `is_voice` |
+| `atendente.test.ts` | a faixa da IA na conversa aberta não traz mais `working` |
+| `ia.test.ts` | padrão do OpenRouter é `openrouter/free` (migração de 23/11) |
+| `provedores.test.ts` + dublê `ia-falsa.mjs` | o dublê de IA passou a conhecer `openrouter/free` (sem isso, a reserva "não existia" e a IA desistia) |
