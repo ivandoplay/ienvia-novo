@@ -6,6 +6,10 @@ campanhas e contas separadas por cliente.
 **Quem vai mexer no código (pessoa ou IA): comece por [docs/README.md](docs/README.md)** — é o índice que
 aponta as regras da casa, a infra, o banco, as telas e o motor, com os erros que já custaram tempo.
 
+Para saber **onde fica cada arquivo e o que cada função faz**, use
+[docs/MAPA-DO-CODIGO.md](docs/MAPA-DO-CODIGO.md): é o mapa arquivo por arquivo, com as telas, os dados,
+as ações de servidor, as rotas de API, as RPCs do banco, os dublês de teste e as armadilhas.
+
 Esta é a **reescrita limpa** do sistema antigo (`zap-ia-studio`). O plano completo, com as fases e
 as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do que sai está em
 [docs/O-QUE-FICA-E-O-QUE-SAI.md](docs/O-QUE-FICA-E-O-QUE-SAI.md). Para ver tudo num lugar só (como o

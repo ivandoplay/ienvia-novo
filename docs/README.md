@@ -77,6 +77,7 @@ Duas audiências, um só código:
 ```
 docs/
 ├── README.md                     ← índice e por onde começar (você está aqui)
+├── MAPA-DO-CODIGO.md             ← **onde fica cada arquivo e o que cada função faz** (comece por aqui se for mexer)
 ├── REGRAS-DA-CASA.md             ← como trabalhar: comandos, testes, estilo, o que não fazer
 ├── INFRA-E-DEPLOY.md             ← onde roda o quê e como publicar (tokens, domínios, regiões)
 ├── ESTRUTURA-HOSPEDAGEM.md       ← inventário medido da infra + custos/limites
