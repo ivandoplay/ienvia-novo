@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import {
+  carregarAutomacoesDeEtapa,
   carregarCatalogosDoCrm,
   carregarConversa,
   carregarDiretorioDeContatos,
@@ -65,7 +66,7 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
   const agora = new Date();
   const [versao, canalRealtime] = await Promise.all([lerVersaoDaInbox(workspace.id), lerCanalDaInbox(workspace.id)]);
 
-  const [chips, catalogos, recursos, lista, aberta, contatosDir, kanban] = await Promise.all([
+  const [chips, catalogos, recursos, lista, aberta, contatosDir, kanban, automacoes] = await Promise.all([
     listarChipsDaInbox(workspace.id),
     carregarCatalogosDoCrm(workspace.id),
     carregarRecursosDaInbox(workspace.id),
@@ -79,6 +80,7 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
     aba === 'kanban'
       ? carregarKanban(workspace.id, { chipId: filtros.chipId, etiquetaId: filtros.etiquetaId, busca: filtros.busca }, agora)
       : Promise.resolve({ cartoes: [], falhou: false }),
+    aba === 'kanban' ? carregarAutomacoesDeEtapa(workspace.id) : Promise.resolve([]),
   ]);
 
   return (
@@ -95,6 +97,7 @@ export default async function PaginaDaInbox({ searchParams }: { searchParams: Pr
       recursos={recursos}
       contatosDir={contatosDir}
       kanban={kanban}
+      automacoes={automacoes}
       conversaId={conversaId}
       aberta={aberta}
       limiteDeMensagens={limiteDeMensagens}

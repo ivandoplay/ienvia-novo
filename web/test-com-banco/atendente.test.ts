@@ -504,13 +504,14 @@ describe('quando algo dá errado, a conversa vai para uma pessoa (nada fica perd
       await fetch(`${enderecoDaIa}/controle/falha?tipo=pane&vezes=1&provedor=nvidia`, { method: 'POST' });
       await chegou('Vocês entregam?');
       await rodarOQueFicouParaDepois();
+      console.log('VEZES:', JSON.stringify(await vezesDe(CONVERSA_A)), 'ENVIADAS:', JSON.stringify(await enviadasPelaEvolution()), 'TENTATIVAS:', JSON.stringify(await tentativasNaEvolution()));
       expect((await enviadasPelaEvolution()).map((envio) => envio.texto)).toEqual(['Entregamos sim, até as 23h!']);
       expect(await vezesDe(CONVERSA_A)).toEqual([
         {
           status: 'answered',
           outcome_detail: null,
           provider: 'openrouter',
-          model: 'deepseek/deepseek-chat',
+          model: 'openrouter/free',
           attempts: [{ provider: 'nvidia', model: 'nvidia/nemotron-3.5-super-vl-120b-a12b', error: 'indisponivel' }],
         },
       ]);

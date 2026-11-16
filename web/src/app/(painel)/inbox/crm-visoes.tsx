@@ -32,6 +32,8 @@ import {
   rascunhoDoDiretorio,
   type RascunhoContato,
 } from './crm-modais';
+import { AutomacaoDasEtapas } from './kanban-automacao';
+import type { AutomacaoDaEtapa } from './acoes';
 
 /* -------------------------------------------------------------------------- */
 /* Coluna 3 (e modal mobile): Ficha CRM do contato, Negócio, Etiquetas, Notas */
@@ -45,6 +47,7 @@ export function CartaoCrmDoContato({
   aoAtualizar,
   aoApagarContato,
   aoAbrirEtiquetas,
+  idDaFicha = null,
 }: {
   conversa: ConversaAberta;
   etapa: string;
@@ -53,6 +56,11 @@ export function CartaoCrmDoContato({
   aoAtualizar: () => void;
   aoApagarContato: () => void;
   aoAbrirEtiquetas: () => void;
+  /**
+   * O `id` da ficha na coluna da direita. Existe só na versão de fora da janela: quando a ficha também
+   * abre no modal (celular), dois `id` iguais na mesma tela quebrariam a ligação com o menu "Contato".
+   */
+  idDaFicha?: string | null;
 }) {
   const [copiado, setCopiado] = useState<'sim' | 'falhou' | null>(null);
   const [valorInput, setValorInput] = useState(() =>
@@ -138,7 +146,7 @@ export function CartaoCrmDoContato({
   };
 
   return (
-    <div className="contato-cartao">
+    <div className="contato-cartao" id={idDaFicha ?? undefined} aria-label="Ficha do contato">
       <div className="contato-topo">
         <span className="inbox-avatar inbox-avatar--grande" aria-hidden="true">
           {conversa.contato.iniciais}
@@ -644,6 +652,7 @@ export function QuadroKanban({
   chipAtual,
   etiquetaAtual,
   aoAtualizar,
+  automacoes,
 }: {
   cartoes: CartaoDoKanban[];
   etiquetas: EtiquetaDoCrm[];
@@ -651,6 +660,8 @@ export function QuadroKanban({
   chipAtual: string | null;
   etiquetaAtual: string | null;
   aoAtualizar: () => void;
+  /** O que acontece sozinho ao entrar em cada etapa (o botão "Automação das etapas"). */
+  automacoes: AutomacaoDaEtapa[];
 }) {
   const router = useRouter();
   const [movidos, setMovidos] = useState<Record<string, string>>({});
@@ -704,6 +715,7 @@ export function QuadroKanban({
         </div>
 
         <div className="crm-barra-busca">
+          <AutomacaoDasEtapas automacoes={automacoes} etiquetas={etiquetas} />
           {chips.length > 1 ? (
             <select
               className="campo"

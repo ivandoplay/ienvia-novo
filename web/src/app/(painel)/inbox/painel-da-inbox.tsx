@@ -3,12 +3,13 @@
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { formatarDuracaoAudio } from '@ienvia/shared/recursos';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import type { FaixaDaIa } from '@/lib/atendente/painel';
 import type { RecursosParaInbox } from '@/lib/dados/recursos';
+import { formatarDataHoraCurta, resumoDaCitacao, trechoEmLinha } from '@/lib/inbox/regras';
 import type {
   ArquivoDaMensagem,
   CartaoDoKanban,
@@ -18,8 +19,10 @@ import type {
   ConversaAberta,
   EtiquetaDoCrm,
   FiltrosDaInbox,
+  AchadoNasConversas,
   ListaDaInbox,
   MensagemDaConversa,
+  PessoaDoWorkspace,
   RespostaRapida,
 } from '@/lib/dados/inbox';
 import { plural } from '@/lib/formato';
@@ -43,6 +46,7 @@ import {
   descreverEtapa,
   enderecoDaInbox,
   formatarReais,
+  deInputDateTimeLocal,
   NOVIDADES_EM_RITMO_LENTO_APOS,
   horaDaMensagem,
   intervaloDeNovidades,
@@ -65,10 +69,20 @@ import {
   enviarItemCatalogoNaConversa,
   enviarMensagem,
   enviarPixNaConversa,
+  lembrarEmLote,
+  lerEquipe,
+  editarMensagemAgendada,
   mudarConversa,
+  pedirRascunhoDaIA,
   prepararEnvioDeArquivo,
+  procurarNaConversa,
+  procurarNasMensagens,
+  silenciarConversa,
+  transferirConversa,
+  type AutomacaoDaEtapa,
   type ResultadoDoEnvio,
 } from './acoes';
+import { DialogoDeTransferencia, DialogoLembrete, MenuMais } from './conversa-topo';
 import { ModalAgendarMensagem, ModalCatalogosCrm, ModalNovaConversa } from './crm-modais';
 import { AgendaDeContatos, CartaoCrmDoContato, QuadroKanban } from './crm-visoes';
 import { JanelaDeEnsino } from './janela-de-ensino';
@@ -89,6 +103,8 @@ interface Props {
   recursos?: RecursosParaInbox;
   contatosDir?: { contatos: ContatoDoDiretorio[]; total: number; falhou: boolean };
   kanban?: { cartoes: CartaoDoKanban[]; falhou: boolean };
+  /** O que acontece sozinho ao entrar em cada etapa do funil (aba Kanban). */
+  automacoes?: AutomacaoDaEtapa[];
   /** Conversa pedida no endereço (?c=...). */
   conversaId: string | null;
   aberta: { conversa: ConversaAberta | null; falhou: boolean } | null;
@@ -453,6 +469,7 @@ export function PainelDaInbox({
   },
   contatosDir = { contatos: [], total: 0, falhou: false },
   kanban = { cartoes: [], falhou: false },
+  automacoes = [],
   conversaId,
   aberta,
   limiteDeMensagens,
@@ -472,7 +489,7 @@ export function PainelDaInbox({
   }, []);
 
   const enviar = useCallback(
-    async (conversa: string, texto: string, opcoes: { chave?: string; anexo?: Anexo } = {}) => {
+    async (conversa: string, texto: string, opcoes: { chave?: string; anexo?: Anexo; respondendoA?: string | null } = {}) => {
       const chave = opcoes.chave ?? novaChave();
       const anexo = opcoes.anexo;
       const agora = Date.now();
@@ -537,7 +554,9 @@ export function PainelDaInbox({
             }),
           );
         } else {
-          resultado = await pedir(() => enviarMensagem({ conversaId: conversa, texto, chave }));
+          resultado = await pedir(() =>
+            enviarMensagem({ conversaId: conversa, texto, chave, respondendoA: opcoes.respondendoA ?? null }),
+          );
         }
       } catch {
         // A resposta se perdeu: não dá para saber o que o servidor fez. Recarrega para ver o que está gravado.
@@ -633,6 +652,7 @@ export function PainelDaInbox({
           chipAtual={filtros.chipId}
           etiquetaAtual={filtros.etiquetaId ?? null}
           aoAtualizar={atualizarTela}
+          automacoes={automacoes}
         />
       ) : (
         <div className={`inbox-grade${conversa ? ' inbox-grade--com-contato' : ''}`}>
@@ -732,6 +752,22 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
   const [modoLote, setModoLote] = useState(false);
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const [ocupadoLote, setOcupadoLote] = useState(false);
+  /** Lembretes em lote: quando marcar (vazio = "tirar o lembrete", com o botão ao lado). */
+  const [lembreteLote, setLembreteLote] = useState('');
+  /** Busca nas mensagens de todas as conversas ("Procurar nas mensagens"). */
+  const [achadosDasConversas, setAchadosDasConversas] = useState<AchadoNasConversas[] | null>(null);
+  const [procurandoNasConversas, setProcurandoNasConversas] = useState(false);
+  /** Mostra/oculta o campo de busca nas mensagens. */
+  const [buscaNasMensagens, setBuscaNasMensagens] = useState(false);
+  const idLembreteLote = useId();
+  /**
+   * Aviso da lista (lote, lembretes). Ele guarda a "chave" do momento em que foi criado (busca, visão e
+   * modo de seleção): mudou alguma coisa, o aviso antigo simplesmente deixa de aparecer — sem efeito.
+   */
+  const chaveDoAviso = `${filtros.busca ?? ''}|${filtros.visao}|${modoLote ? 'lote' : 'normal'}`;
+  const [avisoDaLista, setAvisoDaLista] = useState<{ aviso: Aviso; chave: string } | null>(null);
+  const avisoVisivel = avisoDaLista && avisoDaLista.chave === chaveDoAviso ? avisoDaLista.aviso : null;
+  const avisarLista = (aviso: Aviso) => setAvisoDaLista({ aviso, chave: chaveDoAviso });
 
   const ir = (mudancas: Partial<FiltrosDaInbox>) =>
     enderecoDaInbox({ ...filtros, limite: null, conversaId, ...mudancas });
@@ -746,7 +782,53 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
     setSelecionadas((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
   }
 
-  async function executarLote(acao: 'mark_read' | 'mark_unread' | 'resolve' | 'archive' | 'unarchive', etapaCrm?: string) {
+  /** "Procurar nas mensagens": o mesmo termo da busca, dentro das mensagens de todas as conversas. */
+  async function procurarNasMensagensDoWorkspace() {
+    const termo = (filtros.busca ?? '').trim();
+    if (termo.length < 2) {
+      avisarLista({ tipo: 'erro', texto: 'Escreva pelo menos 2 letras na busca para procurar nas mensagens.' });
+      return;
+    }
+    setProcurandoNasConversas(true);
+    const resultado = await pedir(() => procurarNasMensagens({ termo }));
+    setProcurandoNasConversas(false);
+    if (!resultado.ok) {
+      avisarLista({ tipo: 'erro', texto: resultado.erro });
+      return;
+    }
+    setAchadosDasConversas(resultado.achados);
+    setBuscaNasMensagens(true);
+  }
+
+  /** "Marcar lembrete" / "Tirar lembrete" em várias conversas de uma vez. */
+  async function executarLembretesLote(tirar = false) {
+    if (ocupadoLote || selecionadas.length === 0) return;
+    const quando = tirar ? null : deInputDateTimeLocal(lembreteLote);
+    if (!tirar && !quando) return;
+    setOcupadoLote(true);
+    const res = await pedir(() => lembrarEmLote({ conversaIds: selecionadas, quandoIso: quando }));
+    setOcupadoLote(false);
+    if (!res.ok) {
+      avisarLista({ tipo: 'erro', texto: res.erro });
+      return;
+    }
+    avisarLista({
+      tipo: 'ok',
+      texto: tirar
+        ? `Lembrete tirado de ${plural(res.atualizadas, 'conversa', 'conversas')}.`
+        : `Lembrete marcado em ${plural(res.atualizadas, 'conversa', 'conversas')}.`,
+    });
+    setLembreteLote('');
+    setSelecionadas([]);
+    setModoLote(false);
+    aoAtualizar();
+  }
+
+  async function executarLote(
+    /** Desarquivar, no banco, é o mesmo que "reopen": a conversa volta para a fila. */
+    acao: 'mark_read' | 'mark_unread' | 'resolve' | 'archive' | 'mute' | 'unmute' | 'reopen',
+    etapaCrm?: string,
+  ) {
     if (ocupadoLote || selecionadas.length === 0) return;
     setOcupadoLote(true);
     const res = await aplicarAcaoEmLote({
@@ -940,6 +1022,12 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
               <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('archive')}>
                 Arquivar
               </button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('mute')}>
+                Silenciar
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('unmute')}>
+                Voltar a avisar
+              </button>
               <select
                 className="campo"
                 aria-label="Mover selecionadas para etapa"
@@ -956,17 +1044,114 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
                   </option>
                 ))}
               </select>
+              <label className="inbox-lote-lembrete" htmlFor={idLembreteLote}>
+                <span className="so-leitor-de-tela">Lembretes em lote: data e hora do retorno</span>
+                <input
+                  id={idLembreteLote}
+                  className="campo"
+                  type="datetime-local"
+                  value={lembreteLote}
+                  disabled={ocupadoLote}
+                  onChange={(evento) => setLembreteLote(evento.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={ocupadoLote || !lembreteLote}
+                onClick={() => void executarLembretesLote()}
+              >
+                {ocupadoLote ? 'Marcando…' : 'Marcar lembrete'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={ocupadoLote}
+                onClick={() => void executarLembretesLote(true)}
+              >
+                Tirar lembrete
+              </button>
             </div>
           ) : null}
         </div>
       ) : null}
 
       {filtros.busca ? (
-        <p className="inbox-busca-ativa">
-          Procurando <strong>“{filtros.busca}”</strong> em todas as conversas.{' '}
-          <Link href={ir({ busca: null })} prefetch={false} scroll={false}>
-            Limpar busca
-          </Link>
+        <div className="inbox-busca-ativa">
+          <p>
+            Procurando <strong>“{filtros.busca}”</strong> em todas as conversas.{' '}
+            <Link href={ir({ busca: null })} prefetch={false} scroll={false}>
+              Limpar busca
+            </Link>
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm inbox-busca-conteudo-botao"
+            disabled={procurandoNasConversas}
+            onClick={() => void procurarNasMensagensDoWorkspace()}
+          >
+            <Icone nome="busca" className="icon-15" />
+            <span>{procurandoNasConversas ? 'Procurando…' : 'Procurar nas mensagens'}</span>
+          </button>
+        </div>
+      ) : null}
+
+      {buscaNasMensagens && achadosDasConversas ? (
+        <div className="inbox-busca-conteudo" aria-label="Mensagens encontradas">
+          <div className="inbox-busca-conteudo-topo">
+            <strong>
+              {achadosDasConversas.length === 1
+                ? '1 mensagem encontrada'
+                : `${achadosDasConversas.length} mensagens encontradas`}
+            </strong>
+            <button
+              type="button"
+              className="contato-copiar"
+              onClick={() => {
+                setBuscaNasMensagens(false);
+                setAchadosDasConversas(null);
+              }}
+            >
+              Fechar
+            </button>
+          </div>
+          {achadosDasConversas.length === 0 ? (
+            <p className="inbox-busca-vazia">Nenhuma mensagem com esse texto.</p>
+          ) : (
+            <ul>
+              {achadosDasConversas.slice(0, 40).map((achado) => (
+                <li key={achado.mensagemId}>
+                  <Link
+                    href={enderecoDaInbox({ ...filtros, conversaId: achado.conversaId })}
+                    className="inbox-busca-achado"
+                    prefetch={false}
+                    scroll={false}
+                  >
+                    <span className="inbox-busca-achado-quem">
+                      {achado.contatoNome}
+                      {achado.recebida ? '' : ' (sua equipe)'}
+                    </span>
+                    <span className="inbox-busca-achado-texto">
+                      {achado.trecho.antes}
+                      <mark className="balao-destaque">{achado.trecho.destaque}</mark>
+                      {achado.trecho.depois}
+                    </span>
+                    <span className="inbox-busca-achado-quando">{achado.quando}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
+      {avisoVisivel ? (
+        <p className={`aviso aviso--${avisoVisivel.tipo} inbox-aviso`} role={avisoVisivel.tipo === 'ok' ? 'status' : 'alert'}>
+          <span>{avisoVisivel.texto}</span>
+          <button type="button" className="inbox-aviso-fechar" onClick={() => setAvisoDaLista(null)}>
+            <Icone nome="fechar" className="icon-15" />
+            <span className="so-leitor-de-tela">Fechar aviso</span>
+          </button>
         </p>
       ) : null}
 
@@ -1012,6 +1197,16 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
                     {item.valorNegocio > 0 ? (
                       <span className={`crm-valor-pill crm-valor-pill--${item.situacaoNegocio}`}>{formatarReais(item.valorNegocio)}</span>
                     ) : null}
+                    {item.silenciada ? (
+                      <span className="inbox-etiqueta inbox-etiqueta--calmo">
+                        <Icone nome="bloqueado" className="icon-15" />
+                        Silenciada
+                      </span>
+                    ) : null}
+                    {item.espera && item.tomDaEspera ? (
+                      <span className={`inbox-etiqueta inbox-espera inbox-espera--${item.tomDaEspera}`}>{item.espera}</span>
+                    ) : null}
+                    {item.atendente ? <span className="inbox-etiqueta inbox-etiqueta--atendente">{item.atendente}</span> : null}
                     {item.iaIgnorada ? <span className="inbox-etiqueta inbox-etiqueta--atencao">IA off</span> : null}
                     {item.agendadasPendentes > 0 ? (
                       <span className="inbox-etiqueta">{item.agendadasPendentes} agend.</span>
@@ -1043,7 +1238,9 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
                 ) : (
                   <Link
                     href={enderecoDaInbox({ ...filtros, conversaId: item.id })}
-                    className={`inbox-item${item.naoLidas > 0 ? ' inbox-item--nao-lida' : ''}`}
+                    className={`inbox-item${item.naoLidas > 0 ? ' inbox-item--nao-lida' : ''}${
+                      item.silenciada ? ' inbox-silenciada' : ''
+                    }`}
                     aria-current={item.id === conversaId ? 'true' : undefined}
                     prefetch={false}
                     scroll={false}
@@ -1165,7 +1362,7 @@ interface PropsDaConversa {
   pendentes: Pendente[];
   aviso: Aviso | null;
   aoAvisar: (conversaId: string, aviso: Aviso | null) => void;
-  aoEnviar: (conversaId: string, texto: string, opcoes?: { chave?: string; anexo?: Anexo }) => Promise<void>;
+  aoEnviar: (conversaId: string, texto: string, opcoes?: { chave?: string; anexo?: Anexo; respondendoA?: string | null }) => Promise<void>;
   aoDescartar: (chave: string) => void;
   ehDono: boolean;
   evolutionConfigurada: boolean;
@@ -1267,12 +1464,29 @@ function Conversa({
   const [fotoAberta, setFotoAberta] = useState<FotoAberta | null>(null);
   const [agendarTexto, setAgendarTexto] = useState<string | null>(null);
   const [cancelandoAgendaId, setCancelandoAgendaId] = useState<string | null>(null);
+  /** "Editar" numa mensagem agendada: o texto e o id de quem está sendo editado. */
+  const [editandoAgenda, setEditandoAgenda] = useState<{ id: string; texto: string } | null>(null);
   /** Mensagem cujo arquivo está sendo buscado de novo no WhatsApp. */
   const [buscando, setBuscando] = useState<string | null>(null);
   /** Texto colocado no campo por um "tentar de novo". Cada pedido tem um número, para o campo recomeçar. */
   const [preenchimento, setPreenchimento] = useState<{ texto: string; vez: number } | null>(null);
   /** A resposta que o dono está guardando no Treinamento ("corrigir resposta em 1 clique"). */
   const [ensinando, setEnsinando] = useState<{ mensagemId: string; sugestao: SugestaoDeEnsino } | null>(null);
+  /** Janelas do topo: transferir e lembretes. */
+  const [transferindo, setTransferindo] = useState(false);
+  const [lembrando, setLembrando] = useState(false);
+  const [pessoas, setPessoas] = useState<PessoaDoWorkspace[] | null>(null);
+  /** A mensagem que está sendo respondida com citação (fica no alto do campo). */
+  const [citando, setCitando] = useState<{ id: string; resumo: string } | null>(null);
+  /** O termo procurado dentro desta conversa e o que a busca achou. */
+  const [termoDaConversa, setTermoDaConversa] = useState('');
+  const [achados, setAchados] = useState<Array<{ mensagemId: string; recebida: boolean; quando: string; trecho: string }> | null>(null);
+  const [procurando, setProcurando] = useState(false);
+  const [mensagemEmFoco, setMensagemEmFoco] = useState<string | null>(null);
+  /** O rascunho que a IA escreveu (nada foi enviado ao cliente). */
+  const [rascunho, setRascunho] = useState<{ texto: string; modelo: string } | null>(null);
+  const [rascunhando, setRascunhando] = useState(false);
+
 
   const titulo = useRef<HTMLHeadingElement>(null);
   const rolagem = useRef<HTMLDivElement>(null);
@@ -1356,6 +1570,25 @@ function Conversa({
     }
   }
 
+  /** "Salvar" o texto novo de uma mensagem agendada (ela ainda não saiu). */
+  async function salvarAgenda() {
+    if (!editandoAgenda) return;
+    const texto = editandoAgenda.texto.trim();
+    if (!texto) {
+      aoAvisar(conversa.id, { tipo: 'erro', texto: 'Escreva a mensagem (até 4.096 letras).' });
+      return;
+    }
+    setOcupado('resolver');
+    const resultado = await pedir(() => editarMensagemAgendada({ agendamentoId: editandoAgenda.id, texto }));
+    setOcupado(null);
+    if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+    else {
+      setEditandoAgenda(null);
+      aoAvisar(conversa.id, { tipo: 'ok', texto: 'Mensagem agendada atualizada.' });
+      aoAtualizar();
+    }
+  }
+
   async function cancelarAgenda(agendamentoId: string) {
     if (cancelandoAgendaId) return;
     setCancelandoAgendaId(agendamentoId);
@@ -1396,7 +1629,138 @@ function Conversa({
 
   function enviarDoCampo(texto: string, anexo?: Anexo) {
     pertoDoFim.current = true;
-    void aoEnviar(conversa.id, texto, { anexo });
+    void aoEnviar(conversa.id, texto, { anexo, respondendoA: citando?.id ?? null });
+    // Enviou: a citação cumpriu o papel e o rascunho não serve mais.
+    setCitando(null);
+    setRascunho(null);
+  }
+
+  /** "Responder citando": guarda a mensagem escolhida para o próximo envio. */
+  function responderCitando(mensagemId: string, resumo: string | null, autor: string | null) {
+    const citada = conversa.mensagens.find((mensagem) => mensagem.id === mensagemId);
+    setCitando({
+      id: mensagemId,
+      resumo:
+        resumo ??
+        resumoDaCitacao({
+          texto: citada?.texto ?? '',
+          recebida: citada?.recebida ?? false,
+          autor: autor ?? 'Você',
+          arquivo: citada?.arquivo?.descricao ?? null,
+        }),
+    });
+    // O foco vai para o campo de texto: quem clicou já pode escrever.
+    document.getElementById('campo-de-mensagem')?.focus({ preventScroll: false });
+  }
+
+  /** "Silenciar conversa" / "Voltar a avisar". */
+  async function alternarSilencio() {
+    if (ocupado) return;
+    setOcupado('resolver');
+    aoAvisar(conversa.id, null);
+    try {
+      const resultado = await pedir(() => silenciarConversa({ conversaId: conversa.id, silenciar: !conversa.silenciada }));
+      if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+      else {
+        aoAvisar(conversa.id, {
+          tipo: 'ok',
+          texto: conversa.silenciada ? 'A conversa voltou a avisar.' : 'Conversa silenciada: ela continua aqui, mas não avisa.',
+        });
+        aoAtualizar();
+      }
+    } catch {
+      aoAvisar(conversa.id, { tipo: 'erro', texto: 'Não foi possível falar com o painel. Confira a internet e tente de novo.' });
+      router.refresh();
+    } finally {
+      setOcupado(null);
+    }
+  }
+
+  /** Abre a janela de "Transferir" (a equipe é lida na hora). */
+  async function abrirTransferencia() {
+    setTransferindo(true);
+    if (pessoas) return;
+    const resultado = await pedir(() => lerEquipe());
+    if (resultado.ok) setPessoas(resultado.pessoas);
+    else aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+  }
+
+  async function transferirPara(pessoaId: string | null) {
+    const pessoa = pessoaId ? pessoas?.find((item) => item.id === pessoaId) : null;
+    setOcupado('assumir');
+    const resultado = await pedir(() => transferirConversa({ conversaId: conversa.id, pessoaId, rotulo: pessoa?.nome ?? null }));
+    setOcupado(null);
+    setTransferindo(false);
+    if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+    else {
+      aoAvisar(conversa.id, {
+        tipo: 'ok',
+        texto: pessoa ? `Conversa transferida para ${pessoa.nome}.` : 'Conversa devolvida para a fila da equipe.',
+      });
+      aoAtualizar();
+    }
+  }
+
+  /** "Lembretes": marca (ou tira) o combinado de retorno desta conversa. */
+  async function salvarLembrete(quandoIso: string | null) {
+    setOcupado('resolver');
+    const resultado = await pedir(() => lembrarEmLote({ conversaIds: [conversa.id], quandoIso }));
+    setOcupado(null);
+    setLembrando(false);
+    if (!resultado.ok) aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+    else {
+      aoAvisar(conversa.id, { tipo: 'ok', texto: quandoIso ? 'Lembrete salvo.' : 'Lembrete tirado.' });
+      aoAtualizar();
+    }
+  }
+
+  /** "Procurar nesta conversa": procura dentro das mensagens e leva à primeira ocorrência. */
+  async function procurarNaConversaAberta(evento?: FormEvent<HTMLFormElement>) {
+    evento?.preventDefault();
+    const termo = termoDaConversa.trim();
+    if (termo.length < 2) {
+      setAchados(null);
+      aoAvisar(conversa.id, { tipo: 'erro', texto: 'Escreva pelo menos 2 letras para procurar.' });
+      return;
+    }
+    setProcurando(true);
+    const resultado = await pedir(() => procurarNaConversa({ conversaId: conversa.id, termo }));
+    setProcurando(false);
+    if (!resultado.ok) {
+      aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+      return;
+    }
+    setAchados(
+      resultado.achados.map((achado) => ({
+        mensagemId: achado.mensagemId,
+        recebida: achado.recebida,
+        quando: achado.quando ? formatarDataHoraCurta(achado.quando) : '',
+        trecho: trechoEmLinha(achado.texto, termo) ?? achado.texto.slice(0, 80),
+      })),
+    );
+    if (resultado.achados.length > 0) irParaMensagem(resultado.achados[0]!.mensagemId);
+  }
+
+  /** Leva a conversa até uma mensagem e a destaca por alguns segundos. */
+  function irParaMensagem(mensagemId: string) {
+    setMensagemEmFoco(mensagemId);
+    pertoDoFim.current = false;
+    const alvo = document.getElementById(`mensagem-${mensagemId}`);
+    alvo?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    window.setTimeout(() => setMensagemEmFoco((atual) => (atual === mensagemId ? null : atual)), 4_000);
+  }
+
+  /** "Rascunho da IA": a IA escreve; nada é enviado ao cliente. */
+  async function pedirRascunho() {
+    setRascunhando(true);
+    aoAvisar(conversa.id, null);
+    const resultado = await pedir(() => pedirRascunhoDaIA({ conversaId: conversa.id }));
+    setRascunhando(false);
+    if (!resultado.ok) {
+      aoAvisar(conversa.id, { tipo: 'erro', texto: resultado.erro });
+      return;
+    }
+    setRascunho({ texto: resultado.texto, modelo: resultado.modelo });
   }
 
   /** "Tentar de novo" num arquivo recebido que o painel não conseguiu trazer do WhatsApp. */
@@ -1457,6 +1821,16 @@ function Conversa({
             <span className={`estado${etapa.tom === 'ok' ? ' estado--ok' : etapa.tom === 'atencao' ? ' estado--atencao' : etapa.tom === 'ia' ? ' estado--ia' : ''}`}>
               {etapa.texto}
             </span>
+            {conversa.tomDaEspera ? (
+              <span className={`inbox-espera inbox-espera--${conversa.tomDaEspera}`} title="Tempo desde a última mensagem do cliente">
+                {conversa.espera}
+              </span>
+            ) : null}
+            {conversa.atendente ? (
+              <span className="inbox-etiqueta inbox-etiqueta--atendente" title="Quem está atendendo esta conversa">
+                {conversa.atendente}
+              </span>
+            ) : null}
             <button
               type="button"
               className={`btn btn-secondary btn-sm${conversa.fixada ? ' crm-btn-aviso' : ''}`}
@@ -1467,6 +1841,38 @@ function Conversa({
               <Icone nome="alfinete" className="icon-15" />
               <span className="so-leitor-de-tela">{conversa.fixada ? 'Desafixar' : 'Fixar'}</span>
             </button>
+            <MenuMais>
+              <>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm inbox-acao-extra"
+                    disabled={ocupado !== null}
+                    onClick={() => void alternarSilencio()}
+                  >
+                    <Icone nome={conversa.silenciada ? 'olho' : 'bloqueado'} className="icon-15" />
+                    <span>{conversa.silenciada ? 'Voltar a avisar' : 'Silenciar conversa'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm inbox-acao-extra"
+                    disabled={ocupado !== null || conversa.etapa === 'archived'}
+                    onClick={() => void abrirTransferencia()}
+                  >
+                    <Icone nome="pessoa" className="icon-15" />
+                    <span>Transferir</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm inbox-acao-extra"
+                    disabled={ocupado !== null}
+                    onClick={() => setLembrando(true)}
+                  >
+                    <Icone nome="calendario" className="icon-15" />
+                    <span>Lembretes</span>
+                    {conversa.retornoLabel ? <span className="inbox-acao-extra-marca">{conversa.retornoLabel}</span> : null}
+                  </button>
+              </>
+            </MenuMais>
             <button type="button" className="btn btn-secondary btn-sm inbox-abrir-contato" onClick={() => setContatoAberto(true)}>
               Contato
             </button>
@@ -1490,6 +1896,77 @@ function Conversa({
             )}
           </div>
         </header>
+
+        {conversa.silenciada ? (
+          <p className="inbox-aviso inbox-silenciada" role="status">
+            <Icone nome="bloqueado" className="icon-15" />
+            <span>Conversa silenciada: ela continua aqui, mas não avisa nem soma nas não lidas.</span>
+          </p>
+        ) : null}
+
+        {conversa.janela === 'fechada' || conversa.janela === 'perto-de-fechar' ? (
+          <p className={`inbox-aviso inbox-janela inbox-janela--${conversa.janela}`} role="status">
+            <Icone nome="calendario" className="icon-15" />
+            <span>
+              {conversa.janela === 'fechada'
+                ? 'A janela de 24 h do WhatsApp fechou: o cliente pode não receber a resposta.'
+                : 'A janela de 24 h do WhatsApp está perto de fechar.'}
+            </span>
+          </p>
+        ) : null}
+
+        <div className="inbox-busca-conversa">
+          <form onSubmit={(evento) => void procurarNaConversaAberta(evento)} role="search">
+            <label htmlFor={`busca-conversa-${conversa.id}`} className="so-leitor-de-tela">
+              Procurar nesta conversa
+            </label>
+            <input
+              id={`busca-conversa-${conversa.id}`}
+              className="campo inbox-busca-conversa-campo"
+              type="search"
+              value={termoDaConversa}
+              maxLength={80}
+              placeholder="Procurar nesta conversa"
+              onChange={(evento) => {
+                setTermoDaConversa(evento.target.value);
+                if (!evento.target.value.trim()) setAchados(null);
+              }}
+            />
+            <button type="submit" className="btn btn-secondary btn-sm" disabled={procurando}>
+              <Icone nome="busca" className="icon-15" />
+              <span>{procurando ? 'Procurando…' : 'Procurar nesta conversa'}</span>
+            </button>
+            {achados ? (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAchados(null)}>
+                Limpar
+              </button>
+            ) : null}
+          </form>
+          {achados ? (
+            <div className="inbox-busca-resultados" aria-label="Resultados da busca na conversa">
+              {achados.length === 0 ? (
+                <p>Nada encontrado nesta conversa.</p>
+              ) : (
+                <>
+                  <p className="inbox-busca-contagem">
+                    {achados.length === 1 ? '1 mensagem encontrada' : `${achados.length} mensagens encontradas`}
+                  </p>
+                  <ul className="inbox-busca-conteudo">
+                    {achados.map((achado) => (
+                      <li key={achado.mensagemId}>
+                        <button type="button" className="inbox-busca-achado" onClick={() => irParaMensagem(achado.mensagemId)}>
+                          <span className="inbox-busca-achado-quem">{achado.recebida ? conversa.contato.nome : 'Você'}</span>
+                          <span className="inbox-busca-achado-texto">{achado.trecho}</span>
+                          <span className="inbox-busca-achado-quando">{achado.quando}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : null}
+        </div>
 
         {conversa.ia ? <FaixaDaIaNaConversa faixa={conversa.ia} ocupado={ocupado} aoAgir={(acao) => void agir(acao)} /> : null}
 
@@ -1536,6 +2013,9 @@ function Conversa({
             aoBuscarArquivo={buscarDeNovo}
             ensinaveis={ensinaveis}
             aoEnsinar={abrirEnsino}
+            termoProcurado={achados ? termoDaConversa.trim() : null}
+            mensagemEmFoco={mensagemEmFoco}
+            aoResponderCitando={responderCitando}
           />
 
           {meusPendentes.length > 0 ? (
@@ -1571,7 +2051,7 @@ function Conversa({
               {conversa.agendadas
                 .filter((a) => a.situacao !== 'cancelled')
                 .map((ag) => (
-                  <li key={ag.id} className="inbox-agendada-item">
+                  <li key={ag.id} className={`inbox-agendada-item${editandoAgenda?.id === ag.id ? ' inbox-agendada-edicao' : ''}`}>
                     <div>
                       <strong>{ag.paraQuandoLabel}</strong>
                       <span>
@@ -1583,17 +2063,51 @@ function Conversa({
                               ? ' · Enviando…'
                               : ' · Pendente'}
                       </span>
-                      <p>{ag.texto}</p>
+                      {editandoAgenda?.id === ag.id ? (
+                        <div className="inbox-agendada-editor">
+                          <label htmlFor={`agendada-${ag.id}`} className="so-leitor-de-tela">
+                            Texto da mensagem agendada
+                          </label>
+                          <textarea
+                            id={`agendada-${ag.id}`}
+                            className="campo"
+                            rows={3}
+                            maxLength={TEXTO_MAXIMO}
+                            value={editandoAgenda.texto}
+                            onChange={(evento) => setEditandoAgenda({ id: ag.id, texto: evento.target.value })}
+                          />
+                          <div className="inbox-agendada-editor-acoes">
+                            <button type="button" className="btn btn-primary btn-sm" disabled={ocupado !== null} onClick={() => void salvarAgenda()}>
+                              Salvar
+                            </button>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoAgenda(null)}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p>{ag.texto}</p>
+                      )}
                     </div>
-                    {ag.situacao === 'pending' ? (
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        disabled={cancelandoAgendaId === ag.id}
-                        onClick={() => void cancelarAgenda(ag.id)}
-                      >
-                        {cancelandoAgendaId === ag.id ? 'Cancelando…' : 'Cancelar'}
-                      </button>
+                    {ag.situacao === 'pending' && editandoAgenda?.id !== ag.id ? (
+                      <div className="inbox-agendada-acoes">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={ocupado !== null}
+                          onClick={() => setEditandoAgenda({ id: ag.id, texto: ag.texto })}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={cancelandoAgendaId === ag.id}
+                          onClick={() => void cancelarAgenda(ag.id)}
+                        >
+                          {cancelandoAgendaId === ag.id ? 'Cancelando…' : 'Cancelar'}
+                        </button>
+                      </div>
                     ) : null}
                   </li>
                 ))}
@@ -1615,6 +2129,66 @@ function Conversa({
             ) : null}
           </div>
         ) : (
+          <>
+            {rascunho || rascunhando ? (
+              <div className="inbox-rascunho" role="group" aria-label="Rascunho feito pela IA">
+                <div className="inbox-rascunho-topo">
+                  <Icone nome="kpiIa" className="icon-15" />
+                  <span>Rascunho da IA</span>
+                  <span className="inbox-rascunho-modelo">{rascunhando ? 'escrevendo…' : rascunho?.modelo}</span>
+                  <button
+                    type="button"
+                    className="inbox-aviso-fechar"
+                    onClick={() => {
+                      setRascunho(null);
+                      setRascunhando(false);
+                    }}
+                  >
+                    <Icone nome="fechar" className="icon-15" />
+                    <span className="so-leitor-de-tela">Fechar o rascunho</span>
+                  </button>
+                </div>
+                {rascunho ? (
+                  <>
+                    <p className="inbox-rascunho-texto">{rascunho.texto}</p>
+                    <div className="inbox-rascunho-acoes">
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => {
+                          // Mesmo caminho do "escrever de novo": o campo remonta já com o texto da IA.
+                          escreverDeNovo(rascunho.texto);
+                          setRascunho(null);
+                        }}
+                      >
+                        Usar no campo
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => void pedirRascunho()}>
+                        Pedir outro
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRascunho(null)}>
+                        Descartar
+                      </button>
+                    </div>
+                    <p className="inbox-rascunho-aviso">Nada foi enviado ao cliente: revise antes de enviar.</p>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
+            {citando ? (
+              <div className="inbox-respondendo" role="status">
+                <div>
+                  <span className="inbox-respondendo-rotulo">Responder citando</span>
+                  <p className="inbox-respondendo-texto">{citando.resumo}</p>
+                </div>
+                <button type="button" className="inbox-aviso-fechar" onClick={() => setCitando(null)}>
+                  <Icone nome="fechar" className="icon-15" />
+                  <span className="so-leitor-de-tela">Cancelar a citação</span>
+                </button>
+              </div>
+            ) : null}
+
           <CampoDeMensagem
             key={preenchimento?.vez ?? 0}
             conversaId={conversa.id}
@@ -1626,12 +2200,15 @@ function Conversa({
             aoAtualizar={aoAtualizar}
             aoAgendar={(textoAtual) => setAgendarTexto(textoAtual)}
             aoGerenciarRespostas={aoAbrirEtiquetas}
+            aoPedirRascunho={ehDono ? () => void pedirRascunho() : null}
           />
+          </>
         )}
       </section>
 
-      <aside className="inbox-contato" aria-label="Dados do contato">
+      <aside className="inbox-contato" id="ficha" aria-label="Dados do contato">
         <CartaoCrmDoContato
+          idDaFicha="ficha-do-contato"
           key={`${conversa.id}:${conversa.valorNegocio}:${conversa.motivoPerda}:${conversa.retornoEm ?? ''}`}
           conversa={conversa}
           etapa={etapa.texto}
@@ -1662,6 +2239,25 @@ function Conversa({
             }}
           />
         </Dialogo>
+      ) : null}
+
+      {transferindo ? (
+        <DialogoDeTransferencia
+          pessoas={pessoas ?? []}
+          atendenteAtual={conversa.atendente}
+          ocupado={ocupado !== null}
+          aoFechar={() => setTransferindo(false)}
+          aoTransferir={(pessoaId) => void transferirPara(pessoaId)}
+        />
+      ) : null}
+
+      {lembrando ? (
+        <DialogoLembrete
+          atual={conversa.retornoEm}
+          ocupado={ocupado !== null}
+          aoFechar={() => setLembrando(false)}
+          aoSalvar={(quandoIso) => void salvarLembrete(quandoIso)}
+        />
       ) : null}
 
       {agendarTexto !== null ? (
@@ -1756,6 +2352,70 @@ interface PropsDasMensagens {
   /** As mensagens que têm o botão de ensinar a IA. `null` = quem está olhando não altera o treinamento. */
   ensinaveis: ReadonlySet<string> | null;
   aoEnsinar: (mensagemId: string) => void;
+  /** O termo da busca dentro da conversa: o trecho encontrado aparece destacado. */
+  termoProcurado: string | null;
+  /** A mensagem a que a busca levou (fica destacada por alguns segundos). */
+  mensagemEmFoco: string | null;
+  /** "Responder citando": leva a mensagem escolhida para o campo de texto. */
+  aoResponderCitando: (mensagemId: string, resumo: string | null, autor: string | null) => void;
+}
+
+/** O texto da mensagem com o que foi procurado em destaque (sem `innerHTML`). */
+function destacarTrecho(texto: string, termo: string): ReactNode[] {
+  const pedacos: ReactNode[] = [];
+  const alvo = termo.trim();
+  if (!alvo) return [texto];
+  const minusculo = texto.toLowerCase();
+  const procurado = alvo.toLowerCase();
+  let posicao = 0;
+  let chave = 0;
+  while (posicao < texto.length) {
+    const achado = minusculo.indexOf(procurado, posicao);
+    if (achado < 0) {
+      pedacos.push(texto.slice(posicao));
+      break;
+    }
+    if (achado > posicao) pedacos.push(texto.slice(posicao, achado));
+    pedacos.push(
+      <mark key={`destaque-${chave++}`} className="balao-destaque">
+        {texto.slice(achado, achado + alvo.length)}
+      </mark>,
+    );
+    posicao = achado + alvo.length;
+  }
+  return pedacos;
+}
+
+/** "Copiar" o texto de uma mensagem. O aviso "Copiado" some sozinho. */
+function BotaoCopiar({ texto }: { texto: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    if (!copiado) return;
+    const relogio = setTimeout(() => setCopiado(false), 2_000);
+    return () => clearTimeout(relogio);
+  }, [copiado]);
+
+  if (!texto.trim()) return null;
+
+  return (
+    <button
+      type="button"
+      className="balao-acao"
+      onClick={() => {
+        void (async () => {
+          try {
+            await navigator.clipboard.writeText(texto);
+            setCopiado(true);
+          } catch {
+            // Sem permissão de área de transferência (ou fora de https): nada acontece, e o botão continua ali.
+          }
+        })();
+      }}
+    >
+      {copiado ? 'Copiado' : 'Copiar'}
+    </button>
+  );
 }
 
 /** As mensagens que vêm do banco. Fica separado (e memorizado) para digitar no campo não redesenhar tudo. */
@@ -1771,6 +2431,9 @@ const Mensagens = memo(function Mensagens({
   aoBuscarArquivo,
   ensinaveis,
   aoEnsinar,
+  termoProcurado,
+  mensagemEmFoco,
+  aoResponderCitando,
 }: PropsDasMensagens) {
   if (mensagens.length === 0) return null;
   return (
@@ -1786,13 +2449,20 @@ const Mensagens = memo(function Mensagens({
               </p>
             ) : null}
             <div
+              id={`mensagem-${mensagem.id}`}
               className={`balao ${mensagem.recebida ? 'balao--recebida' : 'balao--enviada'}${
                 situacao === 'falhou' || situacao === 'sem_confirmacao' ? ` balao--${situacao === 'falhou' ? 'falhou' : 'incerta'}` : ''
-              }${mensagem.autor === 'IA' ? ' balao--ia' : ''}`}
+              }${mensagem.autor === 'IA' ? ' balao--ia' : ''}${mensagemEmFoco === mensagem.id ? ' balao--destacada' : ''}`}
             >
               <span className="so-leitor-de-tela">
                 {mensagem.recebida ? `${nomeDoContato} ${mensagem.arquivo ? 'enviou' : 'escreveu'}:` : `${mensagem.autor ?? 'Resposta'}:`}
               </span>
+              {mensagem.citacao ? (
+                <p className="balao-citacao">
+                  <span className="so-leitor-de-tela">Respondendo a </span>
+                  {mensagem.citacao}
+                </p>
+              ) : null}
               {mensagem.arquivo ? (
                 <ArquivoNoBalao
                   arquivo={mensagem.arquivo}
@@ -1802,7 +2472,13 @@ const Mensagens = memo(function Mensagens({
                   aoBuscar={() => aoBuscarArquivo(mensagem.id)}
                 />
               ) : null}
-              {mensagem.texto ? <p className="balao-texto">{mensagem.texto}</p> : null}
+              {mensagem.texto ? (
+                <p className="balao-texto">
+                  {termoProcurado && mensagem.texto.toLowerCase().includes(termoProcurado.toLowerCase())
+                    ? destacarTrecho(mensagem.texto, termoProcurado)
+                    : mensagem.texto}
+                </p>
+              ) : null}
               <p className="balao-rodape">
                 {mensagem.autor ? <span aria-hidden="true">{mensagem.autor}</span> : null}
                 <span>{mensagem.hora}</span>
@@ -1839,6 +2515,19 @@ const Mensagens = memo(function Mensagens({
                   </button>
                 </div>
               ) : null}
+
+              <div className="balao-acoes">
+                {podeResponder ? (
+                  <button
+                    type="button"
+                    className="balao-acao"
+                    onClick={() => aoResponderCitando(mensagem.id, mensagem.citacao ?? null, mensagem.autor ?? null)}
+                  >
+                    Responder citando
+                  </button>
+                ) : null}
+                <BotaoCopiar texto={mensagem.texto} />
+              </div>
 
               {ensinaveis?.has(mensagem.id) ? (
                 <div className="balao-ensinar">
@@ -2090,6 +2779,7 @@ function CampoDeMensagem({
   aoAtualizar,
   aoAgendar,
   aoGerenciarRespostas,
+  aoPedirRascunho,
 }: {
   conversaId: string;
   textoInicial: string | null;
@@ -2100,6 +2790,8 @@ function CampoDeMensagem({
   aoAtualizar: () => void;
   aoAgendar: (textoAtual: string) => void;
   aoGerenciarRespostas: () => void;
+  /** "Rascunho da IA"; `null` quando quem está olhando não pode pedir. */
+  aoPedirRascunho: (() => void) | null;
 }) {
   const [texto, setTexto] = useState(() => textoInicial ?? rascunhos.get(conversaId) ?? '');
   const [anexo, setAnexo] = useState<Anexo | null>(null);
@@ -2111,9 +2803,11 @@ function CampoDeMensagem({
   const [enviandoRecurso, setEnviandoRecurso] = useState(false);
   const campo = useRef<HTMLTextAreaElement>(null);
   const seletor = useRef<HTMLInputElement>(null);
+
   /** O anexo que está no campo agora (para as medidas que chegam depois, e para a limpeza ao sair). */
   const anexoNoCampo = useRef<Anexo | null>(null);
-  const idCampo = useId();
+  // O campo é único na tela: o "Responder citando" acha ele por este id e leva o foco para lá.
+  const idCampo = 'campo-de-mensagem';
   const idDica = useId();
   const idAnexo = useId();
 
@@ -2355,6 +3049,17 @@ function CampoDeMensagem({
           <Icone nome="clipe" />
           <span className="so-leitor-de-tela">Anexar arquivo</span>
         </button>
+        {aoPedirRascunho ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon-only inbox-anexar inbox-rascunho-botao"
+            onClick={aoPedirRascunho}
+            title="Rascunho da IA: ela escreve, você revisa antes de enviar"
+          >
+            <Icone nome="kpiIa" />
+            <span className="so-leitor-de-tela">Rascunho da IA</span>
+          </button>
+        ) : null}
         <button
           type="button"
           className={`btn btn-secondary btn-icon-only inbox-anexar${mostrarMenuRapidas ? ' crm-btn-aviso' : ''}`}

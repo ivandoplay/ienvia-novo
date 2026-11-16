@@ -19,8 +19,21 @@ import {
 } from '@/lib/inbox/arquivos';
 import { mapearAudiosEstrategicos, mapearCatalogo } from '@/lib/recursos/mapeamento';
 import { trazerArquivoDaMensagem } from '@/lib/inbox/buscar-arquivo';
+import { rascunharResposta } from '@/lib/atendente/rascunho';
+import { carregarConversa } from '@/lib/dados/inbox';
+import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
+import { ordemDeUso, type Provedor } from '@/lib/ia/regras';
+import { lerMotorDeIa } from '@/lib/dados/ia';
 import { conferirEnsino, descreverEnsino, explicarRecusaDoEnsino, lerResultadoDoEnsino } from '@/lib/ia/ensino';
-import { ETAPAS_DO_KANBAN, ehChaveDeEnvio, numeroParaEnvio, validarTexto, type SituacaoDoEnvio } from '@/lib/inbox/regras';
+import {
+  ETAPAS_DO_KANBAN,
+  ehChaveDeEnvio,
+  formatarDataHoraCurta,
+  numeroParaEnvio,
+  trechoDaBusca,
+  validarTexto,
+  type SituacaoDoEnvio,
+} from '@/lib/inbox/regras';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { obterSessao } from '@/lib/sessao';
 import { enderecoDoDepositoParaONavegador } from '@/lib/supabase/deposito';
@@ -678,7 +691,17 @@ export async function atualizarNegocioConversa(dados: {
 
 export async function aplicarAcaoEmLote(dados: {
   conversaIds: string[];
-  acao: 'mark_read' | 'mark_unread' | 'resolve' | 'reopen' | 'archive' | 'unarchive' | 'set_crm_stage' | 'add_tag' | 'remove_tag';
+  acao:
+    | 'mark_read'
+    | 'mark_unread'
+    | 'resolve'
+    | 'reopen'
+    | 'archive'
+    | 'set_crm_stage'
+    | 'add_tag'
+    /** Silenciar / voltar a avisar em várias conversas de uma vez. */
+    | 'mute'
+    | 'unmute';
   etapaCrm?: string;
   etiquetaId?: string;
 }): Promise<{ ok: true; atualizadas: number } | { ok: false; erro: string }> {
@@ -1333,4 +1356,120 @@ export async function lembrarEmLote(dados: {
   }
   atualizarTelas();
   return { ok: true, atualizadas };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Rascunho da IA                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * "Rascunho da IA": pede para a IA escrever a resposta que ela daria nesta conversa.
+ *
+ * Nada é enviado ao cliente e nada é gravado como atendimento: o texto volta para a tela, e a pessoa
+ * decide se usa no campo ("Usar no campo"), edita ou descarta. Só o dono da conta pode pedir, porque a
+ * chave de IA é dele (o banco confere de novo).
+ */
+export async function pedirRascunhoDaIA(dados: {
+  conversaId: string;
+}): Promise<{ ok: true; texto: string; provedor: string; modelo: string } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!ehIdentificador(dados?.conversaId)) return { ok: false, erro: 'Esta conversa não existe mais. Atualize a página.' };
+
+  const sessao = await obterSessao();
+  const ehDono = sessao?.workspaceAtivo?.papel === 'owner';
+  const cofre = lerChaveDoCofre();
+  if (!cofre) return { ok: false, erro: 'O cofre de chaves não está configurado neste ambiente.' };
+
+  const motor = await lerMotorDeIa(contexto.workspaceId);
+  if (!motor.motor) return { ok: false, erro: 'Não foi possível ler as configurações do Motor de IA.' };
+  const provedores = ordemDeUso(motor.motor.configuracao);
+
+  const chaves: Partial<Record<Provedor, string>> = {};
+  const servico = criarClienteDeServico();
+  if (servico) {
+    const { data } = await servico.rpc('read_workspace_ai_keys_for_simulator', { p_workspace_id: contexto.workspaceId });
+    const bruto = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+    for (const provedor of provedores) {
+      const cifrada = bruto[provedor];
+      if (typeof cifrada === 'string' && cifrada) {
+        const aberta = decifrar(cifrada, contextoDaChaveDeIa(contexto.workspaceId, provedor), cofre);
+        if (aberta) chaves[provedor] = aberta;
+      }
+    }
+  } else if (ehDono) {
+    for (const provedor of provedores) {
+      const { data } = await contexto.supabase.rpc('read_my_ai_key_ciphertext', {
+        p_workspace_id: contexto.workspaceId,
+        p_provider: provedor,
+      });
+      if (typeof data === 'string' && data) {
+        const aberta = decifrar(data, contextoDaChaveDeIa(contexto.workspaceId, provedor), cofre);
+        if (aberta) chaves[provedor] = aberta;
+      }
+    }
+  }
+
+  const leitura = await carregarConversa(contexto.workspaceId, dados.conversaId);
+  if (!leitura.conversa) return { ok: false, erro: 'Esta conversa não existe mais. Atualize a página.' };
+
+  const resultado = await rascunharResposta({
+    workspaceId: contexto.workspaceId,
+    conversa: leitura.conversa,
+    chaves,
+  });
+  if (!resultado.ok) return resultado;
+  return { ok: true, texto: resultado.texto, provedor: resultado.provedor, modelo: resultado.modelo };
+}
+
+/** "Procurar nas mensagens": o termo dentro das mensagens de todas as conversas da empresa. */
+export async function procurarNasMensagens(dados: {
+  termo: string;
+}): Promise<
+  | {
+      ok: true;
+      achados: Array<{
+        mensagemId: string;
+        conversaId: string;
+        contatoNome: string;
+        recebida: boolean;
+        quando: string;
+        trecho: { antes: string; destaque: string; depois: string };
+      }>;
+    }
+  | { ok: false; erro: string }
+> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  const termo = (dados?.termo ?? '').trim();
+  if (termo.length < 2) return { ok: false, erro: 'Escreva pelo menos 2 letras para procurar.' };
+  if (termo.length > 80) return { ok: false, erro: 'O que procurar vai até 80 letras.' };
+
+  const { data, error } = await contexto.supabase.rpc('search_my_workspace_messages', {
+    p_workspace_id: contexto.workspaceId,
+    p_term: termo,
+  });
+  if (error || !data) return { ok: false, erro: traduzirErroDeGestao(error?.message ?? '') };
+
+  const linhas = ((data as { hits?: Array<Record<string, unknown>> | null }).hits ?? []) as Array<Record<string, unknown>>;
+  const achados = linhas.flatMap((linha) => {
+    const texto = typeof linha.body_text === 'string' ? linha.body_text : '';
+    const trecho = trechoDaBusca(texto, termo);
+    if (!trecho || typeof linha.message_id !== 'string' || typeof linha.conversation_id !== 'string') return [];
+    const nome =
+      (typeof linha.contact_name === 'string' && linha.contact_name.trim()) ||
+      (typeof linha.contact_phone === 'string' ? linha.contact_phone : '') ||
+      'Contato';
+    return [
+      {
+        mensagemId: linha.message_id,
+        conversaId: linha.conversation_id,
+        contatoNome: nome,
+        recebida: linha.direction === 'inbound',
+        quando: formatarDataHoraCurta(typeof linha.occurred_at === 'string' ? linha.occurred_at : null),
+        trecho,
+      },
+    ];
+  });
+  return { ok: true, achados };
 }

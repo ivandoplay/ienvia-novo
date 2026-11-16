@@ -394,16 +394,12 @@ export interface AchadoNasConversas {
   conversaId: string;
   contatoNome: string;
   recebida: boolean;
+  /** Data e hora curtas ("24/11 14:30"). */
   quando: string;
-  dia: string;
   trecho: TrechoDaBusca;
 }
 
-export async function buscarNasMensagens(
-  workspaceId: string,
-  termo: string,
-  agora: Date = new Date(),
-): Promise<AchadoNasConversas[]> {
+export async function buscarNasMensagens(workspaceId: string, termo: string): Promise<AchadoNasConversas[]> {
   const limpo = termo.trim();
   if (limpo.length < 2) return [];
   const supabase = await criarClienteServidor();
@@ -429,7 +425,6 @@ export async function buscarNasMensagens(
         contatoNome: nomeDoContato(linha.contact_name, linha.contact_phone),
         recebida,
         quando: formatarDataHoraCurta(linha.occurred_at),
-        dia: diaDaConversa(linha.occurred_at ?? new Date().toISOString(), agora),
         trecho,
       },
     ];

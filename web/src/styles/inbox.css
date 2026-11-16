@@ -555,6 +555,8 @@
   white-space: pre-wrap;
 }
 
+/* Hora, autor e situação. O texto pequeno do rodapé tem cor própria por tipo de balão:
+   com `opacity` ele ficava abaixo do contraste mínimo no tema claro (a hora sumia no fundo verde). */
 .balao-rodape {
   display: flex;
   align-items: center;
@@ -562,9 +564,25 @@
   flex-wrap: wrap;
   gap: 3px 8px;
   margin-top: 4px;
-  font-size: 10.5px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
-  opacity: 0.8;
+}
+
+/* Azul-escuro sobre o verde do balão de saída e sobre o bege/cinza da conversa. */
+.balao--recebida .balao-rodape,
+.balao--enviada .balao-rodape {
+  color: color-mix(in srgb, var(--wa-incoming-text) 78%, var(--wa-incoming) 22%);
+}
+
+:root[data-theme='dark'] .balao--recebida .balao-rodape,
+:root[data-theme='dark'] .balao--enviada .balao-rodape {
+  color: color-mix(in srgb, var(--wa-incoming-text) 72%, transparent);
+}
+
+.balao--ia .balao-rodape {
+  color: color-mix(in srgb, var(--wa-outgoing-text) 78%, transparent);
 }
 
 .balao--falhou .balao-rodape,
@@ -2072,5 +2090,651 @@ dl.inbox-ia-recado {
   .crm-form--duas-colunas,
   .crm-form-linha {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ==========================================================================
+   Gestão fina da conversa (24/11/2026)
+   Menu "Mais", espera, silenciada, citação, busca, rascunho da IA, lembretes,
+   automação das etapas e barra de lote. Tudo em cima dos tokens do tema, então
+   vale igual no escuro e no claro.
+   ========================================================================== */
+
+/* ---------- Menu "Mais" do topo da conversa ---------- */
+
+.inbox-mais {
+  position: relative;
+  display: inline-flex;
+}
+
+.inbox-mais-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-conversa-acoes-extras {
+  display: none;
+}
+
+/* Aberto: vira uma lista ancorada no botão (no celular, ocupa a largura do topo). */
+.inbox-conversa-acoes-extras--abertas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--z-popover);
+  min-width: 232px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.inbox-conversa-acoes-extras--abertas .inbox-acao-extra {
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+}
+
+.inbox-conversa-acoes-extras--abertas .inbox-acao-extra:hover,
+.inbox-conversa-acoes-extras--abertas .inbox-acao-extra:focus-visible {
+  background: var(--bg-card-subtle);
+  border-color: var(--border);
+}
+
+.inbox-acao-extra-marca {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* ---------- Friozinho da espera: calmo, atenção, crítico ---------- */
+
+.inbox-espera {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inbox-espera--calmo {
+  color: var(--text-secondary);
+}
+
+.inbox-espera--atencao {
+  color: var(--warning-text);
+}
+
+.inbox-espera--critico {
+  color: var(--danger-text);
+}
+
+.inbox-etiqueta--atendente {
+  display: inline-flex;
+  align-items: center;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+.inbox-etiqueta--calmo {
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+/* Conversa silenciada: fica na lista, mas apagada e sem contador de não lidas. */
+.inbox-silenciada .inbox-item-nome {
+  color: var(--text-secondary);
+}
+
+.inbox-silenciada .inbox-nao-lidas {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.inbox-aviso.inbox-silenciada {
+  margin: 0 12px 6px;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+}
+
+.inbox-janela--fechada {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.inbox-janela--perto-de-fechar {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.inbox-janela {
+  margin: 0 12px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+/* ---------- Citação dentro do balão ---------- */
+
+.balao-citacao {
+  margin: 0 0 5px;
+  padding: 5px 8px;
+  border-left: 3px solid currentColor;
+  border-radius: 4px;
+  /* O fundo da citação vem da cor do próprio balão: escurece no escuro e clareia no claro,
+     e o texto continua com o contraste do balão. */
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.92;
+  overflow-wrap: anywhere;
+}
+
+/* A mensagem a que a busca levou. */
+.balao--destacada {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+.balao-destaque {
+  border-radius: 3px;
+  padding: 0 1px;
+  background: var(--warning-soft);
+  color: inherit;
+  font-weight: 700;
+}
+
+/* Ações do balão (responder citando, copiar). Aparecem no hover/foco e no toque. */
+.balao-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 120ms var(--ease-out);
+}
+
+.balao:hover .balao-acoes,
+.balao:focus-within .balao-acoes {
+  opacity: 1;
+}
+
+.balao-acao {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.balao-acao:hover,
+.balao-acao:focus-visible {
+  color: var(--accent-bright);
+}
+
+@media (hover: none) {
+  .balao-acoes {
+    opacity: 1;
+  }
+}
+
+/* ---------- "Responder citando" no alto do campo ---------- */
+
+.inbox-respondendo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 12px 6px;
+  padding: 7px 10px;
+  border-left: 3px solid var(--accent-bright);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.inbox-respondendo-rotulo {
+  display: block;
+  color: var(--accent-bright);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inbox-respondendo-texto {
+  margin: 2px 0 0;
+  color: var(--text-main);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Rascunho da IA ---------- */
+
+.inbox-rascunho {
+  margin: 0 12px 8px;
+  padding: 9px 11px;
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+}
+
+.inbox-rascunho-topo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inbox-rascunho-modelo {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.inbox-rascunho-texto {
+  margin: 7px 0 0;
+  color: var(--text-main);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.inbox-rascunho-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.inbox-rascunho-aviso {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+/* ---------- Busca dentro da conversa ---------- */
+
+.inbox-busca-conversa {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card-subtle);
+}
+
+.inbox-busca-conversa form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-busca-conversa-campo {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.inbox-busca-resultados {
+  margin-top: 7px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.inbox-busca-contagem {
+  margin: 0 0 5px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.inbox-busca-conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inbox-busca-achado {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 12.5px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.inbox-busca-achado:hover,
+.inbox-busca-achado:focus-visible {
+  border-color: var(--accent-border);
+  background: var(--bg-card-subtle);
+}
+
+.inbox-busca-achado-quem {
+  font-weight: 700;
+}
+
+.inbox-busca-achado-texto {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.inbox-busca-achado-quando {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Busca nas mensagens de todas as conversas (coluna da lista). */
+.inbox-busca-ativa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 12px 0;
+}
+
+.inbox-busca-ativa p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.inbox-busca-conteudo-botao {
+  gap: 6px;
+}
+
+.inbox-busca-conteudo {
+  margin: 7px 12px 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+
+.inbox-busca-conteudo-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: var(--text-main);
+  font-size: 12.5px;
+}
+
+.inbox-busca-vazia {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+/* ---------- Mensagens agendadas: editar ---------- */
+
+.inbox-agendada-acoes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.inbox-agendada-edicao {
+  display: block;
+}
+
+.inbox-agendada-editor {
+  margin-top: 6px;
+}
+
+.inbox-agendada-editor textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.inbox-agendada-editor-acoes {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ---------- Janelas novas (transferir, lembretes) ---------- */
+
+.inbox-dialogo-texto {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.inbox-pessoas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.inbox-pessoa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.inbox-pessoa-nome {
+  font-weight: 600;
+}
+
+.inbox-pessoa-papel {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.inbox-dialogo-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.inbox-atalhos-de-horario {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+/* ---------- Automação das etapas (Kanban) ---------- */
+
+.kanban-automacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kanban-automacao-contagem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.kanban-automacao-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.kanban-automacao-etapa {
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+}
+
+.kanban-automacao-etapa h3 {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+}
+
+.kanban-automacao-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.kanban-automacao-ligar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kanban-automacao-ligar input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.kanban-automacao-salvar {
+  align-self: flex-start;
+}
+
+/* ---------- Barra de lote: silenciar e lembretes ---------- */
+
+.inbox-lote-botoes {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inbox-lote-lembrete {
+  display: inline-flex;
+  align-items: center;
+}
+
+.inbox-lote-lembrete .campo {
+  min-width: 168px;
+}
+
+/* ---------- Celular ---------- */
+
+@media (max-width: 900px) {
+  /* O menu "Mais" abre colado ao topo, ocupando a largura toda: nada de menu cortado na borda. */
+  .inbox-conversa-acoes-extras--abertas {
+    right: auto;
+    left: 0;
+    width: min(300px, calc(100vw - 24px));
+  }
+
+  .inbox-busca-conversa {
+    padding: 6px 10px;
+  }
+
+  .inbox-busca-conversa form {
+    gap: 5px;
+  }
+
+  .inbox-busca-conversa-campo {
+    flex: 1 1 100%;
+  }
+
+  .inbox-rascunho,
+  .inbox-respondendo,
+  .inbox-janela,
+  .inbox-aviso.inbox-silenciada {
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+
+  /* No celular as ações do balão ficam sempre visíveis e um pouco maiores para o dedo. */
+  .balao-acao {
+    padding: 4px 0;
+    font-size: 12px;
+  }
+
+  .inbox-lote-lembrete {
+    flex: 1 1 100%;
+  }
+
+  .inbox-lote-lembrete .campo {
+    width: 100%;
+  }
+
+  .kanban-automacao-lista {
+    max-height: 55vh;
+  }
+}
+
+@media (max-width: 420px) {
+  .inbox-conversa-acoes-extras--abertas {
+    width: calc(100vw - 16px);
+  }
+
+  .inbox-espera {
+    font-size: 11px;
+  }
+
+  .inbox-etiqueta--atendente {
+    max-width: 84px;
   }
 }
