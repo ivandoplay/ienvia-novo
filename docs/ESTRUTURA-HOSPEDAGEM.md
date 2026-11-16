@@ -32,7 +32,10 @@ e, quando usam Evolution, dependem de um **servidor PageUp**.
 ## Deploy
 
 - Projeto: `ienvia-novo` (`prj_xh77MMsGuQkGtDKyAB2yuaTPl0QM`), root `web/`, domínio `app.ienvia.online` + alias `ienvia-novo-dusky.vercel.app`.
-- O deploy **já está no commit `e54610b`** (o do motor com página inicial). `/api/motor/versao` em produção serve
+- **Deploy de 16/11/2026:** commit `e9bb3df` (`READY`, `aliasAssigned`, `app.ienvia.online`
+  respondendo). O mesmo commit foi publicado no reserva Netlify (`superb-tapioca-aaf330`, 45 s,
+  `ready`) e o travamento manual voltou a ficar ligado.
+- O texto abaixo é do deploy anterior: **commit `e54610b`** (o do motor com página inicial). `/api/motor/versao` em produção serve
   **6.1.0 assinado** e `/api/motor/parear-senha` responde JSON de verdade (`401 E-mail ou senha incorretos`), ou seja,
   a entrada por senha do motor **já está funcionando no ar**.
 - Não há deploy manual: cada push na `main` dispara o build.

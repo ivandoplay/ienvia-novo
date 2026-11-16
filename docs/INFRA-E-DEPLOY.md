@@ -2,7 +2,7 @@
 
 > Este arquivo existe para uma pergunta nunca mais precisar ser feita: **onde roda o quê e como
 > publicar**. Se alguma informação aqui envelhecer, corrija este arquivo — ele é a fonte.
-> Última verificação: 13/11/2026, com deploy real feito e conferido.
+> Última verificação: 16/11/2026, com deploy real feito e conferido nos **dois** provedores.
 
 ---
 
@@ -155,6 +155,11 @@ curl -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" https://api.netlify.com/api/
 curl -X PATCH -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" -H 'Content-Type: application/json' \
   -d '{"build_settings":{"stop_builds":true}}' https://api.netlify.com/api/v1/sites/$SITE
 ```
+
+**Deploy de 16/11/2026 (último):** commit `e9bb3df92f2e` (contador de não lidas no título da
+lista da Inbox + traço da conversa aberta), 45 s, `ready`. Conferido no ar: `/api/saude` 200 e
+`.inbox-titulo-contador` presente na folha de estilo servida. `stop_builds` foi religado para `true`
+depois do deploy — o reserva voltou a ser **somente manual**.
 
 **Deploy de 12/11/2026:** commit `c6e317faa176`, 42 s, `ready`. Conferido no ar: `/api/saude` 200,
 motores servindo **v6.1.0 assinado (27.045 bytes)**, `/api/motor/parear-senha` respondendo `401` para senha errada.
