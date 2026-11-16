@@ -410,3 +410,119 @@ export function atalhoDeHorario(tipo: '1h' | '3h' | 'amanha', agora: Date = new 
   const { ano, mes, dia } = partesDaData(amanha, FUSO_PADRAO);
   return `${ano}-${mes}-${dia}T09:00`;
 }
+
+/* ========================================================================== */
+/* Gestão fina da conversa (24/11/2026): espera, silêncio, janela de 24 h,     */
+/* busca dentro das mensagens e resumo da citação                             */
+/* ========================================================================== */
+
+/** A aba "Lembretes" é uma visão a mais da lista (o banco chama de `reminders`). */
+export const VISAO_DE_LEMBRETES = { valor: 'lembretes', noBanco: 'reminders', rotulo: 'Lembretes' } as const;
+
+/**
+ * Há quanto tempo o cliente espera resposta, em três tons:
+ * calmo (até 30 min), atenção (de 30 min a 2 h) e crítico (mais de 2 h).
+ */
+export type TomDaEspera = 'calmo' | 'atencao' | 'critico';
+
+export function tomDaEspera(desdeIso: string | null | undefined, agora: Date = new Date()): TomDaEspera | null {
+  if (!desdeIso) return null;
+  const quando = new Date(desdeIso);
+  if (Number.isNaN(quando.getTime())) return null;
+  const minutos = Math.max(0, Math.floor((agora.getTime() - quando.getTime()) / 60_000));
+  if (minutos >= 120) return 'critico';
+  if (minutos >= 30) return 'atencao';
+  return 'calmo';
+}
+
+/** "esperando há 5 min", "esperando há 1 h 20 min", "esperando há 2 dias". */
+export function esperaEmTexto(desdeIso: string | null | undefined, agora: Date = new Date()): string | null {
+  if (!desdeIso) return null;
+  const quando = new Date(desdeIso);
+  if (Number.isNaN(quando.getTime())) return null;
+  const minutos = Math.max(0, Math.floor((agora.getTime() - quando.getTime()) / 60_000));
+  if (minutos < 1) return 'esperando agora';
+  if (minutos < 60) return `esperando há ${minutos} min`;
+  if (minutos < 24 * 60) {
+    const horas = Math.floor(minutos / 60);
+    const resto = minutos % 60;
+    return resto ? `esperando há ${horas} h ${resto} min` : `esperando há ${horas} h`;
+  }
+  const dias = Math.floor(minutos / (24 * 60));
+  return dias === 1 ? 'esperando há 1 dia' : `esperando há ${dias} dias`;
+}
+
+/** A janela de 24 h do WhatsApp: depois disso o cliente pode não receber a resposta. */
+export type JanelaDeConversa = 'aberta' | 'perto-de-fechar' | 'fechada';
+
+export const JANELA_JUSTA_MINUTOS = 60;
+
+export function janelaDaConversa(ultimaDoClienteIso: string | null | undefined, agora: Date = new Date()): JanelaDeConversa | null {
+  if (!ultimaDoClienteIso) return null;
+  const quando = new Date(ultimaDoClienteIso);
+  if (Number.isNaN(quando.getTime())) return null;
+  const minutos = Math.floor((agora.getTime() - quando.getTime()) / 60_000);
+  if (minutos >= 24 * 60) return 'fechada';
+  if (minutos >= 24 * 60 - JANELA_JUSTA_MINUTOS) return 'perto-de-fechar';
+  return 'aberta';
+}
+
+/** O trecho de uma mensagem em volta do que foi procurado, com o miolo separado para destacar. */
+export interface TrechoDaBusca {
+  antes: string;
+  destaque: string;
+  depois: string;
+}
+
+export function trechoDaBusca(texto: string, termo: string, voltas = 40): TrechoDaBusca | null {
+  const alvo = termo.trim();
+  if (!texto || !alvo) return null;
+  const posicao = texto.toLowerCase().indexOf(alvo.toLowerCase());
+  if (posicao < 0) return null;
+  const inicio = Math.max(0, posicao - voltas);
+  const fim = Math.min(texto.length, posicao + alvo.length + voltas);
+  return {
+    antes: `${inicio > 0 ? '…' : ''}${texto.slice(inicio, posicao)}`,
+    destaque: texto.slice(posicao, posicao + alvo.length),
+    depois: `${texto.slice(posicao + alvo.length, fim)}${fim < texto.length ? '…' : ''}`,
+  };
+}
+
+/** Uma linha só com o trecho (para o `aria-label`, o título do link etc.). */
+export function trechoEmLinha(texto: string, termo: string, voltas = 40): string | null {
+  const trecho = trechoDaBusca(texto, termo, voltas);
+  return trecho ? `${trecho.antes}${trecho.destaque}${trecho.depois}`.trim() : null;
+}
+
+/** O primeiro nome de quem transferiu/atende, para caber no cartão da lista. */
+export function primeiroNome(nome: string | null | undefined): string {
+  const limpo = (nome ?? '').trim();
+  if (!limpo) return '';
+  return limpo.split(/\s+/)[0]!.slice(0, 24);
+}
+
+/**
+ * Como mostrar uma mensagem citada em cima da resposta: "Você: O frete é R$ 10,00".
+ * O texto é encurtado porque a citação fica em uma linha.
+ */
+export function resumoDaCitacao(citada: {
+  texto?: string | null;
+  recebida?: boolean;
+  autor?: string | null;
+  arquivo?: string | null;
+}): string {
+  const quem = citada.recebida ? 'Cliente' : (citada.autor ?? 'Você');
+  const corpo = (citada.texto ?? '').trim() || citada.arquivo?.trim() || 'mensagem';
+  const curto = corpo.length > 60 ? `${corpo.slice(0, 60).trimEnd()}…` : corpo;
+  return `${quem}: ${curto}`;
+}
+
+/** Quanto falta para fechar a janela de 24 h, em texto ("fecha em 3 h"). */
+export function janelaEmTexto(ultimaDoClienteIso: string | null | undefined, agora: Date = new Date()): string | null {
+  const janela = janelaDaConversa(ultimaDoClienteIso, agora);
+  if (janela !== 'perto-de-fechar' && janela !== 'fechada') return janela === 'aberta' ? null : null;
+  if (janela === 'fechada') return 'A janela de 24 h já fechou.';
+  const quando = new Date(ultimaDoClienteIso as string).getTime();
+  const restam = Math.max(0, 24 * 60 - Math.floor((agora.getTime() - quando) / 60_000));
+  return restam <= 1 ? 'A janela de 24 h fecha em 1 min.' : `A janela de 24 h fecha em ${restam} min.`;
+}

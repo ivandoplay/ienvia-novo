@@ -4,6 +4,14 @@ import {
   CONVERSAS_POR_PAGINA,
   MENSAGENS_POR_VEZ,
   atalhoDeHorario,
+  esperaEmTexto,
+  janelaDaConversa,
+  janelaEmTexto,
+  primeiroNome,
+  resumoDaCitacao,
+  tomDaEspera,
+  trechoDaBusca,
+  trechoEmLinha,
   autorDoEnvio,
   carimboParaNomeDeArquivo,
   deInputDateTimeLocal,
@@ -317,3 +325,83 @@ describe('CRM na Inbox', () => {
   });
 });
 
+
+/* ========================================================================== */
+/* Gestão fina da conversa: espera, silêncio, janela de 24 h, busca, citação   */
+/* ========================================================================== */
+
+describe('gestão fina da conversa', () => {
+  const agora = new Date('2026-11-24T15:00:00Z');
+  const minutosAtras = (minutos: number) => new Date(agora.getTime() - minutos * 60_000).toISOString();
+
+  test('o tom da espera: calmo até 30 min, atenção a partir de 30 min, crítico a partir de 2 h', () => {
+    expect(tomDaEspera(minutosAtras(0), agora)).toBe('calmo');
+    expect(tomDaEspera(minutosAtras(29), agora)).toBe('calmo');
+    expect(tomDaEspera(minutosAtras(30), agora)).toBe('atencao');
+    expect(tomDaEspera(minutosAtras(119), agora)).toBe('atencao');
+    expect(tomDaEspera(minutosAtras(120), agora)).toBe('critico');
+    expect(tomDaEspera(null, agora)).toBeNull();
+    expect(tomDaEspera('isto não é uma data', agora)).toBeNull();
+  });
+
+  test('a espera em texto, do jeito que cabe no cartão', () => {
+    expect(esperaEmTexto(minutosAtras(0), agora)).toBe('esperando agora');
+    expect(esperaEmTexto(minutosAtras(5), agora)).toBe('esperando há 5 min');
+    expect(esperaEmTexto(minutosAtras(60), agora)).toBe('esperando há 1 h');
+    expect(esperaEmTexto(minutosAtras(80), agora)).toBe('esperando há 1 h 20 min');
+    expect(esperaEmTexto(minutosAtras(24 * 60), agora)).toBe('esperando há 1 dia');
+    expect(esperaEmTexto(minutosAtras(3 * 24 * 60), agora)).toBe('esperando há 3 dias');
+    expect(esperaEmTexto(null, agora)).toBeNull();
+  });
+
+  test('a janela de 24 h: aberta, perto de fechar (última hora) e fechada', () => {
+    expect(janelaDaConversa(minutosAtras(10), agora)).toBe('aberta');
+    expect(janelaDaConversa(minutosAtras(24 * 60 - 61), agora)).toBe('aberta');
+    expect(janelaDaConversa(minutosAtras(24 * 60 - 30), agora)).toBe('perto-de-fechar');
+    expect(janelaDaConversa(minutosAtras(24 * 60), agora)).toBe('fechada');
+    expect(janelaDaConversa(minutosAtras(3 * 24 * 60), agora)).toBe('fechada');
+    expect(janelaDaConversa(null, agora)).toBeNull();
+    expect(janelaEmTexto(minutosAtras(24 * 60 - 30), agora)).toBe('A janela de 24 h fecha em 30 min.');
+    expect(janelaEmTexto(minutosAtras(30), agora)).toBeNull();
+    expect(janelaEmTexto(minutosAtras(24 * 60 + 1), agora)).toBe('A janela de 24 h já fechou.');
+  });
+
+  test('a busca dentro das mensagens devolve o trecho com o miolo separado', () => {
+    const texto = 'Oi! O frete para o centro fica em R$ 10,00, e o prazo é de dois dias.';
+    expect(trechoDaBusca(texto, 'frete')).toEqual({
+      antes: 'Oi! O ',
+      destaque: 'frete',
+      // 40 letras depois do termo, e "…" quando ainda sobra texto.
+      depois: ' para o centro fica em R$ 10,00, e o pra…',
+    });
+    // Sem diferenciar maiúsculas e minúsculas (o banco procura com ilike).
+    expect(trechoDaBusca(texto, 'FRETE')?.destaque).toBe('frete');
+    // Não achou: nada de trecho.
+    expect(trechoDaBusca(texto, 'entrega')).toBeNull();
+    expect(trechoDaBusca('', 'frete')).toBeNull();
+    expect(trechoDaBusca(texto, '   ')).toBeNull();
+    // No começo do texto não entra "…" na frente.
+    expect(trechoDaBusca('Frete grátis hoje', 'frete')?.antes).toBe('');
+    // Texto curto demais para precisar de "…".
+    expect(trechoEmLinha('Frete grátis', 'frete')).toBe('Frete grátis');
+  });
+
+  test('a citação em uma linha: quem falou e o começo do que falou', () => {
+    expect(resumoDaCitacao({ texto: 'O frete é R$ 10,00.', recebida: false, autor: 'Você' })).toBe('Você: O frete é R$ 10,00.');
+    expect(resumoDaCitacao({ texto: 'Vocês entregam no centro?', recebida: true })).toBe('Cliente: Vocês entregam no centro?');
+    // Sem texto, a citação mostra o arquivo (ou só "mensagem").
+    expect(resumoDaCitacao({ texto: '', recebida: true, arquivo: 'Foto' })).toBe('Cliente: Foto');
+    expect(resumoDaCitacao({ texto: null, recebida: false })).toBe('Cliente: mensagem'.replace('Cliente', 'Você'));
+    // Texto longo é cortado em 60 letras.
+    const longo = resumoDaCitacao({ texto: 'a'.repeat(200), recebida: true });
+    expect(longo.length).toBe('Cliente: '.length + 61);
+    expect(longo.endsWith('…')).toBe(true);
+  });
+
+  test('o primeiro nome de quem atende cabe no cartão', () => {
+    expect(primeiroNome('Caio Colega')).toBe('Caio');
+    expect(primeiroNome('  Ana  Souza ')).toBe('Ana');
+    expect(primeiroNome('')).toBe('');
+    expect(primeiroNome(null)).toBe('');
+  });
+});
