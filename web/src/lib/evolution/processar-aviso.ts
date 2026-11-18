@@ -1,4 +1,4 @@
-import { recuperarHistoricoEvolution } from '@/lib/evolution/historico';
+import { recuperarHistoricoEvolution, continuarHistoricoEvolution } from '@/lib/evolution/historico';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { enviarAlertaViaRpc, textoAlertaDesconexao } from '@/lib/atendente/alertas';
 import { atenderSobras, atenderVez, orcamentoDoAtendente } from '@/lib/atendente/atendente';
@@ -36,6 +36,13 @@ export interface OpcoesDoAviso {
 
 export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoAviso): Promise<Response> {
   const chegouEm = Date.now();
+  const historicoInterno=pedido.headers.get('x-ienvia-history');
+  if(historicoInterno){
+    if(!segredoCronConfere(historicoInterno))return responder(401,{erro:'não autorizado'});
+    opcoes.agendar(async()=>{await continuarHistoricoEvolution();});
+    return responder(202,{ok:true,resultado:'history_worker_scheduled'});
+  }
+
   const cabecalhoCron = pedido.headers.get('x-ienvia-cron');
   if (cabecalhoCron) {
     if (!segredoCronConfere(cabecalhoCron)) return responder(401, { ok: false, erro: 'não autorizado' });
@@ -74,7 +81,7 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
     const {data,error} = await banco.rpc('enqueue_evolution_history',{p_instance_name:String(lote.instance || ''),p_token_sha256:createHash('sha256').update(segredo).digest('hex'),p_messages:mensagens});
     if(error)return responder(500,{erro:'não foi possível preservar histórico'});
     if(data?.result === 'unauthorized')return responder(401,{erro:'não autorizado'});
-    opcoes.agendar(async()=>{await banco.rpc('process_evolution_history_queue',{p_limit:100});});
+    opcoes.agendar(async()=>{await continuarHistoricoEvolution();});
     return responder(200,{ok:true,...data});
   }
 
@@ -168,7 +175,7 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
 
   if (aviso.tipo === 'conexao' && aviso.estado === 'open' && gravado?.workspace_id) {
     await supabase.rpc('request_evolution_history',{p_instance_name:aviso.instancia,p_token_sha256:resumo});
-    opcoes.agendar(async()=>{await recuperarHistoricoEvolution();});
+    opcoes.agendar(async()=>{await continuarHistoricoEvolution();});
   }
 
   if (aviso.tipo === 'conexao' && gravado?.workspace_id) {

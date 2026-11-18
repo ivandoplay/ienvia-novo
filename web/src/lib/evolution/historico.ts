@@ -28,3 +28,22 @@ export async function recuperarHistoricoEvolution() {
  }
  await db.rpc('process_evolution_history_queue',{p_limit:100});
 }
+
+/** Worker exclusivo de histórico: não executa campanhas nem atendimento ao vivo. */
+export async function continuarHistoricoEvolution() {
+ const db=criarClienteDeServico();if(!db)return;
+ const inicio=Date.now();
+ for(let volta=0;volta<20 && Date.now()-inicio<30000;volta++) {
+  await recuperarHistoricoEvolution();
+  const [{count:a},{count:b}]=await Promise.all([
+   db.from('evolution_history_recovery').select('instance_id',{head:true,count:'exact'}).eq('status','pending'),
+   db.from('evolution_history_queue').select('id',{head:true,count:'exact'}).eq('status','pending')
+  ]);
+  if(!a&&!b)return;
+ }
+ const segredo=process.env.CRON_SECRET?.trim();
+ const base=(process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim();
+ if(!segredo||!base)throw new Error('Continuação de histórico sem configuração.');
+ const resposta=await fetch(`${base}/functions/v1/evolution-webhook`,{method:'POST',headers:{'x-ienvia-history':segredo},signal:AbortSignal.timeout(10000)});
+ if(!resposta.ok)throw new Error('Não foi possível continuar a recuperação; cursor preservado.');
+}
