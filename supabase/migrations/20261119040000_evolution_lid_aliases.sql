@@ -179,7 +179,7 @@ begin
   on conflict (workspace_id,channel,instance_id,external_user_id)
     where external_user_id is not null and erased_at is null
   do update set
-    display_name = case when public.contacts.display_name in ('','Contato') and excluded.display_name <> ''
+    display_name = case when (public.contacts.display_name='' or public.contacts.display_name ~ '^(Contato|Contato WhatsApp|[0-9]+)( · número pendente)?$') and excluded.display_name <> '' and excluded.display_name !~ '^(Contato|Contato WhatsApp|[0-9]+)( · número pendente)?$'
                         then excluded.display_name else public.contacts.display_name end,
     phone_e164 = coalesce(public.contacts.phone_e164,excluded.phone_e164),
     updated_at = now()

@@ -24,6 +24,11 @@ export async function recuperarHistoricoEvolution() {
     continue;
    }
    const mensagens=normalizarHistorico(job.instance_name,pagina.registros);
+   const {data:aliases,error:erroAliases}=await db.from('whatsapp_lid_aliases').select('lid,phone_jid').eq('instance_id',job.instance_id);
+   if(erroAliases)throw new Error('Falha ao ler identidades verificadas.');
+   const mapa=new Map((aliases||[]).map(a=>[a.lid,a.phone_jid]));
+   for(const mensagem of mensagens)mensagem.sender_jid=mapa.get(mensagem.sender_jid) || mensagem.sender_jid;
+
    const {error:erroNomes}=await db.rpc('refresh_evolution_history_names',{p_instance_name:job.instance_name,p_token_sha256:job.token_sha256,p_messages:mensagens});
    if(erroNomes)throw new Error('Falha ao atualizar nomes.');
    const pendentes=(job.pending_identity_count || 0)+mensagens.filter(m=>m.sender_jid.endsWith('@lid')).length;
