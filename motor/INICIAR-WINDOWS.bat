@@ -7,9 +7,10 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+set "NODE_BIN=node"
 if exist "%~dp0.runtime\node\node.exe" (
-  "%~dp0.runtime\node\node.exe" "%~dp0src\iniciar-guiado.mjs"
-) else (
-  node "%~dp0src\iniciar-guiado.mjs"
+  "%~dp0.runtime\node\node.exe" -e "if(Number(process.versions.node.split('.')[0]) < 24) process.exit(1)" >nul 2>&1
+  if not errorlevel 1 set "NODE_BIN=%~dp0.runtime\node\node.exe"
 )
+"%NODE_BIN%" "%~dp0src\iniciar-guiado.mjs"
 if errorlevel 1 pause
