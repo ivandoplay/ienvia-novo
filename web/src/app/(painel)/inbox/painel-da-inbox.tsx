@@ -2350,8 +2350,8 @@ function motivoParaNaoResponder(conversa: ConversaAberta, ehDono: boolean, evolu
   if (conversa.etapa === 'resolved') return { texto: 'Esta conversa está resolvida. Para responder, reabra a conversa.', acao: 'reabrir' };
   if (conversa.contato.apagado) return { texto: 'Os dados deste contato foram apagados. Dá para ler a conversa, mas não para responder.' };
   if (conversa.chip.estado === 'revoked') return { texto: `${chip} foi removido. Dá para ler a conversa, mas não para responder por ela.` };
-  if (conversa.chip.motor !== 'evolution') return { texto: `${chip} usa o motor local, que ainda não envia mensagens pelo painel.` };
-  if (!evolutionConfigurada) {
+  if (conversa.chip.motor !== 'evolution' && conversa.chip.motor !== 'baileys') return { texto: `${chip} usa um motor não suportado para resposta.` };
+  if (conversa.chip.motor === 'evolution' && !evolutionConfigurada) {
     return { texto: 'A conexão com a Evolution ainda não foi configurada neste ambiente. Por enquanto dá para ler, mas não para responder.' };
   }
   if (conversa.chip.estado !== 'connected') {
