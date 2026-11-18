@@ -70,6 +70,24 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
     return responder(400, { ok: false, erro: 'aviso ilegível' });
   }
 
+  // Aprender somente pares LID/telefone explícitos; nunca inferir por nome ou foto.
+  const identidade = corpo as {instance?:unknown;data?:{key?:Record<string,unknown>}} | null;
+  const chaveIdentidade = identidade?.data?.key;
+  if(chaveIdentidade && typeof identidade?.instance === 'string') {
+    const bancoIdentidade=criarClienteDeServico();
+    if(bancoIdentidade){
+      const remoto=String(chaveIdentidade.remoteJid || ''), alternativo=String(chaveIdentidade.remoteJidAlt || '');
+      const lid=/^[1-9][0-9]{5,19}@lid$/.test(remoto)?remoto:/^[1-9][0-9]{5,19}@lid$/.test(alternativo)?alternativo:null;
+      const pn=/^[1-9][0-9]{5,19}@s\.whatsapp\.net$/.test(remoto)?remoto:/^[1-9][0-9]{5,19}@s\.whatsapp\.net$/.test(alternativo)?alternativo:null;
+      const resumoIdentidade=createHash('sha256').update(segredo).digest('hex');
+      if(lid&&pn)await bancoIdentidade.rpc('register_evolution_lid_alias',{p_instance_name:identidade.instance,p_token_sha256:resumoIdentidade,p_lid:lid,p_phone_jid:pn});
+      if(lid&&remoto===lid){
+        const {data:resolvido}=await bancoIdentidade.rpc('resolve_evolution_lid',{p_instance_name:identidade.instance,p_token_sha256:resumoIdentidade,p_lid:lid});
+        if(typeof resolvido==='string')chaveIdentidade.remoteJidAlt=resolvido;
+      }
+    }
+  }
+
   // História é persistida antes do processamento, sem passar pelo fluxo de mensagens ao vivo.
   const lote = corpo as { event?: unknown; instance?: unknown; data?: unknown } | null;
   if (lote && typeof lote === 'object' && String(lote.event).toUpperCase().replace(/[.-]/g,'_') === 'MESSAGES_SET') {

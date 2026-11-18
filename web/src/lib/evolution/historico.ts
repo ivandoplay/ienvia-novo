@@ -24,6 +24,8 @@ export async function recuperarHistoricoEvolution() {
     continue;
    }
    const mensagens=normalizarHistorico(job.instance_name,pagina.registros);
+   const {error:erroNomes}=await db.rpc('refresh_evolution_history_names',{p_instance_name:job.instance_name,p_token_sha256:job.token_sha256,p_messages:mensagens});
+   if(erroNomes)throw new Error('Falha ao atualizar nomes.');
    const pendentes=(job.pending_identity_count || 0)+mensagens.filter(m=>m.sender_jid.endsWith('@lid')).length;
    const {data:enfileirado,error:falha}=await db.rpc('enqueue_evolution_history',{p_instance_name:job.instance_name,p_token_sha256:job.token_sha256,p_messages:mensagens});
    if(falha||enfileirado?.result==='unauthorized')throw new Error('Falha ao preservar página.');
