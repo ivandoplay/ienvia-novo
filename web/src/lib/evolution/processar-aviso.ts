@@ -77,7 +77,7 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
     if (!banco) return responder(503,{erro:'serviço indisponível'});
     const dados = lote.data as { messages?: unknown } | null;
     const itens = Array.isArray(lote.data) ? lote.data : Array.isArray(dados?.messages) ? dados.messages : [];
-    const mensagens = itens.map(item => interpretarAviso({event:'MESSAGES_UPSERT',instance:lote.instance,data:item})).flatMap(a => a.tipo === 'mensagem' ? [{event_id:a.idDoEvento,sender_jid:a.remetente,push_name:a.nome,body_text:a.texto,occurred_at:a.quando,from_me:a.deMim,media:a.arquivo?{kind:a.arquivo.tipo,mime:a.arquivo.conteudo,size:a.arquivo.tamanho,file_name:a.arquivo.nome,duration:a.arquivo.duracao,voice:a.arquivo.voz}:null}] : []);
+    const mensagens = itens.map(item => interpretarAviso({event:'MESSAGES_UPSERT',instance:lote.instance,data:item},new Date(),true)).flatMap(a => a.tipo === 'mensagem' ? [{event_id:a.idDoEvento,sender_jid:a.remetente,push_name:a.nome,body_text:a.texto,occurred_at:a.quando,from_me:a.deMim,media:a.arquivo?{kind:a.arquivo.tipo,mime:a.arquivo.conteudo,size:a.arquivo.tamanho,file_name:a.arquivo.nome,duration:a.arquivo.duracao,voice:a.arquivo.voz}:null}] : []);
     const {data,error} = await banco.rpc('enqueue_evolution_history',{p_instance_name:String(lote.instance || ''),p_token_sha256:createHash('sha256').update(segredo).digest('hex'),p_messages:mensagens});
     if(error)return responder(500,{erro:'não foi possível preservar histórico'});
     if(data?.result === 'unauthorized')return responder(401,{erro:'não autorizado'});

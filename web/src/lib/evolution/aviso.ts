@@ -72,12 +72,13 @@ function nomeDoEvento(evento: unknown): string {
  * Quem mandou a mensagem. Em conversas novas o WhatsApp às vezes manda um código interno (@lid)
  * no lugar do número; nesses casos o número vem num campo alternativo.
  */
-function remetenteDaMensagem(chave: Objeto, dados: Objeto): string | null {
+function remetenteDaMensagem(chave: Objeto, dados: Objeto, aceitarLid = false): string | null {
   const candidatos = [chave.remoteJid, chave.remoteJidAlt, chave.senderPn, dados.senderPn, dados.remoteJidAlt];
   for (const candidato of candidatos) {
     const encontrado = typeof candidato === 'string' ? JID_DE_PESSOA.exec(candidato.trim()) : null;
     if (encontrado) return `${encontrado[1]}@s.whatsapp.net`;
   }
+  if (aceitarLid && typeof chave.remoteJid === 'string' && /^[1-9][0-9]{5,19}@lid$/.test(chave.remoteJid)) return chave.remoteJid;
   return null;
 }
 
@@ -212,7 +213,7 @@ function lerStatusDeAck(valor: unknown): 'delivered' | 'read' | null {
   return null;
 }
 
-export function interpretarAviso(corpo: unknown, agora: Date = new Date()): AvisoDaEvolution {
+export function interpretarAviso(corpo: unknown, agora: Date = new Date(), aceitarLid = false): AvisoDaEvolution {
   if (!ehObjeto(corpo)) return { tipo: 'ignorado', motivo: 'corpo inválido' };
 
   const instancia = texto(corpo.instance);
@@ -254,7 +255,7 @@ export function interpretarAviso(corpo: unknown, agora: Date = new Date()): Avis
     const idDoEvento = texto(chave.id);
     if (!idDoEvento || idDoEvento.length > 200) return { tipo: 'ignorado', motivo: 'mensagem sem identificação' };
 
-    const remetente = remetenteDaMensagem(chave, dados);
+    const remetente = remetenteDaMensagem(chave, dados, aceitarLid);
     if (!remetente) return { tipo: 'ignorado', motivo: 'não é conversa com uma pessoa (grupo, status ou lista)' };
 
     const conteudo = conteudoDaMensagem(dados.message);
