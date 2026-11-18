@@ -234,7 +234,6 @@ export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConf
         </span>
       </Cabecalho>
 
-      <ConfiguracaoTranscricao />
       <div className="motor-avisos">
         {!ATENDENTE_DE_IA_NO_AR && (
           <p className="aviso aviso--atencao">
@@ -272,6 +271,7 @@ export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConf
           cifrada: depois de cadastrada, ninguém consegue vê-la inteira de novo, nem aqui no painel.
         </p>
         <div className="motor-provedores">
+          <ConfiguracaoTranscricao podeEditar={podeEditar && cofreConfigurado} />
           {PROVEDORES.map((provedor) => (
             <CartaoDoProvedor
               key={provedor}

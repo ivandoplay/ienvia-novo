@@ -275,12 +275,14 @@ export async function enviarDossieDeTeste(whatsapp: unknown, chipId?: unknown): 
 
 
 /** Configuração de transcrição separada do modelo de atendimento. */
-export async function lerTranscricao(): Promise<Resultado<{ cadastrada: boolean; reserva: boolean }>> {
+export async function lerTranscricao(): Promise<Resultado<{ cadastrada: boolean; reserva: boolean; final: string | null; atualizadaEm: string | null }>> {
  const ctx=await abrirContexto();if('erro' in ctx)return {ok:false,erro:ctx.erro};
  const db=criarClienteDeServico();if(!db)return {ok:false,erro:ALGO_DEU_ERRADO};
- const {data,error}=await db.from('workspace_transcription_settings').select('groq_ciphertext,gemini_fallback').eq('workspace_id',ctx.workspaceId).maybeSingle();
+ const {data,error}=await db.from('workspace_transcription_settings').select('groq_ciphertext,gemini_fallback,updated_at').eq('workspace_id',ctx.workspaceId).maybeSingle();
  if(error)return {ok:false,erro:ALGO_DEU_ERRADO};
- return {ok:true,cadastrada:!!data?.groq_ciphertext,reserva:!!data?.gemini_fallback};
+ const cofre=lerChaveDoCofre();
+ const aberta=data?.groq_ciphertext&&cofre?decifrar(data.groq_ciphertext,contextoDaChaveDeIa(ctx.workspaceId,'groq'),cofre):null;
+ return {ok:true,cadastrada:!!data?.groq_ciphertext,reserva:!!data?.gemini_fallback,final:aberta?finalDaChave(aberta):null,atualizadaEm:data?.updated_at??null};
 }
 export async function salvarTranscricao(chave: string, reserva: boolean, remover = false): Promise<Resultado> {
  const ctx=await abrirContexto();if('erro' in ctx)return {ok:false,erro:ctx.erro};
