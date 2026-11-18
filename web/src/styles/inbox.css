@@ -2919,3 +2919,12 @@ dl.inbox-ia-recado {
  .conversa-mobile-ativa .mob-topbar-brand {display:none;}
  .inbox-crm-completo>summary span {max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 }
+
+/* Exclusão seletiva: visual distinto de Resolver e Arquivar. */
+.inbox-apagar-selecionadas { color: #b42318; border-color: #f4b4ae; }
+.inbox-confirmar-exclusao { display: grid; gap: 18px; padding-top: 12px; }
+.inbox-confirmar-exclusao p { margin: 0; line-height: 1.55; }
+.inbox-confirmar-exclusao label { display: grid; gap: 8px; }
+.inbox-exclusao-acoes { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.inbox-exclusao-confirmar { background: #b42318; color: white; border-color: #b42318; }
+.inbox-exclusao-confirmar:disabled { opacity: .45; cursor: not-allowed; }

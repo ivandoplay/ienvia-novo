@@ -63,6 +63,7 @@ import {
 import { descreverEstado } from '@/lib/instancias/regras';
 import {
   aplicarAcaoEmLote,
+  apagarConversasSelecionadas,
   atualizarNegocioConversa,
   buscarArquivo,
   cancelarMensagemAgendada,
@@ -757,6 +758,9 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
   const idBusca = useId();
   const idChip = useId();
   const idTitulo = useId();
+  const [exclusaoPendente, setExclusaoPendente] = useState<string[] | null>(null);
+  const [confirmacaoExclusao, setConfirmacaoExclusao] = useState('');
+  const [erroExclusao, setErroExclusao] = useState('');
   const [modoLote, setModoLote] = useState(false);
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const [ocupadoLote, setOcupadoLote] = useState(false);
@@ -836,6 +840,22 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
     aoAtualizar();
   }
 
+  async function executarExclusao() {
+    if (ocupadoLote || !exclusaoPendente?.length || confirmacaoExclusao !== 'APAGAR') return;
+    const ids = [...exclusaoPendente];
+    setOcupadoLote(true);
+    setErroExclusao('');
+    const res = await pedir(() => apagarConversasSelecionadas({ conversaIds: ids, confirmacao: confirmacaoExclusao }));
+    setOcupadoLote(false);
+    if (!res.ok) { setErroExclusao(res.erro); return; }
+    setExclusaoPendente(null);
+    setSelecionadas([]);
+    setModoLote(false);
+    avisarLista({ tipo: 'ok', texto: `${plural(res.apagadas, 'conversa apagada', 'conversas apagadas')} do Ienvia. Contatos e WhatsApp preservados.` });
+    if (conversaId && ids.includes(conversaId)) router.replace(enderecoDaInbox({ ...filtros, conversaId: null }));
+    aoAtualizar();
+  }
+
   async function executarLote(
     /** Desarquivar, no banco, é o mesmo que "reopen": a conversa volta para a fila. */
     acao: 'mark_read' | 'mark_unread' | 'resolve' | 'archive' | 'mute' | 'unmute' | 'reopen',
@@ -872,6 +892,22 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
 
   return (
     <section className="inbox-lista" aria-labelledby={idTitulo}>
+      {exclusaoPendente ? (
+        <Dialogo titulo={`Apagar ${plural(exclusaoPendente.length, 'conversa selecionada', 'conversas selecionadas')}?`} aoFechar={() => { if (!ocupadoLote) setExclusaoPendente(null); }}>
+          <form className="inbox-confirmar-exclusao" onSubmit={(e) => { e.preventDefault(); void executarExclusao(); }}>
+            <p>Esta ação é permanente no Ienvia. O histórico, as notas e os agendamentos dessas conversas serão apagados. Os anexos entrarão na fila de remoção.</p>
+            <p><strong>Seus contatos, as conversas não selecionadas e as mensagens no WhatsApp serão preservados.</strong></p>
+            <label>Digite <strong>APAGAR</strong> para confirmar
+              <input className="campo" aria-label="Digite APAGAR para confirmar" autoComplete="off" autoFocus value={confirmacaoExclusao} disabled={ocupadoLote} onChange={(e) => setConfirmacaoExclusao(e.target.value)} />
+            </label>
+            {erroExclusao ? <p role="alert">{erroExclusao}</p> : null}
+            <div className="inbox-exclusao-acoes">
+              <button type="button" className="btn btn-secondary" disabled={ocupadoLote} onClick={() => setExclusaoPendente(null)}>Cancelar</button>
+              <button type="submit" className="btn inbox-exclusao-confirmar" disabled={ocupadoLote || confirmacaoExclusao !== 'APAGAR'}>{ocupadoLote ? 'Apagando…' : `Apagar ${plural(exclusaoPendente.length, 'conversa', 'conversas')}`}</button>
+            </div>
+          </form>
+        </Dialogo>
+      ) : null}
       <div className="inbox-lista-topo">
         <form className="inbox-busca" role="search" action="/inbox" method="get" onSubmit={buscar}>
           {filtros.visao !== 'ativas' ? <input type="hidden" name="ver" value={filtros.visao} /> : null}
@@ -1052,6 +1088,11 @@ function ListaDeConversas({ lista, filtros, chips, etiquetas, conversaId, ehDono
               <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('archive')}>
                 Arquivar
               </button>
+              {ehDono ? (
+                <button type="button" className="btn btn-secondary btn-sm inbox-apagar-selecionadas" disabled={ocupadoLote || selecionadas.length > 100} onClick={() => { setExclusaoPendente([...selecionadas]); setConfirmacaoExclusao(''); setErroExclusao(''); }}>
+                  Apagar selecionadas
+                </button>
+              ) : null}
               <button type="button" className="btn btn-secondary btn-sm" disabled={ocupadoLote} onClick={() => void executarLote('mute')}>
                 Silenciar
               </button>

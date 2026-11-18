@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { limparArquivosDeConversasApagadas } from '@/lib/dados/limpeza-inbox';
 import { executarLimpezaDeRetencao } from '@/lib/dados/retencao';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
 
@@ -28,5 +29,6 @@ export async function POST(pedido: Request) {
   }
 
   const retencao = await executarLimpezaDeRetencao(supabase, 100);
-  return Response.json({ ok: true, ...retencao });
+  const exclusoesDaInbox = await limparArquivosDeConversasApagadas(supabase);
+  return Response.json({ ok: true, ...retencao, exclusoesDaInbox });
 }

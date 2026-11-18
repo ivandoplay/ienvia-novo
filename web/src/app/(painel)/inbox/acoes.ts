@@ -1473,3 +1473,27 @@ export async function procurarNasMensagens(dados: {
   });
   return { ok: true, achados };
 }
+
+/** Exclusão explícita: autorização e atomicidade são verificadas novamente pela RPC. */
+export async function apagarConversasSelecionadas(entrada: { conversaIds: string[]; confirmacao: string }): Promise<{ ok: true; apagadas: number } | { ok: false; erro: string }> {
+  const contexto = await abrirContexto();
+  if ('erro' in contexto) return { ok: false, erro: contexto.erro };
+  if (!Array.isArray(entrada.conversaIds) || entrada.conversaIds.length < 1 || entrada.conversaIds.length > 100 || entrada.confirmacao !== 'APAGAR') {
+    return { ok: false, erro: 'Selecione de 1 a 100 conversas e digite APAGAR para confirmar.' };
+  }
+  const { data, error } = await contexto.supabase.rpc('delete_my_selected_conversations', {
+    p_workspace_id: contexto.workspaceId, p_conversation_ids: entrada.conversaIds, p_confirmation: entrada.confirmacao,
+  });
+  if (error) {
+    const erro = /conversation_busy/.test(error.message)
+      ? 'Uma das conversas tem um envio ou processamento em andamento. Aguarde e tente novamente. Nenhuma conversa foi apagada.'
+      : /workspace_owner_required/.test(error.message)
+        ? 'Somente o proprietário pode apagar conversas.'
+        : /selection_changed/.test(error.message)
+          ? 'A seleção mudou. Atualize a lista e selecione novamente. Nenhuma conversa foi apagada.'
+          : 'Não foi possível apagar as conversas. Nenhuma exclusão parcial foi realizada. Tente novamente.';
+    return { ok: false, erro };
+  }
+  atualizarTelas();
+  return { ok: true, apagadas: Number(data.deleted) };
+}
