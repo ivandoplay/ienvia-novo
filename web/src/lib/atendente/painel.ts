@@ -202,9 +202,9 @@ export function descreverIaNaConversa(ia: IaDaConversa, etapa: string, agora: Da
       : ia.pausadaNaEmpresa
         ? 'A IA está pausada em todos os chips.'
         : ia.travada
-          ? 'A IA só volta a responder aqui quando você devolver a conversa.'
+          ? 'A IA só volta a responder aqui quando você usar Retomar IA.'
           : ia.pausadaAte
-            ? `A IA volta a responder aqui ${volta}, ou antes, se você devolver a conversa.`
+            ? `A IA volta a responder aqui ${volta}, ou antes, se você usar Retomar IA.`
             : 'A IA volta a responder aqui na próxima mensagem do contato.';
     return {
       tom: 'atencao',
@@ -227,7 +227,7 @@ export function descreverIaNaConversa(ia: IaDaConversa, etapa: string, agora: Da
     return {
       tom: 'neutro',
       titulo: ia.motivo === 'claimed' ? 'Esta conversa foi assumida por uma pessoa' : 'A IA não responde nesta conversa',
-      detalhe: 'Ela só volta quando alguém devolver a conversa.',
+      detalhe: 'Ela só volta quando alguém usar Retomar IA.',
       recado: null,
       podeAssumir: false,
       podeDevolver: true,
@@ -237,7 +237,7 @@ export function descreverIaNaConversa(ia: IaDaConversa, etapa: string, agora: Da
     return {
       tom: 'neutro',
       titulo: ia.motivo === 'human_reply' ? 'Uma pessoa respondeu, e a IA parou nesta conversa' : 'A IA está parada nesta conversa',
-      detalhe: `Ela volta a responder aqui ${volta}, ou antes, se você devolver a conversa.`,
+      detalhe: `Ela volta a responder aqui ${volta}, ou antes, se você usar Retomar IA.`,
       recado: null,
       podeAssumir: true,
       podeDevolver: true,

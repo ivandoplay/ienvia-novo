@@ -2786,8 +2786,7 @@ dl.inbox-ia-recado {
 @media(max-width:900px){
  html.conversa-mobile-ativa,html.conversa-mobile-ativa body {height:100%;overflow:hidden;overscroll-behavior:none;}
  .conversa-mobile-ativa .mobile-bottom-nav {display:none;}
- .inbox[data-aberta="sim"] {position:fixed;inset-inline:0;top:var(--inbox-topo-visivel,0px);height:var(--inbox-altura-visivel,100dvh);z-index:40;display:flex;flex-direction:column;background:var(--bg-app);padding:0;overflow:hidden;}
- .inbox[data-aberta="sim"]>.inbox-titulo {display:none;}
+ .inbox[data-aberta="sim"] {position:fixed;inset-inline:0;top:calc(var(--inbox-topo-visivel,0px) + 52px);height:calc(var(--inbox-altura-visivel,100dvh) - 52px);z-index:40;display:flex;flex-direction:column;background:var(--bg-app);padding:0;overflow:hidden;}
  .inbox[data-aberta="sim"]>.inbox-grade {display:flex;flex:1;min-height:0;height:auto!important;margin:0;gap:0;}
  .inbox[data-aberta="sim"] .inbox-conversa {flex:1;border:0;border-radius:0;box-shadow:none;height:100%;min-height:0;}
  .inbox[data-aberta="sim"] .inbox-lista {display:none;}
@@ -2839,10 +2838,8 @@ dl.inbox-ia-recado {
  .inbox-ferramentas-menu .inbox-anexar {display:flex;flex-direction:column;gap:7px;width:100%;height:auto;min-height:74px;padding:10px 5px;white-space:normal;}
  .inbox-ferramentas-menu .so-leitor-de-tela {position:static;width:auto;height:auto;clip:auto;clip-path:none;overflow:visible;white-space:normal;font-size:10px;line-height:1.35;text-align:center;}
  .inbox-recurso-popover,.inbox-rapidas-popover {bottom:calc(100% + 6px);max-height:45vh;overflow:auto;}
- .inbox-contato {position:fixed;inset:0;z-index:60;height:var(--inbox-altura-visivel,100dvh);overflow:auto;border-radius:0;}
 }
 @media(max-width:900px){
- .conversa-mobile-ativa .topbar {display:none;}
  .inbox[data-aberta="sim"] .inbox-conversa-topo {min-height:62px;}
  .inbox[data-aberta="sim"] .inbox-conversa-topo .inbox-mais-botao {width:40px;}
 }
@@ -2852,4 +2849,73 @@ dl.inbox-ia-recado {
 }
 @media(max-width:900px){
  .inbox-conversa-acoes-extras--abertas {right:0;left:auto;width:min(300px,calc(100vw - 24px));min-width:0;}
+}
+
+/* Restaura acessos completos: compactar não deve retirar comandos do atendimento. */
+.inbox-crm-completo {display:contents;}
+.inbox-crm-completo>summary {display:none;}
+.inbox-ia {flex-shrink:0;}
+@media(max-width:900px){
+ .conversa-mobile-ativa .topbar {display:flex;position:fixed;top:var(--inbox-topo-visivel,0px);left:0;right:0;height:52px;min-height:52px;padding:6px 9px;gap:6px;z-index:60;}
+ .conversa-mobile-ativa .topbar-left,.conversa-mobile-ativa .topbar-right {gap:6px;min-width:0;}
+ .conversa-mobile-ativa .mob-topbar-title {display:none;}
+ .conversa-mobile-ativa .mob-topbar-brand {gap:0;}
+ .conversa-mobile-ativa .mob-topbar-brand img {width:23px;height:23px;}
+ .conversa-mobile-ativa .topbar .sidebar-toggle-btn,.conversa-mobile-ativa .topbar .account-trigger-btn {width:32px;height:34px;min-height:34px;padding:5px;}
+ .conversa-mobile-ativa .topbar .status-pill {padding:4px 6px;font-size:10px;gap:5px;white-space:nowrap;}
+ .conversa-mobile-ativa .topbar .controle-da-ia {gap:4px;}
+ .conversa-mobile-ativa .topbar .controle-da-ia .btn {font-size:10px;min-height:34px;padding:5px;gap:3px;}
+ .conversa-mobile-ativa .topbar .controle-da-ia .icon-svg {width:14px;height:14px;}
+ .inbox[data-aberta="sim"]>.inbox-titulo {display:block;position:relative;width:auto;height:auto;clip:auto;clip-path:none;white-space:normal;overflow:visible;margin:0;padding:0;flex-shrink:0;z-index:15;}
+ .inbox[data-aberta="sim"]>.inbox-titulo>div:first-child {display:none;}
+ .inbox-crm-completo {display:block;}
+ .inbox-crm-completo>summary {display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;padding:7px 12px;list-style:none;cursor:pointer;border-bottom:1px solid var(--border);background:var(--bg-card);font-size:11px;color:var(--text-main);font-weight:600;}
+ .inbox-crm-completo>summary span {font-size:10px;color:var(--text-secondary);font-weight:400;}
+ .inbox-crm-completo>summary::-webkit-details-marker {display:none;}
+ .inbox-crm-completo>.inbox-crm-topo {position:absolute;top:100%;left:8px;right:8px;padding:12px;display:flex;flex-direction:column;align-items:stretch;gap:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-elevated);box-shadow:var(--shadow-md);}
+ .inbox-crm-completo:not([open])>.inbox-crm-topo {display:none;}
+ .inbox-crm-completo .crm-abas {display:flex;width:100%;}
+ .inbox-crm-completo .crm-aba {flex:1;justify-content:center;font-size:11px;}
+ .inbox-crm-completo .inbox-crm-acoes {display:flex;flex-wrap:wrap;gap:8px;}
+ .inbox-crm-completo .inbox-crm-acoes .btn {flex:1;justify-content:center;font-size:11px;}
+ .inbox-ia {padding:8px 10px;gap:7px;flex-wrap:nowrap;align-items:center;}
+ .inbox-ia .inbox-ia-icone {width:17px;height:17px;flex-shrink:0;}
+ .inbox-ia-titulo {font-size:11px;}
+ .inbox-ia-detalhe {font-size:10px;line-height:1.4;}
+ .inbox-ia-acoes {width:auto;flex-shrink:0;margin:0;padding:0;gap:5px;}
+ .inbox-ia-acoes .btn,.inbox-ia--humano>.btn {min-height:36px;padding:6px 8px;font-size:10px;white-space:normal;text-align:center;line-height:1.25;}
+ .inbox-ia-recado {max-height:100px;overflow:auto;}
+}
+
+/* Áreas de toque sem depender do tamanho do desenho do ícone. */
+@media(max-width:900px){
+ .conversa-mobile-ativa .topbar {padding:4px 7px;gap:4px;}
+ .conversa-mobile-ativa .topbar-left,.conversa-mobile-ativa .topbar-right {gap:4px;}
+ .conversa-mobile-ativa .topbar .sidebar-toggle-btn,
+ .conversa-mobile-ativa .topbar .account-trigger-btn,
+ .conversa-mobile-ativa .topbar .busca-global-gatilho,
+ .conversa-mobile-ativa .topbar .controle-da-ia .btn {width:44px;min-width:44px;height:44px;min-height:44px;padding:8px;flex-shrink:0;}
+ .conversa-mobile-ativa .topbar .controle-da-ia .btn {width:auto;min-width:44px;}
+ .inbox-crm-completo>summary {min-height:44px;}
+ .inbox[data-aberta="sim"] .inbox-conversa-topo .inbox-voltar,
+ .inbox[data-aberta="sim"] .inbox-conversa-topo .inbox-mobile-buscar,
+ .inbox[data-aberta="sim"] .inbox-conversa-topo .inbox-mais-botao {width:44px;min-width:44px;height:44px;min-height:44px;}
+ .inbox[data-aberta="sim"] .inbox-conversa-topo {grid-template-columns:44px 30px minmax(0,1fr) 44px 44px;column-gap:5px;}
+ .inbox-conversa-quem {min-width:0;}
+ .inbox-conversa-topo>.inbox-avatar {width:30px;height:30px;}
+ .inbox-ferramentas {flex-basis:44px;}
+ .inbox-ferramentas>summary {width:44px;min-height:44px;}
+ .inbox-escrever-linha>button[type="submit"] {min-height:44px;height:44px;}
+ .inbox-ia-acoes .btn,.inbox-ia--humano>.btn {min-height:44px;}
+ .conversa-mobile-baixa .inbox-escrever-campo.campo {max-height:44px!important;overflow-y:auto!important;}
+ .conversa-mobile-baixa .inbox-conversa-topo {padding-block:4px;min-height:52px;}
+ .conversa-mobile-baixa .inbox-ia {padding-block:4px;}
+ .conversa-mobile-baixa .inbox-ia-texto {max-height:44px;overflow-y:auto;}
+ .conversa-mobile-baixa .inbox-ia-recado {max-height:44px;}
+ .conversa-mobile-baixa .inbox-mensagens {min-height:0;}
+ .conversa-mobile-baixa .inbox-grade {min-height:0!important;}
+}
+@media(max-width:380px){
+ .conversa-mobile-ativa .mob-topbar-brand {display:none;}
+ .inbox-crm-completo>summary span {max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 }

@@ -1,4 +1,6 @@
 'use client';
+import { ControleDeAtendimento } from './controle-de-atendimento';
+import { FaixaDaIaNaConversa } from './faixa-da-ia';
 import { ViewportDaConversa } from './viewport-da-conversa';
 import { TranscricaoDoAudio } from './transcricao-do-audio';
 
@@ -9,7 +11,6 @@ import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, 
 import { formatarDuracaoAudio } from '@ienvia/shared/recursos';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
-import type { FaixaDaIa } from '@/lib/atendente/painel';
 import type { RecursosParaInbox } from '@/lib/dados/recursos';
 import { formatarDataHoraCurta, resumoDaCitacao, trechoEmLinha } from '@/lib/inbox/regras';
 import type {
@@ -599,7 +600,10 @@ export function PainelDaInbox({
           <p>As conversas do WhatsApp dos seus chips, num lugar só.</p>
         </div>
 
-        <div className="inbox-crm-topo">
+        <details className="inbox-crm-completo" open>
+          <summary>CRM e ferramentas <span>Conversas · Contatos · Kanban</span><Icone nome="seta" className="icon-15"/></summary>
+          <div className="inbox-crm-topo" onClick={evento=>{if(window.matchMedia('(max-width: 900px)').matches&&(evento.target as HTMLElement).closest('button,a'))evento.currentTarget.closest('details')?.removeAttribute('open');}}>
+
           <nav className="crm-abas" aria-label="Modos do CRM">
             {ABAS_DO_CRM.map((item) => {
               const ativo = aba === item.valor;
@@ -635,6 +639,7 @@ export function PainelDaInbox({
             ) : null}
           </div>
         </div>
+        </details>
       </div>
 
       {aba === 'contatos' ? (
@@ -1407,64 +1412,6 @@ type AcaoNaConversa = 'resolver' | 'reabrir' | 'assumir' | 'devolver' | 'fixar' 
  * A faixa da IA no alto da conversa: diz se a IA está respondendo ali, por que parou, o recado que ela
  * deixou ao passar a conversa, e traz os botões "Assumir" e "Devolver para a IA".
  */
-function FaixaDaIaNaConversa({ faixa, ocupado, aoAgir }: { faixa: FaixaDaIa; ocupado: AcaoNaConversa | null; aoAgir: (acao: AcaoNaConversa) => void }) {
-  const { recado } = faixa;
-  return (
-    <div className={`inbox-ia inbox-ia--${faixa.tom}`} role="group" aria-label="A IA nesta conversa">
-      <Icone nome={faixa.tom === 'atencao' ? 'pessoa' : 'kpiIa'} className="inbox-ia-icone" />
-      <div className="inbox-ia-texto">
-        <p className="inbox-ia-titulo">{faixa.titulo}</p>
-        {recado ? (
-          recado.cenario || recado.gatilho || recado.proximaJogada ? (
-            <dl className="inbox-ia-recado">
-              {recado.cenario ? (
-                <div>
-                  <dt>Quem é</dt>
-                  <dd>{recado.cenario}</dd>
-                </div>
-              ) : null}
-              {recado.gatilho ? (
-                <div>
-                  <dt>O que pediu</dt>
-                  <dd>{recado.gatilho}</dd>
-                </div>
-              ) : null}
-              {recado.proximaJogada ? (
-                <div>
-                  <dt>Sugestão</dt>
-                  <dd>{recado.proximaJogada}</dd>
-                </div>
-              ) : null}
-              {recado.livre ? (
-                <div>
-                  <dt>Recado</dt>
-                  <dd>{recado.livre}</dd>
-                </div>
-              ) : null}
-            </dl>
-          ) : (
-            <p className="inbox-ia-recado">{recado.livre}</p>
-          )
-        ) : null}
-        {faixa.detalhe ? <p className="inbox-ia-detalhe">{faixa.detalhe}</p> : null}
-      </div>
-      {faixa.podeAssumir || faixa.podeDevolver ? (
-        <div className="inbox-ia-acoes">
-          {faixa.podeAssumir ? (
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => aoAgir('assumir')} disabled={ocupado !== null}>
-              {ocupado === 'assumir' ? 'Assumindo…' : 'Assumir'}
-            </button>
-          ) : null}
-          {faixa.podeDevolver ? (
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => aoAgir('devolver')} disabled={ocupado !== null}>
-              {ocupado === 'devolver' ? 'Devolvendo…' : 'Devolver para a IA'}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function Conversa({
   conversa,
@@ -1834,7 +1781,7 @@ function Conversa({
             {conversa.contato.iniciais}
           </span>
           <div className="inbox-conversa-quem">
-            <h2 ref={titulo} tabIndex={-1}>
+            <h2 ref={titulo} tabIndex={-1} title={conversa.contato.nome}>
               {conversa.contato.nome}
             </h2>
             <p>
@@ -1873,6 +1820,8 @@ function Conversa({
             </button>
             <MenuMais>
               <>
+                <ControleDeAtendimento faixa={conversa.ia} ocupado={ocupado} aoAgir={acao=>void agir(acao)}/>
+
                 <div className="inbox-mobile-info"><strong>{conversa.contato.nome}</strong><span>{conversa.contato.telefone}</span><span>Chip: {conversa.chip.apelido}</span><span>{etapa.texto} · {conversa.espera}</span></div>
                 <button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" onClick={()=>setContatoAberto(true)}>Dados do contato</button>
                 <button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" disabled={ocupado!==null} onClick={()=>void agir('fixar')}>{conversa.fixada?'Desafixar conversa':'Fixar conversa'}</button>
@@ -2012,7 +1961,7 @@ function Conversa({
           ) : null}
         </div>
 
-        {conversa.ia ? <FaixaDaIaNaConversa faixa={conversa.ia} ocupado={ocupado} aoAgir={(acao) => void agir(acao)} /> : null}
+        {conversa.ia ? <FaixaDaIaNaConversa mostrarControle={false} faixa={conversa.ia} ocupado={ocupado} aoAgir={(acao) => void agir(acao)} /> : <div className="inbox-ia inbox-ia--humano" role="group" aria-label="Quem responde nesta conversa"><Icone nome="pessoa" className="inbox-ia-icone"/><div className="inbox-ia-texto"><p className="inbox-ia-titulo">{conversa.etapa==='resolved'||conversa.etapa==='archived'?'Conversa encerrada':'Atendimento humano'}</p><p className="inbox-ia-detalhe">{conversa.etapa==='resolved'||conversa.etapa==='archived'?'Reabra para retomar o atendimento.':conversa.iaNoChip===false?'A IA está desligada neste chip. Somente a equipe responde.':'Não há controle de IA disponível nesta conversa.'}</p></div><Link href="/instancias" className="btn btn-secondary btn-sm">Ver IA do chip</Link></div>}
 
         <div
           ref={rolagem}
@@ -2870,10 +2819,16 @@ function CampoDeMensagem({
   useLayoutEffect(() => {
     const area = campo.current;
     if (!area) return;
-    area.style.height = 'auto';
-    const limite=window.matchMedia('(max-width: 900px)').matches?104:150;
-    area.style.height = `${Math.min(area.scrollHeight, limite)}px`;
-    area.style.overflowY=area.scrollHeight>limite?'auto':'hidden';
+    const ajustarAltura=()=>{
+      area.style.height = 'auto';
+      const limite=window.matchMedia('(max-width: 900px)').matches?((window.visualViewport?.height??window.innerHeight)<=440?44:104):150;
+      area.style.height = `${Math.min(area.scrollHeight, limite)}px`;
+      area.style.overflowY=area.scrollHeight>limite?'auto':'hidden';
+    };
+    ajustarAltura();
+    window.visualViewport?.addEventListener('resize',ajustarAltura);
+    window.addEventListener('resize',ajustarAltura);
+    return ()=>{window.visualViewport?.removeEventListener('resize',ajustarAltura);window.removeEventListener('resize',ajustarAltura);};
   }, [texto]);
 
   // Um "escrever de novo" coloca o texto no campo e já deixa o cursor nele.

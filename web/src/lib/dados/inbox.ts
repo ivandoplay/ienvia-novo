@@ -1,3 +1,4 @@
+import { estadoIaNoChip } from '@/lib/inbox/estado-da-ia';
 import 'server-only';
 
 import { descreverIaNaConversa, lerIaDaConversa, type FaixaDaIa } from '@/lib/atendente/painel';
@@ -523,6 +524,7 @@ export interface ConversaAberta {
   chip: { id: string; apelido: string; estado: string; motor: string };
   /** A faixa da IA nesta conversa (o que ela está fazendo aqui e quais botões cabem). `null` = a IA não participa. */
   ia: FaixaDaIa | null;
+  iaNoChip?: boolean | null;
   mensagens: MensagemDaConversa[];
   notas: NotaDaConversa[];
   agendadas: MensagemAgendada[];
@@ -722,6 +724,7 @@ export async function carregarConversa(
         motor: conversa.instance.engine,
       },
       ia: descreverIaNaConversa(lerIaDaConversa(conversa.ai), conversa.stage, agora),
+      iaNoChip: estadoIaNoChip(conversa.ai),
       temMensagensAnteriores: resposta.has_more === true,
       notas: (resposta.notes ?? []).map((nota) => ({
         id: nota.id,
