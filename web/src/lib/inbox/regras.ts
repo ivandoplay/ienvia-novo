@@ -526,3 +526,10 @@ export function janelaEmTexto(ultimaDoClienteIso: string | null | undefined, ago
   const restam = Math.max(0, 24 * 60 - Math.floor((agora.getTime() - quando) / 60_000));
   return restam <= 1 ? 'A janela de 24 h fecha em 1 min.' : `A janela de 24 h fecha em ${restam} min.`;
 }
+
+/** Evolution aceita LID nativo. Nunca remover @lid e tratar seus dígitos como telefone. */
+export function destinatarioParaEvolution(destinatario: unknown): string | null {
+ if(typeof destinatario!=='string')return null;
+ const jid=destinatario.trim();
+ return /^[1-9][0-9]{5,19}@lid$/.test(jid)?jid:numeroParaEnvio(jid);
+}

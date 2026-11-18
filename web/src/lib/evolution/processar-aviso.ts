@@ -103,7 +103,7 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
     return responder(200,{ok:true,...data});
   }
 
-  const aviso = interpretarAviso(corpo);
+  const aviso = interpretarAviso(corpo,new Date(),true);
   // O que o painel não usa é respondido com "ok": assim a Evolution não fica reenviando.
   if (aviso.tipo === 'ignorado') return responder(200, { ok: true, resultado: 'ignorado' });
 

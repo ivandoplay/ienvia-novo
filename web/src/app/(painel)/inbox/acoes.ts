@@ -29,7 +29,7 @@ import {
   ETAPAS_DO_KANBAN,
   ehChaveDeEnvio,
   formatarDataHoraCurta,
-  numeroParaEnvio,
+  destinatarioParaEvolution,
   trechoDaBusca,
   validarTexto,
   type SituacaoDoEnvio,
@@ -172,7 +172,7 @@ export async function enviarMensagem(dados: {
   }
 
   // 3) Uma única chamada à Evolution.
-  const numero = numeroParaEnvio(mensagem.recipient);
+  const numero = destinatarioParaEvolution(mensagem.recipient);
   const resposta: RespostaDaEvolution =
     numero && mensagem.provider_instance_name
       ? await enviarTexto(mensagem.provider_instance_name, numero, mensagem.body_text ?? texto)
@@ -375,7 +375,7 @@ export async function enviarArquivo(dados: {
   // 3) O servidor lê o arquivo no depósito (com a sessão da pessoa)...
   const lido = await comLimiteDeTempo(supabase.storage.from(DEPOSITO).download(dados.caminho), TEMPO_LIMITE_PARA_LER_O_ARQUIVO);
   const bytes = lido && !lido.error && lido.data ? Buffer.from(await lido.data.arrayBuffer()) : null;
-  const numero = numeroParaEnvio(mensagem.recipient);
+  const numero = destinatarioParaEvolution(mensagem.recipient);
   if (!bytes || bytes.length === 0) {
     console.error('[inbox] não foi possível ler no depósito o arquivo de um envio:', { mensagem: mensagem.message_id, erro: lido?.error?.message ?? 'demorou demais' });
     // Nada foi para a Evolution: com certeza não saiu.
@@ -951,7 +951,7 @@ async function enviarRecursoDoWorkspaceNaConversa(
     bytes = lido && !lido.error && lido.data ? Buffer.from(await lido.data.arrayBuffer()) : null;
   }
 
-  const numero = numeroParaEnvio(mensagem.recipient);
+  const numero = destinatarioParaEvolution(mensagem.recipient);
   if (!bytes || bytes.length === 0) {
     return terminarEnvio(
       contexto,
