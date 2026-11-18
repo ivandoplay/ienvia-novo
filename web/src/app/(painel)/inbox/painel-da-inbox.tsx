@@ -1,4 +1,5 @@
 'use client';
+import { ViewportDaConversa } from './viewport-da-conversa';
 import { TranscricaoDoAudio } from './transcricao-do-audio';
 
 import { createClient } from '@supabase/supabase-js';
@@ -591,6 +592,7 @@ export function PainelDaInbox({
 
   return (
     <div className="inbox" data-aberta={aba === 'conversas' && conversaId ? 'sim' : 'nao'}>
+      <ViewportDaConversa ativa={aba === 'conversas' && Boolean(conversaId)}/>
       <div className="page-header inbox-titulo">
         <div>
           <h1>Inbox</h1>
@@ -1505,6 +1507,7 @@ function Conversa({
   const [citando, setCitando] = useState<{ id: string; resumo: string } | null>(null);
   /** O termo procurado dentro desta conversa e o que a busca achou. */
   const [termoDaConversa, setTermoDaConversa] = useState('');
+  const [buscaMobileAberta, setBuscaMobileAberta] = useState(false);
   const [achados, setAchados] = useState<Array<{ mensagemId: string; recebida: boolean; quando: string; trecho: string }> | null>(null);
   const [procurando, setProcurando] = useState(false);
   const [mensagemEmFoco, setMensagemEmFoco] = useState<string | null>(null);
@@ -1842,6 +1845,8 @@ function Conversa({
               </span>
             </p>
           </div>
+          <span className="inbox-mobile-etapa">{etapa.texto}</span>
+          <button type="button" className="btn btn-secondary btn-icon-only inbox-mobile-buscar" aria-label={buscaMobileAberta?'Fechar busca na conversa':'Buscar na conversa'} aria-expanded={buscaMobileAberta} aria-controls={`pesquisa-${conversa.id}`} onClick={()=>{setBuscaMobileAberta(v=>!v);if(!buscaMobileAberta)setTimeout(()=>document.getElementById(`busca-conversa-${conversa.id}`)?.focus(),0);}}><Icone nome="busca"/></button>
           <div className="inbox-conversa-acoes">
             <span className={`estado${etapa.tom === 'ok' ? ' estado--ok' : etapa.tom === 'atencao' ? ' estado--atencao' : etapa.tom === 'ia' ? ' estado--ia' : ''}`}>
               {etapa.texto}
@@ -1868,6 +1873,11 @@ function Conversa({
             </button>
             <MenuMais>
               <>
+                <div className="inbox-mobile-info"><strong>{conversa.contato.nome}</strong><span>{conversa.contato.telefone}</span><span>Chip: {conversa.chip.apelido}</span><span>{etapa.texto} · {conversa.espera}</span></div>
+                <button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" onClick={()=>setContatoAberto(true)}>Dados do contato</button>
+                <button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" disabled={ocupado!==null} onClick={()=>void agir('fixar')}>{conversa.fixada?'Desafixar conversa':'Fixar conversa'}</button>
+                {conversa.etapa==='resolved'?<button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" disabled={ocupado!==null} onClick={()=>void agir('reabrir')}>Reabrir conversa</button>:conversa.etapa==='archived'?<button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" disabled={ocupado!==null} onClick={()=>void agir('desarquivar')}>Desarquivar conversa</button>:<><button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" disabled={ocupado!==null} onClick={()=>void agir('resolver')}>Resolver conversa</button><button type="button" className="btn btn-secondary btn-sm inbox-acao-extra inbox-so-mobile" disabled={ocupado!==null} onClick={()=>void agir('arquivar')}>Arquivar conversa</button></>}
+
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm inbox-acao-extra"
@@ -1949,7 +1959,7 @@ function Conversa({
           </p>
         ) : null}
 
-        <div className="inbox-busca-conversa">
+        <div id={`pesquisa-${conversa.id}`} className={`inbox-busca-conversa${buscaMobileAberta?' inbox-busca-conversa--aberta':''}`}>
           <form onSubmit={(evento) => void procurarNaConversaAberta(evento)} role="search">
             <label htmlFor={`busca-conversa-${conversa.id}`} className="so-leitor-de-tela">
               Procurar nesta conversa
@@ -2551,7 +2561,7 @@ const Mensagens = memo(function Mensagens({
                 </div>
               ) : null}
 
-              <div className="balao-acoes">
+              <details className="balao-menu-acoes"><summary aria-label="Opções da mensagem">•••</summary><div className="balao-acoes">
                 {podeResponder ? (
                   <button
                     type="button"
@@ -2562,7 +2572,7 @@ const Mensagens = memo(function Mensagens({
                   </button>
                 ) : null}
                 <BotaoCopiar texto={mensagem.texto} />
-              </div>
+              </div></details>
 
               {ensinaveis?.has(mensagem.id) ? (
                 <div className="balao-ensinar">
@@ -2849,12 +2859,21 @@ function CampoDeMensagem({
   const idDica = useId();
   const idAnexo = useId();
 
+  useEffect(()=>{
+    const media=window.matchMedia('(max-width: 900px)');
+    const ajustar=()=>{const d=campo.current?.closest('form')?.querySelector<HTMLDetailsElement>('.inbox-ferramentas');if(d)d.open=!media.matches;};
+    const fechar=(evento:Event)=>{const d=campo.current?.closest('form')?.querySelector<HTMLDetailsElement>('.inbox-ferramentas');if(!d?.open||!media.matches)return;if(evento instanceof window.KeyboardEvent&&evento.key==='Escape'){d.open=false;d.querySelector<HTMLElement>('summary')?.focus();}else if(evento.type==='pointerdown'&&!d.contains(evento.target as Node))d.open=false;};
+    ajustar();media.addEventListener('change',ajustar);document.addEventListener('pointerdown',fechar);document.addEventListener('keydown',fechar);return ()=>{media.removeEventListener('change',ajustar);document.removeEventListener('pointerdown',fechar);document.removeEventListener('keydown',fechar);};
+  },[]);
+
   // O campo cresce com o texto, até um limite; depois disso rola por dentro.
   useLayoutEffect(() => {
     const area = campo.current;
     if (!area) return;
     area.style.height = 'auto';
-    area.style.height = `${Math.min(area.scrollHeight, 150)}px`;
+    const limite=window.matchMedia('(max-width: 900px)').matches?104:150;
+    area.style.height = `${Math.min(area.scrollHeight, limite)}px`;
+    area.style.overflowY=area.scrollHeight>limite?'auto':'hidden';
   }, [texto]);
 
   // Um "escrever de novo" coloca o texto no campo e já deixa o cursor nele.
@@ -3083,6 +3102,9 @@ function CampoDeMensagem({
             evento.target.value = '';
           }}
         />
+        <details className="inbox-ferramentas" open>
+          <summary className="btn btn-secondary btn-icon-only" aria-label="Abrir ferramentas de envio"><Icone nome="clipe"/></summary>
+          <div className="inbox-ferramentas-menu" role="group" aria-label="Ferramentas de envio" onClick={evento=>{if(window.matchMedia('(max-width: 900px)').matches&&(evento.target as HTMLElement).closest('button'))evento.currentTarget.closest('details')?.removeAttribute('open');}}>
         <button type="button" className="btn btn-secondary btn-icon-only inbox-anexar" onClick={() => seletor.current?.click()}>
           <Icone nome="clipe" />
           <span className="so-leitor-de-tela">Anexar arquivo</span>
@@ -3146,6 +3168,19 @@ function CampoDeMensagem({
           <Icone nome="qrCode" />
           <span className="so-leitor-de-tela">Enviar PIX</span>
         </button>
+        {!anexo ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon-only inbox-anexar"
+            onClick={() => aoAgendar(texto.trim())}
+            title="Agendar envio automático"
+          >
+            <Icone nome="calendario" />
+            <span className="so-leitor-de-tela">Agendar envio</span>
+          </button>
+        ) : null}
+          </div>
+        </details>
         <label htmlFor={idCampo} className="so-leitor-de-tela">
           {anexo ? (semLegenda ? 'Mensagem (o áudio vai sem legenda)' : 'Legenda do arquivo') : 'Mensagem'}
         </label>
@@ -3158,7 +3193,7 @@ function CampoDeMensagem({
           value={texto}
           maxLength={TEXTO_MAXIMO}
           readOnly={semLegenda}
-          placeholder={anexo ? (semLegenda ? 'Áudio vai sem legenda' : 'Legenda (opcional)') : 'Escreva uma mensagem ou digite /'}
+          placeholder={anexo ? (semLegenda ? 'Áudio vai sem legenda' : 'Legenda (opcional)') : 'Mensagem'}
           aria-describedby={anexo ? `${idAnexo} ${idDica}` : idDica}
           aria-invalid={passouDoLimite || undefined}
           enterKeyHint="enter"
@@ -3183,17 +3218,6 @@ function CampoDeMensagem({
             anexar(colado);
           }}
         />
-        {!anexo ? (
-          <button
-            type="button"
-            className="btn btn-secondary btn-icon-only inbox-anexar"
-            onClick={() => aoAgendar(texto.trim())}
-            title="Agendar envio automático"
-          >
-            <Icone nome="calendario" />
-            <span className="so-leitor-de-tela">Agendar envio</span>
-          </button>
-        ) : null}
         <button type="submit" className="btn btn-primary" disabled={!podeEnviar}>
           Enviar
         </button>
