@@ -11,6 +11,7 @@ import {
 } from '@ienvia/shared/recursos';
 import { DEPOSITO } from '@/lib/inbox/arquivos';
 import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
+import { transcreverDaEmpresa } from '@/lib/ia/transcricao';
 import { ErroDeIa, transcreverAudio } from '@/lib/ia/provedores';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { mapearAudioEstrategico } from '@/lib/recursos/mapeamento';
@@ -191,29 +192,7 @@ export async function transcreverAudioEstrategico(dados: {
     return { ok: false, erro: 'O áudio ainda não terminou de subir. Grave ou envie o arquivo primeiro.' };
   }
 
-  // A chave do Gemini é a mesma que o cliente cadastrou no Motor de IA, guardada cifrada no cofre.
-  const cofre = lerChaveDoCofre();
-  if (!cofre) return { ok: false, erro: 'O servidor não conseguiu abrir o cofre de chaves agora.' };
-
-  const servico = criarClienteDeServico();
   const supabase = await criarClienteServidor();
-  let cifrada: string | null = null;
-
-  if (servico) {
-    const { data } = await servico.rpc('read_workspace_ai_keys_for_simulator', { p_workspace_id: workspaceId });
-    const bruto = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
-    const valor = bruto.gemini;
-    cifrada = typeof valor === 'string' && valor ? valor : null;
-  } else {
-    const { data } = await supabase.rpc('read_my_ai_key_ciphertext', { p_workspace_id: workspaceId, p_provider: 'gemini' });
-    cifrada = typeof data === 'string' && data ? data : null;
-  }
-
-  const chave = cifrada ? decifrar(cifrada, contextoDaChaveDeIa(workspaceId, 'gemini'), cofre) : null;
-  if (!chave) {
-    return { ok: false, erro: 'Nenhuma chave do Gemini cadastrada. Abra Motor de IA e cadastre a chave para transcrever sozinho.' };
-  }
-
   let bytes: Uint8Array;
   let tipo: string;
   if (dados.trechoWavBase64 !== undefined) {
@@ -239,11 +218,11 @@ export async function transcreverAudioEstrategico(dados: {
   }
 
   try {
-    const resultado = await transcreverAudio({ chave, audio: bytes, contentType: tipo });
+    const resultado = await transcreverDaEmpresa(workspaceId, bytes, tipo);
     return { ok: true, texto: resultado.texto, modelo: resultado.modelo };
   } catch (erro) {
     if (erro instanceof ErroDeIa) return { ok: false, erro: traduzirErroDaTranscricao(erro) };
-    return { ok: false, erro: 'Não foi possível transcrever o áudio agora. Tente de novo.' };
+    return { ok: false, erro: erro instanceof Error ? erro.message : 'Não foi possível transcrever o áudio agora.' };
   }
 }
 

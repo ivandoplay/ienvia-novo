@@ -1,0 +1,9 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {lerTranscricao,salvarTranscricao} from './acoes';
+export function ConfiguracaoTranscricao(){
+ const [chave,setChave]=useState(''),[reserva,setReserva]=useState(false),[cadastrada,setCadastrada]=useState(false),[ocupado,setOcupado]=useState(true),[recado,setRecado]=useState('');
+ useEffect(()=>{lerTranscricao().then(r=>{if(r.ok){setCadastrada(r.cadastrada);setReserva(r.reserva);}else setRecado(r.erro);}).catch(()=>setRecado('Não foi possível carregar.')).finally(()=>setOcupado(false));},[]);
+ async function salvar(remover=false){setOcupado(true);try{const r=await salvarTranscricao(chave,reserva,remover);if(r.ok){setCadastrada(!remover);setChave('');setRecado('Configuração salva.');}else setRecado(r.erro);}catch{setRecado('Falha ao salvar.');}finally{setOcupado(false);}}
+ return <section className="card" style={{padding:20,marginBottom:20}}><h2>Transcrição de áudios — Groq</h2><p>Biblioteca e áudios recebidos no WhatsApp. Cada empresa usa sua própria chave e cota. O áudio inteiro é priorizado.</p><p>{cadastrada?'Chave cadastrada e protegida no cofre.':'Nenhuma chave Groq cadastrada.'}</p><label>Chave Groq <input type="password" autoComplete="new-password" value={chave} onChange={e=>setChave(e.target.value)} placeholder={cadastrada?'Deixe vazio para manter':'gsk_…'} disabled={ocupado}/></label><p><label><input type="checkbox" checked={reserva} onChange={e=>setReserva(e.target.checked)} disabled={ocupado}/> Autorizar Gemini como reserva se a Groq falhar (envia o áudio ao Google e consome a cota da chave Gemini desta empresa).</label></p><button type="button" className="btn btn-primary" disabled={ocupado} onClick={()=>void salvar()}>Salvar transcrição</button>{cadastrada&&<button type="button" className="btn btn-secondary" disabled={ocupado} onClick={()=>void salvar(true)}>Remover chave Groq</button>}<p role="status">{recado}</p></section>;
+}

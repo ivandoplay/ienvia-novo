@@ -177,23 +177,10 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
     setTranscrevendo(true);
     const chave = editando.objectKey;
     try {
-      if (progressoRef.current?.chave !== chave) {
-        setProgressoTranscricao('Preparando trechos de até 30 segundos…');
-        const url = enderecoDoRecurso(chave);
-        if (!url) throw new Error('Áudio indisponível para transcrever.');
-        const trechos = await prepararTrechosDeTranscricao(url);
-        progressoRef.current = { chave, trechos, textos: [] };
-      }
-      const trabalho = progressoRef.current;
-      for (let i = trabalho.textos.length; i < trabalho.trechos.length; i++) {
-        setProgressoTranscricao(`Transcrevendo trecho ${i+1} de ${trabalho.trechos.length}…`);
-        const resultado = await transcreverAudioEstrategico({ objectKey: chave, trechoWavBase64: trabalho.trechos[i] });
-        if (!resultado.ok) throw new Error(`Trecho ${i+1} de ${trabalho.trechos.length}: ${resultado.erro} Clique novamente para retomar.`);
-        trabalho.textos.push(resultado.texto.trim());
-      }
-      const texto = trabalho.textos.join(' ').trim();
-      setEditando(atual => atual?.objectKey === chave ? { ...atual, transcription: texto } : atual);
-      progressoRef.current = null;
+      setProgressoTranscricao('Transcrevendo o áudio inteiro…');
+      const resultado = await transcreverAudioEstrategico({objectKey: chave, contentType: editando.contentType});
+      if (!resultado.ok) throw new Error(resultado.erro);
+      setEditando(atual => atual?.objectKey === chave ? {...atual, transcription: resultado.texto.trim()} : atual);
     } catch (erro) {
       setErroModal(erro instanceof Error ? erro.message : 'Falha ao transcrever o áudio.');
     } finally {
@@ -677,12 +664,12 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
                   onClick={() => void transcreverSozinho()}
                   title={
                     editando.objectKey
-                      ? 'Ouve o áudio e escreve a transcrição usando a chave do Gemini cadastrada em Motor de IA'
+                      ? 'Ouve o áudio e escreve a transcrição usando o provedor de transcrição configurado em Motor de IA'
                       : 'Grave ou envie o áudio primeiro'
                   }
                 >
                   <Icone nome="motorIa" className="icon-15" />
-                  {transcrevendo ? progressoTranscricao || 'Transcrevendo o áudio…' : 'Transcrever com o Gemini'}
+                  {transcrevendo ? progressoTranscricao || 'Transcrevendo o áudio…' : 'Transcrever áudio'}
                 </button>
                 <span className="f6-transcricao-nota">
                   {editando.objectKey

@@ -273,3 +273,26 @@ export async function enviarDossieDeTeste(whatsapp: unknown, chipId?: unknown): 
   return { ok: false, erro: 'A Evolution respondeu sem confirmar o envio. Confira o WhatsApp do administrador.' };
 }
 
+
+/** Configuração de transcrição separada do modelo de atendimento. */
+export async function lerTranscricao(): Promise<Resultado<{ cadastrada: boolean; reserva: boolean }>> {
+ const ctx=await abrirContexto();if('erro' in ctx)return {ok:false,erro:ctx.erro};
+ const db=criarClienteDeServico();if(!db)return {ok:false,erro:ALGO_DEU_ERRADO};
+ const {data,error}=await db.from('workspace_transcription_settings').select('groq_ciphertext,gemini_fallback').eq('workspace_id',ctx.workspaceId).maybeSingle();
+ if(error)return {ok:false,erro:ALGO_DEU_ERRADO};
+ return {ok:true,cadastrada:!!data?.groq_ciphertext,reserva:!!data?.gemini_fallback};
+}
+export async function salvarTranscricao(chave: string, reserva: boolean, remover = false): Promise<Resultado> {
+ const ctx=await abrirContexto();if('erro' in ctx)return {ok:false,erro:ctx.erro};
+ const cofre=lerChaveDoCofre();if(!cofre)return {ok:false,erro:SEM_COFRE};
+ const db=criarClienteDeServico();if(!db)return {ok:false,erro:ALGO_DEU_ERRADO};
+ if(typeof chave!=='string'||typeof reserva!=='boolean'||typeof remover!=='boolean')return {ok:false,erro:'Configuração inválida.'};
+ chave=chave.trim();if(chave && !/^gsk_[A-Za-z0-9]{20,200}$/.test(chave))return {ok:false,erro:'Chave Groq inválida.'};
+ const {data,error:leitura}=await db.from('workspace_transcription_settings').select('groq_ciphertext').eq('workspace_id',ctx.workspaceId).maybeSingle();
+ if(leitura)return {ok:false,erro:ALGO_DEU_ERRADO};
+ const ciphertext=remover?null:chave?cifrar(chave,contextoDaChaveDeIa(ctx.workspaceId,'groq'),cofre):data?.groq_ciphertext;
+ if(!ciphertext&&!remover)return {ok:false,erro:'Informe sua chave Groq.'};
+ const {error}=await db.from('workspace_transcription_settings').upsert({workspace_id:ctx.workspaceId,groq_ciphertext:ciphertext,gemini_fallback:reserva,updated_at:new Date().toISOString()});
+ if(error)return {ok:false,erro:ALGO_DEU_ERRADO};
+ revalidatePath('/inteligencia-artificial');return {ok:true};
+}

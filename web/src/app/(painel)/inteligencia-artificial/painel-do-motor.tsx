@@ -1,5 +1,6 @@
 'use client';
 
+import { ConfiguracaoTranscricao } from './transcricao';
 import Link from 'next/link';
 import { useId, useState, type FormEvent } from 'react';
 import { Dialogo } from '@/components/ui/dialogo';
@@ -233,6 +234,7 @@ export function PainelDoMotor({ motor: motorInicial, falhouAoCarregar, cofreConf
         </span>
       </Cabecalho>
 
+      <ConfiguracaoTranscricao />
       <div className="motor-avisos">
         {!ATENDENTE_DE_IA_NO_AR && (
           <p className="aviso aviso--atencao">
