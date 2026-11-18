@@ -179,6 +179,7 @@ export async function excluirAudioEstrategico(voiceId: string): Promise<{ ok: tr
 export async function transcreverAudioEstrategico(dados: {
   objectKey: string;
   contentType?: string;
+  trechoWavBase64?: string;
 }): Promise<{ ok: true; texto: string; modelo: string } | { ok: false; erro: string }> {
   const sessao = await obterSessao();
   if (!sessao?.workspaceAtivo) return { ok: false, erro: SESSAO_EXPIRADA };
@@ -213,13 +214,29 @@ export async function transcreverAudioEstrategico(dados: {
     return { ok: false, erro: 'Nenhuma chave do Gemini cadastrada. Abra Motor de IA e cadastre a chave para transcrever sozinho.' };
   }
 
-  const arquivo = await supabase.storage.from(DEPOSITO).download(objectKey);
-  if (arquivo.error || !arquivo.data) {
-    return { ok: false, erro: 'Não consegui baixar o áudio agora. Tente de novo em instantes.' };
+  let bytes: Uint8Array;
+  let tipo: string;
+  if (dados.trechoWavBase64 !== undefined) {
+    const base64 = dados.trechoWavBase64;
+    if (typeof base64 !== 'string' || base64.length > 641000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+      return { ok: false, erro: 'Trecho de áudio inválido ou maior que 30 segundos.' };
+    }
+    const wav = Buffer.from(base64, 'base64');
+    if (wav.length < 46 || wav.toString('ascii',0,4) !== 'RIFF' || wav.toString('ascii',8,12) !== 'WAVE' ||
+        wav.toString('ascii',12,16) !== 'fmt ' || wav.readUInt32LE(16) !== 16 || wav.readUInt16LE(20) !== 1 ||
+        wav.readUInt16LE(22) !== 1 || wav.readUInt32LE(24) !== 8000 || wav.readUInt32LE(28) !== 16000 ||
+        wav.readUInt16LE(32) !== 2 || wav.readUInt16LE(34) !== 16 || wav.toString('ascii',36,40) !== 'data' ||
+        wav.readUInt32LE(40) !== wav.length - 44 || wav.length > 480044) {
+      return { ok: false, erro: 'O trecho deve ser WAV mono de até 30 segundos.' };
+    }
+    bytes = wav;
+    tipo = 'audio/wav';
+  } else {
+    const arquivo = await supabase.storage.from(DEPOSITO).download(objectKey);
+    if (arquivo.error || !arquivo.data) return { ok: false, erro: 'Não consegui baixar o áudio agora. Tente de novo.' };
+    bytes = new Uint8Array(await arquivo.data.arrayBuffer());
+    tipo = (dados.contentType || arquivo.data.type || 'audio/ogg').split(';')[0] || 'audio/ogg';
   }
-
-  const bytes = new Uint8Array(await arquivo.data.arrayBuffer());
-  const tipo = (dados.contentType || arquivo.data.type || 'audio/ogg').split(';')[0] || 'audio/ogg';
 
   try {
     const resultado = await transcreverAudio({ chave, audio: bytes, contentType: tipo });

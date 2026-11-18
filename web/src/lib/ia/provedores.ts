@@ -280,7 +280,7 @@ async function listarModelosDoGemini(chave: string): Promise<ModeloDisponivel[]>
 // ---------------------------------------------------------------------------------------------
 
 /** Modelos que aceitam áudio e devolvem texto. O primeiro que existir na chave do cliente é usado. */
-export const MODELOS_DE_TRANSCRICAO = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'] as const;
+export const MODELOS_DE_TRANSCRICAO = ['gemini-flash-latest', 'gemini-3.8-flash'] as const;
 
 /** O arquivo enviado é limitado a 16 MB; o pedido inteiro (base64 + prompt) fica abaixo do teto da API. */
 const LIMITE_DO_AUDIO_EM_BYTES = 16 * 1024 * 1024;
@@ -349,7 +349,7 @@ export async function transcreverAudio(pedido: {
       const erro = erroDoGemini(status, dados, modelo);
       ultimoErro = erro;
       // Modelo que não existe nesta chave: tenta o próximo da lista.
-      if (erro.motivo === 'modelo_inexistente') continue;
+      if (erro.motivo === 'modelo_inexistente' || erro.motivo === 'indisponivel') continue;
       throw erro;
     }
 

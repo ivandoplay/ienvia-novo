@@ -7,6 +7,7 @@ import {
   type AudioEstrategico,
 } from '@ienvia/shared/recursos';
 import { comecarAGravarEmOgg, type GravadorDeVoz } from '@/lib/audio/gravador-de-voz';
+import { prepararTrechosDeTranscricao } from '@/lib/audio/transcricao-em-partes';
 import { prepararAudioDeVoz } from '@/lib/audio/voz-do-whatsapp';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
@@ -132,6 +133,8 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   // Transcrição automática pela chave do Gemini cadastrada em Motor de IA.
   const [transcrevendo, setTranscrevendo] = useState(false);
+  const [progressoTranscricao, setProgressoTranscricao] = useState('');
+  const progressoRef = useRef<{ chave: string; trechos: string[]; textos: string[] } | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState<AudioEstrategico | null>(null);
 
   // Gravador no navegador
@@ -172,17 +175,31 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
     if (!editando?.objectKey || transcrevendo) return;
     setErroModal(null);
     setTranscrevendo(true);
-    const resultado = await transcreverAudioEstrategico({
-      objectKey: editando.objectKey,
-      contentType: editando.contentType,
-    });
-    setTranscrevendo(false);
-    if (!resultado.ok) {
-      setErroModal(resultado.erro);
-      return;
+    const chave = editando.objectKey;
+    try {
+      if (progressoRef.current?.chave !== chave) {
+        setProgressoTranscricao('Preparando trechos de até 30 segundos…');
+        const url = enderecoDoRecurso(chave);
+        if (!url) throw new Error('Áudio indisponível para transcrever.');
+        const trechos = await prepararTrechosDeTranscricao(url);
+        progressoRef.current = { chave, trechos, textos: [] };
+      }
+      const trabalho = progressoRef.current;
+      for (let i = trabalho.textos.length; i < trabalho.trechos.length; i++) {
+        setProgressoTranscricao(`Transcrevendo trecho ${i+1} de ${trabalho.trechos.length}…`);
+        const resultado = await transcreverAudioEstrategico({ objectKey: chave, trechoWavBase64: trabalho.trechos[i] });
+        if (!resultado.ok) throw new Error(`Trecho ${i+1} de ${trabalho.trechos.length}: ${resultado.erro} Clique novamente para retomar.`);
+        trabalho.textos.push(resultado.texto.trim());
+      }
+      const texto = trabalho.textos.join(' ').trim();
+      setEditando(atual => atual?.objectKey === chave ? { ...atual, transcription: texto } : atual);
+      progressoRef.current = null;
+    } catch (erro) {
+      setErroModal(erro instanceof Error ? erro.message : 'Falha ao transcrever o áudio.');
+    } finally {
+      setTranscrevendo(false);
+      setProgressoTranscricao('');
     }
-    const texto = resultado.texto.trim();
-    setEditando((atual) => (atual ? { ...atual, transcription: texto } : atual));
   }
 
   async function enviarAudioParaDeposito(blob: Blob, nomeOriginal: string, tipoMime: string) {
@@ -665,7 +682,7 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
                   }
                 >
                   <Icone nome="motorIa" className="icon-15" />
-                  {transcrevendo ? 'Transcrevendo o áudio…' : 'Transcrever com o Gemini'}
+                  {transcrevendo ? progressoTranscricao || 'Transcrevendo o áudio…' : 'Transcrever com o Gemini'}
                 </button>
                 <span className="f6-transcricao-nota">
                   {editando.objectKey
