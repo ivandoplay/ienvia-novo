@@ -18,7 +18,7 @@ export async function transcreverDaEmpresa(workspaceId:string,audio:Uint8Array,c
   if(!chave)throw new Error('A chave Groq não pode ser aberta. Cadastre novamente.');
   if(!audio.length || audio.length>24*1024*1024)throw new Error('Use um áudio não vazio de até 24 MB.');
   try {
-   const mime=contentType.split(';')[0].trim();
+   const mime=(contentType.split(';')[0] || 'audio/ogg').trim();
    const extensoes:Record<string,string>={'audio/wav':'wav','audio/x-wav':'wav','audio/ogg':'ogg','audio/mpeg':'mp3','audio/mp4':'m4a','audio/webm':'webm','audio/flac':'flac','audio/aac':'aac'};
    const form=new FormData();form.append('file',new Blob([new Uint8Array(audio)],{type:mime}),`audio.${extensoes[mime] || 'ogg'}`);form.append('model','whisper-large-v3-turbo');form.append('language','pt');form.append('response_format','json');form.append('temperature','0');
    const r=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{method:'POST',headers:{Authorization:`Bearer ${chave}`},body:form,signal:AbortSignal.timeout(45000),cache:'no-store'});
