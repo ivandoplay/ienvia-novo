@@ -4,16 +4,19 @@ $ErrorActionPreference = "Stop"
 $RootDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $RootDir
 
-$NodeVersion = "v22.14.0"
+$NodeVersion = "v24.22.3"
 $RuntimeDir = Join-Path $RootDir ".runtime\node"
 $LocalNode = Join-Path $RuntimeDir "node.exe"
 
 function Get-IenviaNode {
-  if (Test-Path $LocalNode) { return $LocalNode }
+  if (Test-Path $LocalNode) {
+    $major = [int]((& $LocalNode -p "process.versions.node.split('.')[0]") 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $major -ge 24) { return $LocalNode }
+  }
   $sys = Get-Command node -ErrorAction SilentlyContinue
   if ($sys) {
     $major = [int]((& $sys.Source -p "process.versions.node.split('.')[0]") 2>$null)
-    if ($major -ge 20) { return $sys.Source }
+    if ($major -ge 24) { return $sys.Source }
   }
   return $null
 }
@@ -51,12 +54,22 @@ if (-not $NodeBin) {
   }
 }
 
+$env:PATH = "$(Split-Path $NodeBin -Parent);$env:PATH"
 $NpmCmd = Join-Path (Split-Path $NodeBin -Parent) "npm.cmd"
-if (-not (Test-Path (Join-Path $RootDir "node_modules"))) {
-  Write-Host "[Ienvia] Instalando dependencias do Motor..."
-  $env:PATH = "$(Split-Path $NodeBin -Parent);$env:PATH"
-  & $NpmCmd install --omit=dev
+if (-not (Test-Path $NpmCmd)) { $NpmCmd = (Get-Command npm.cmd -ErrorAction Stop).Source }
+$Lock = Join-Path $RootDir "package-lock.json"
+$StampInput = (Get-FileHash (Join-Path $RootDir "package.json") -Algorithm SHA256).Hash
+if (Test-Path $Lock) { $StampInput += (Get-FileHash $Lock -Algorithm SHA256).Hash }
+$StampPath = Join-Path $RootDir "node_modules\.ienvia-deps-windows"
+$OldStamp = if (Test-Path $StampPath) { (Get-Content $StampPath -Raw).Trim() } else { "" }
+if ($StampInput -ne $OldStamp) {
+  Write-Host "[Ienvia] Instalando dependencias; data/ sera preservada."
+  if (Test-Path $Lock) {
+    & $NpmCmd ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
+  } else {
+    & $NpmCmd install --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
+  }
+  if ($LASTEXITCODE -ne 0) { throw "Falha na instalacao das dependencias (codigo $LASTEXITCODE)." }
+  Set-Content -Path $StampPath -Value $StampInput
 }
-
-Write-Host "[Ienvia] Pronto! Para parear, execute:"
-Write-Host "  .\scripts\iniciar.bat --url https://SEU-PAINEL --pair IENV-XXXX-XXXX"
+Write-Host "[Ienvia] Preparacao concluida."

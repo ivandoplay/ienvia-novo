@@ -139,6 +139,11 @@ function listarArquivosDoMotor(motorDir: string): EntradaZip[] {
     }
   };
 
+  for (const nome of ['INICIAR-WINDOWS.bat', 'INICIAR-TERMUX.sh', 'package-lock.json']) {
+    const arquivo = path.join(motorDir, nome);
+    if (fs.existsSync(arquivo)) entradas.push({ path: `ienvia-motor/${nome}`, content: fs.readFileSync(arquivo), executable: nome.endsWith('.sh') });
+  }
+
   coletar('src', false);
   coletar('scripts', true);
 
@@ -148,41 +153,21 @@ function listarArquivosDoMotor(motorDir: string): EntradaZip[] {
       'IENVIA MOTOR LOCAL — INSTALACAO RAPIDA',
       '======================================',
       '',
-      'IMPORTANTE: rode os comandos de DENTRO da pasta "ienvia-motor"',
-      '(a pasta que tem package.json, src/ e scripts/).',
-      'Se você entrar em scripts/, volte:  cd ..',
-      '',
-      'jeito certo:   ./scripts/iniciar.sh --url https://app.ienvia.online',
-      'jeito errado:  node src/index.mjs   (nao use; o iniciar.sh acha a pasta sozinho)',
-      '',
-      '1. Windows:',
-      '   PowerShell -ExecutionPolicy Bypass -File .\\scripts\\setup-windows.ps1',
-      '   .\\scripts\\iniciar.bat --url https://app.ienvia.online',
-      '',
-      '2. Linux / VPS:',
-      '   bash ./scripts/setup-linux.sh',
-      '   ./scripts/iniciar.sh --url https://app.ienvia.online',
-      '',
-      '3. Android (Termux):',
-      '   bash ./scripts/setup-termux.sh',
-      '   termux-wake-lock',
-      '   ./scripts/iniciar.sh --url https://app.ienvia.online',
-      '',
-      'DEPOIS DE INICIAR: o motor abre uma pagina no navegador (http://127.0.0.1:4599).',
-      'Nela voce liga o aparelho de um dos dois jeitos:',
-      '   - e-mail (ou usuario) e senha da sua conta Ienvia;',
-      '   - codigo de pareamento IENV-XXXX-XXXX gerado no painel (Conexoes / Motor).',
-      'Para pular a pagina e parear direto no terminal: acrescente --pair IENV-XXXX-XXXX',
-      'Para rodar sem pagina (servidor/VPS): acrescente --sem-pagina',
-      '',
-      'A senha serve so para ligar o aparelho: o motor guarda um token proprio, nunca a senha.',
-      'Conectar WhatsApp (QR ou codigo de 8 digitos) e feito SOMENTE no painel.',
-      '',
-      'O iniciar.sh funciona de qualquer pasta: ele entra na pasta do motor sozinho.',
-      'Se aparecer "Cannot find module .../scripts/src/index.mjs", você chamou o node',
-      'de dentro de scripts/ — use ./scripts/iniciar.sh em vez disso.',
-      '',
-      'As sessoes do WhatsApp ficam em data/wa_auth/ e nunca sao sobrescritas nas atualizacoes.',
+      '1. Extraia o ZIP inteiro; nao execute dentro do compactador.',
+      '2. Windows: clique duas vezes em INICIAR-WINDOWS.bat.',
+      '   O instalador prepara Node.js portatil se necessario e verifica o SHA-256.',
+      '3. Android: extraia a pasta dentro de $HOME no Termux.',
+      '   Execute: bash INICIAR-TERMUX.sh',
+      '   Na primeira preparacao, o Termux pode atualizar seus pacotes.',
+      '4. Cole apenas o codigo IENV-XXXX-XXXX gerado em Conexoes / Motor.',
+      '   Nas proximas aberturas, o vinculo salvo sera reaproveitado.',
+      '5. No painel, vincule uma instancia ao aparelho e conecte o WhatsApp.',
+      '   O codigo IENV vincula o aparelho, nao substitui a confirmacao do WhatsApp.',
+      '6. Mantenha a janela aberta e desative a economia de bateria do Termux.',
+      'Nunca compartilhe data/, tokens, arquivos de autenticacao ou .env.',
+      'Nao copie credenciais do servidor para o motor.',
+      'Nao apague data/ ao atualizar. Ctrl+C encerra sem apagar a sessao.',
+      'Linux/VPS: use scripts/setup-linux.sh e scripts/iniciar.sh.',
       '',
     ].join('\n'),
   });
