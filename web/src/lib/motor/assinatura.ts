@@ -55,7 +55,7 @@ export function obterVersaoEAssinatura(env: NodeJS.ProcessEnv = process.env): {
     sha256: pacote.sha256,
     size: pacote.size,
     published_at: '2026-11-12T00:00:00.000Z',
-    min_node_major: 20,
+    min_node_major: 24,
     notes: 'Motor Ienvia oficial v6 — pareamento seguro, fila anti-reenvio e suporte a mídia e IA.',
   };
 
