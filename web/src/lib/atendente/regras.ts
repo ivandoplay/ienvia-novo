@@ -339,7 +339,7 @@ function quebrarEmBlocos(paragrafo: string): string[] {
  * Devolve `null` quando o texto é tão grande que não cabe nem em cinco balões: isso não é resposta de WhatsApp.
  */
 export function dividirResposta(textoDaResposta: string, dividir: boolean): string[] | null {
-  const limpo = textoDaResposta.trim();
+  const limpo = textoDaResposta.replace(/\r\n?/g, '\n').trim();
   if (!limpo) return [];
 
   let baloes: string[];
@@ -351,7 +351,14 @@ export function dividirResposta(textoDaResposta: string, dividir: boolean): stri
       .map((paragrafo) => paragrafo.trim())
       .filter(Boolean);
   } else {
-    baloes = [limpo];
+    // Alguns modelos separam falas completas por uma única quebra de linha.
+    // Não fragmentar listas, endereços, dados de pagamento ou linhas incompletas.
+    const linhas = limpo.split('\n').map((linha) => linha.trim()).filter(Boolean);
+    const falasCompletas = linhas.length >= 2 && linhas.length <= 3 && linhas.every((linha) =>
+      linha.length >= 12 && /[.!?…]["'”’)]?$/.test(linha) &&
+      !/^(?:[-*•]|\d+[.)]|https?:|pix\b|chave\b|banco\b|ag[eê]ncia\b|conta\b|rua\b|avenida\b|endere[cç]o\b)/i.test(linha),
+    );
+    baloes = falasCompletas ? linhas : [limpo];
   }
 
   if (dividir) {

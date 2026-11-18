@@ -291,3 +291,24 @@ describe('o recado que a IA deixa ao passar a conversa', () => {
     expect(cortarRecado(' um\n\nrecado ')).toBe('um recado');
   });
 });
+
+
+describe('regressão: falas completas separadas por uma única quebra', () => {
+  const exemplos = [
+    ['Oi! Boa tarde.', 'Aqui é o Lizandro mesmo, tô acompanhando nossa conversa por aqui.', 'Me conta, como vocês divulgam os veículos hoje?'],
+    ['Entendi, só Instagram mesmo.', 'Postar por postar no Instagram vira vitrine sem vendedor, sabe? O carro aparece, mas quem chama não é bem aproveitado.', 'Você responde rápido quem manda direct ou demora um pouco?'],
+    ['Boa, isso já ajuda bastante.', 'O problema é que o Instagram sozinho não traz gente nova todo dia, só quem já te segue ou te acha por acaso.', 'Você anuncia alguma coisa hoje ou depende só do orgânico e indicação?'],
+  ];
+  for (const [i, partes] of exemplos.entries()) {
+    test(`exemplo real ${i + 1}: três envios separados`, () => {
+      expect(dividirResposta(partes.join('\n'), true)).toEqual(partes);
+      expect(dividirResposta(partes.join('\r\n'), true)).toEqual(partes);
+      expect(dividirResposta(partes.join('\n'), false)).toEqual([partes.join('\n')]);
+    });
+  }
+  test('preserva lista e dados estruturados', () => {
+    for (const texto of ['1. Primeiro item.\n2. Segundo item.', 'Rua das Flores, 123.\nAvenida Central, 456.', 'Chave PIX: exemplo@email.com.\nBanco: Exemplo.']) {
+      expect(dividirResposta(texto, true)).toEqual([texto]);
+    }
+  });
+});
