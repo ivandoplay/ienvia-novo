@@ -63,7 +63,7 @@ const DIGITANDO_NO_MAXIMO = 15_000;
  *   SEND_MESSAGE      — mensagem que saiu pela Evolution (é o "eco" do que o painel enviou);
  *   CONNECTION_UPDATE — chip conectou ou caiu.
  */
-export const EVENTOS_DO_AVISO = ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] as const;
+export const EVENTOS_DO_AVISO = ['MESSAGES_UPSERT', 'MESSAGES_SET', 'MESSAGES_UPDATE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] as const;
 
 function extrairMensagem(dado: unknown): string {
   if (dado && typeof dado === 'object') {
@@ -424,4 +424,14 @@ export async function buscarArquivoDaMensagem(
     if (!(erro instanceof ErroEvolution)) return { ok: false, detalhe: 'erro inesperado ao chamar a Evolution' };
     return { ok: false, detalhe: erro.status ? `HTTP ${erro.status}: ${erro.message}` : erro.message };
   }
+}
+/** Consulta somente leitura, paginada; nunca envia mensagens ao WhatsApp. */
+export async function buscarPaginaHistorico(nome:string,pagina:number):Promise<{registros:unknown[];ultima:boolean}> {
+ const resposta=await chamar<unknown>('POST',`/chat/findMessages/${nomeNoCaminho(nome)}`,{corpo:{where:{},page:pagina,offset:100}});
+ const raiz=resposta as {messages?:unknown;records?:unknown;pages?:number;total?:number};
+ const bloco=(raiz?.messages && !Array.isArray(raiz.messages)?raiz.messages:raiz) as {records?:unknown;pages?:number;total?:number};
+ const registros=Array.isArray(raiz?.messages)?raiz.messages:Array.isArray(bloco?.records)?bloco.records:null;
+ if(!registros)throw new Error('Formato de histórico não reconhecido; cursor preservado.');
+ const totalPaginas=typeof bloco.pages==='number'?bloco.pages:typeof bloco.total==='number'?Math.ceil(bloco.total/100):null;
+ return {registros,ultima:totalPaginas!==null?pagina>=totalPaginas:registros.length===0};
 }

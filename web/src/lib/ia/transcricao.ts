@@ -1,7 +1,7 @@
 import 'server-only';
 import { criarClienteDeServico } from '@/lib/supabase/servico';
-import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from './cofre';
-import { transcreverAudio } from './provedores';
+import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
+import { transcreverAudio } from '@/lib/ia/provedores';
 export async function configuracaoTranscricao(workspaceId: string) {
  const db=criarClienteDeServico();
  if(!db) throw new Error('Serviço de transcrição indisponível.');

@@ -12,6 +12,7 @@ export async function POST(req: Request) {
   if (!token) return NextResponse.json({ erro: 'Token do motor ausente.' }, { status: 401 });
 
   let corpo: {
+    historical?: boolean;
     instance_id?: string;
     event_id?: string;
     sender_jid?: string;
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
   const supabase = criarClienteDeServico();
   if (!supabase) return NextResponse.json({ erro: 'Painel sem configuração de serviço.' }, { status: 503 });
 
-  const { data, error } = await supabase.rpc('ingest_local_message', {
+  const { data, error } = await supabase.rpc(corpo.historical === true ? 'ingest_local_history_message' : 'ingest_local_message', {
     p_token_sha256: sha256Hex(token),
     p_instance_id: corpo.instance_id,
     p_event_id: corpo.event_id,

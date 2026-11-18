@@ -1,3 +1,4 @@
+import { recuperarHistoricoEvolution } from '@/lib/evolution/historico';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { enviarAlertaViaRpc, textoAlertaDesconexao } from '@/lib/atendente/alertas';
 import { atenderSobras, atenderVez, orcamentoDoAtendente } from '@/lib/atendente/atendente';
@@ -40,6 +41,8 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
     if (!segredoCronConfere(cabecalhoCron)) return responder(401, { ok: false, erro: 'não autorizado' });
     const supabase = criarClienteDeServico();
     if (!supabase) return responder(503, { ok: false, erro: 'painel sem configuração de serviço' });
+    await recuperarHistoricoEvolution();
+    await supabase.rpc('process_evolution_history_queue', { p_limit: 100 });
     const [agendamentos, disparos] = await Promise.all([
       processarAgendamentosVencidos(supabase, 25),
       executarCampanhasEFilaSegura(supabase, chegouEm, 48_000),
@@ -58,6 +61,21 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
     corpo = JSON.parse(bruto);
   } catch {
     return responder(400, { ok: false, erro: 'aviso ilegível' });
+  }
+
+  // História é persistida antes do processamento, sem passar pelo fluxo de mensagens ao vivo.
+  const lote = corpo as { event?: unknown; instance?: unknown; data?: unknown } | null;
+  if (lote && typeof lote === 'object' && String(lote.event).toUpperCase().replace(/[.-]/g,'_') === 'MESSAGES_SET') {
+    const banco = criarClienteDeServico();
+    if (!banco) return responder(503,{erro:'serviço indisponível'});
+    const dados = lote.data as { messages?: unknown } | null;
+    const itens = Array.isArray(lote.data) ? lote.data : Array.isArray(dados?.messages) ? dados.messages : [];
+    const mensagens = itens.map(item => interpretarAviso({event:'MESSAGES_UPSERT',instance:lote.instance,data:item})).flatMap(a => a.tipo === 'mensagem' ? [{event_id:a.idDoEvento,sender_jid:a.remetente,push_name:a.nome,body_text:a.texto,occurred_at:a.quando,from_me:a.deMim,media:a.arquivo?{kind:a.arquivo.tipo,mime:a.arquivo.conteudo,size:a.arquivo.tamanho,file_name:a.arquivo.nome,duration:a.arquivo.duracao,voice:a.arquivo.voz}:null}] : []);
+    const {data,error} = await banco.rpc('enqueue_evolution_history',{p_instance_name:String(lote.instance || ''),p_token_sha256:createHash('sha256').update(segredo).digest('hex'),p_messages:mensagens});
+    if(error)return responder(500,{erro:'não foi possível preservar histórico'});
+    if(data?.result === 'unauthorized')return responder(401,{erro:'não autorizado'});
+    opcoes.agendar(async()=>{await banco.rpc('process_evolution_history_queue',{p_limit:100});});
+    return responder(200,{ok:true,...data});
   }
 
   const aviso = interpretarAviso(corpo);
@@ -147,6 +165,11 @@ export async function processarAvisoEvolution(pedido: Request, opcoes: OpcoesDoA
   } | null;
   const resultado = gravado?.result ?? 'desconhecido';
   if (resultado === 'unauthorized') return responder(401, { ok: false, erro: 'não autorizado' });
+
+  if (aviso.tipo === 'conexao' && aviso.estado === 'open' && gravado?.workspace_id) {
+    await supabase.rpc('request_evolution_history',{p_instance_name:aviso.instancia,p_token_sha256:resumo});
+    opcoes.agendar(async()=>{await recuperarHistoricoEvolution();});
+  }
 
   if (aviso.tipo === 'conexao' && gravado?.workspace_id) {
     // Um chip voltou a conectar: é a hora de entregar o aviso de conta suspensa que ficou na fila.

@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { BufferJSON } from '@whiskeysockets/baileys';
+import { abrirFila } from './fila-historico.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import QRCode from 'qrcode';
@@ -126,6 +128,8 @@ export class SupervisorDeSessoes {
     this.onLog = onLog;
     this.sessoes = new Map();
     this.encerrando = false;
+    this.filaHistorico = abrirFila(path.join(rootDir,'data','fila-historico'));
+    this.escoandoHistorico = false;
   }
 
   headers(extra = {}) {
@@ -174,7 +178,7 @@ export class SupervisorDeSessoes {
       logger,
       printQRInTerminal: false,
       markOnlineOnConnect: false,
-      syncFullHistory: false,
+      syncFullHistory: true,
     });
 
     const registro = { sock, status: 'connecting', qrTimer: null, codeRequested: false };
@@ -245,35 +249,50 @@ export class SupervisorDeSessoes {
       }
     });
 
-    sock.ev.on('messages.upsert', async ({ type, messages }) => {
-      if (type !== 'notify' && type !== 'append') return;
+    sock.ev.on('messaging-history.set', ({ messages }) => {
       for (const msg of messages || []) {
-        try {
-          const jid = normalizarJidParaContato(msg?.key?.remoteJid);
-          const msgId = msg?.key?.id;
-          if (!jid || !msgId) continue;
-          const extraido = extrairConteudoMensagemBaileys(msg);
-          if (!extraido) continue;
-
-          const recebido = await this.chamarApi('/api/motor/eventos', {
-            instance_id: instanceId,
-            event_id: msgId,
-            sender_jid: jid,
-            push_name: msg.pushName || '',
-            body_text: extraido.text,
-            occurred_at: normalizarTimestampMsg(msg.messageTimestamp),
-            from_me: Boolean(msg.key.fromMe),
-            media: extraido.media,
-          });
-
-          if (recebido?.message_id && recebido?.media?.status === 'pending' && extraido.mediaMessage) {
-            await this.enviarMidiaRecebida(recebido.message_id, extraido.mediaMessage, extraido.media);
-          }
-        } catch (err) {
-          this.onLog(`[motor] erro ao processar mensagem recebida: ${err.message}`);
-        }
+        if (!msg.key?.id) continue;
+        try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: true, msg: JSON.stringify(msg, BufferJSON.replacer) }); }
+        catch (err) { this.onLog(`[motor] Histórico não salvo: ${err.message}`); }
+      }
+      this.onLog(`[motor] Histórico enfileirado: ${(messages || []).length} mensagens.`);
+    });
+    sock.ev.on('messages.upsert', ({ type, messages }) => {
+      if (!['notify','append'].includes(type)) return;
+      for (const msg of messages || []) {
+        if (!msg.key?.id) continue;
+        try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: false, msg: JSON.stringify(msg, BufferJSON.replacer) }); }
+        catch (err) { this.onLog(`[motor] Entrada não salva: ${err.message}`); }
       }
     });
+  }
+
+  async escoarHistorico() {
+    if (this.escoandoHistorico) return;
+    this.escoandoHistorico = true;
+    try {
+      for (const item of this.filaHistorico.listar(10)) {
+        const { instanceId } = item.valor;
+        const msg = JSON.parse(item.valor.msg, BufferJSON.reviver);
+        const sock = this.sessoes.get(instanceId)?.sock;
+        if (!sock) continue;
+        try {
+          let jid = normalizarJidParaContato(msg.key?.remoteJid) || normalizarJidParaContato(msg.key?.remoteJidAlt);
+          if (!jid && msg.key?.remoteJid?.endsWith('@lid')) jid = normalizarJidParaContato(await sock.signalRepository?.lidMapping?.getPNForLID(msg.key.remoteJid));
+          if (!jid) {
+            if (!msg.key?.remoteJid?.endsWith('@lid')) this.filaHistorico.confirmar(item.nome);
+            continue;
+          }
+          const x = extrairConteudoMensagemBaileys(msg);
+          if (!x) { this.filaHistorico.confirmar(item.nome); continue; }
+          const r = await this.chamarApi('/api/motor/eventos', { historical: item.valor.historical === true, instance_id: instanceId, event_id: msg.key.id, sender_jid: jid, push_name: msg.pushName || '', body_text: x.text, occurred_at: normalizarTimestampMsg(msg.messageTimestamp), from_me: Boolean(msg.key.fromMe), media: x.media });
+          if (r.result === 'accepted' && r.message_id && r.media?.status === 'pending' && x.mediaMessage) {
+            await this.enviarMidiaRecebida(r.message_id, x.mediaMessage, x.media);
+          }
+          if (['accepted','duplicate','ignored'].includes(r.result)) this.filaHistorico.confirmar(item.nome);
+        } catch (err) { this.onLog(`[motor] Histórico preservado para nova tentativa: ${err.message}`); }
+      }
+    } finally { this.escoandoHistorico = false; }
   }
 
   async enviarMidiaRecebida(messageId, msg, mediaMeta) {

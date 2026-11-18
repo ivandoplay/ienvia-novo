@@ -216,6 +216,8 @@ async function rodarLoopPrincipal() {
       }
     }
 
+    await supervisor.escoarHistorico().catch(err => console.error('[motor] Histórico pendente:', err.message));
+
     if (agora - ultimaChecagemUpdate >= 10 * 60_000) {
       ultimaChecagemUpdate = agora;
       try {

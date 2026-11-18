@@ -33,6 +33,8 @@
     "@/lib/recursos/mapeamento": "../../../web/src/lib/recursos/mapeamento.ts",
     "@/lib/supabase/servico": "../../../web/src/lib/supabase/servico.ts",
     "@/lib/env": "../../../web/src/lib/env.ts",
-    "@/lib/tempo": "../../../web/src/lib/tempo.ts"
+    "@/lib/tempo": "../../../web/src/lib/tempo.ts",
+    "@/lib/evolution/historico": "../../../web/src/lib/evolution/historico.ts",
+    "@/lib/ia/transcricao": "../../../web/src/lib/ia/transcricao.ts"
   }
 }
