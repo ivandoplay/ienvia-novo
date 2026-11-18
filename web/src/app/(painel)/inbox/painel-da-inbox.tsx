@@ -1,4 +1,5 @@
 'use client';
+import { TranscricaoDoAudio } from './transcricao-do-audio';
 
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
@@ -2498,6 +2499,7 @@ const Mensagens = memo(function Mensagens({
               ) : null}
               {mensagem.arquivo ? (
                 <ArquivoNoBalao
+                  mensagemId={mensagem.id}
                   arquivo={mensagem.arquivo}
                   legenda={mensagem.texto}
                   buscando={buscando === mensagem.id}
@@ -2590,12 +2592,14 @@ function explicarArquivo(arquivo: ArquivoDaMensagem): string {
 
 /** O arquivo de uma mensagem dentro do balão: foto, figurinha, áudio, vídeo ou documento. */
 function ArquivoNoBalao({
+  mensagemId,
   arquivo,
   legenda,
   buscando,
   aoAbrirFoto,
   aoBuscar,
 }: {
+  mensagemId: string;
   arquivo: ArquivoDaMensagem;
   legenda: string;
   buscando: boolean;
@@ -2650,6 +2654,7 @@ function ArquivoNoBalao({
     return (
       <div className="balao-som">
         <audio controls preload="none" src={arquivo.endereco} aria-label={detalhes} />
+        <TranscricaoDoAudio key={mensagemId} mensagemId={mensagemId}/>
         <span className="balao-arquivo-detalhe">
           {detalhes}
           <LinkParaBaixar endereco={arquivo.enderecoParaBaixar} oQue="o áudio" />

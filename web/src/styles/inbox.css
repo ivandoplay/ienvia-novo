@@ -2771,3 +2771,8 @@ dl.inbox-ia-recado {
     max-width: 84px;
   }
 }
+
+.audio-transcricao {margin-top:8px;border-top:1px solid var(--border);padding-top:8px;font-size:12px;line-height:1.55;}
+.audio-transcricao small {font-size:10px;color:var(--text-secondary);}
+.audio-transcricao p {margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;}
+.audio-transcricao .audio-transcricao-erro {color:var(--text-secondary);}

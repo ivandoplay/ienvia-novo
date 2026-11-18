@@ -155,3 +155,11 @@
 .chip-ia-atalho {
   margin: 0 0 4px 56px;
 }
+
+/* Saúde no mesmo ritmo visual dos detalhes do chip, sem novo banner dominante. */
+.chip-saude { display:flex; align-items:flex-start; gap:9px; margin:16px 0; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:var(--bg-subtle,rgba(128,128,128,.035)); font-size:12px; line-height:1.5; }
+.chip-saude strong {font-size:12px;font-weight:600;}
+.chip-saude p {margin:3px 0 0;color:var(--text-secondary);max-width:65ch;}
+.chip-saude-ponto {width:7px;height:7px;border-radius:50%;margin-top:6px;flex-shrink:0;background:var(--text-secondary);}
+.chip-saude--ok .chip-saude-ponto {background:#22a06b;}
+.chip-saude--aviso .chip-saude-ponto {background:#d49b29;}

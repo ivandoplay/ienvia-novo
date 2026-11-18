@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition, type FormEvent } fro
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
+import { SaudeDoChip } from './saude-do-chip';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
 import { Interruptor } from '@/components/ui/interruptor';
@@ -105,6 +106,17 @@ export function PainelDeChips({
       else delete proximos[chipId];
       return proximos;
     });
+
+  // Atualiza o estado persistido sem enviar mensagens ou reconectar automaticamente.
+  const estadosAnteriores = useRef<Record<string,string>>({});
+  useEffect(() => {
+    for(const chip of chips){
+      const anterior=estadosAnteriores.current[chip.id];
+      if(anterior==='connected'&&chip.estado!=='connected')avisar(chip.id,{tipo:'erro',texto:'Este número perdeu a conexão. Confira a saúde do chip abaixo antes de continuar os envios.'});
+      estadosAnteriores.current[chip.id]=chip.estado;
+    }
+  },[chips]);
+  useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')router.refresh();},30000);return ()=>clearInterval(timer);},[router]);
 
   // Ao abrir a tela, confere com a Evolution como cada chip na nuvem está de verdade.
   const jaConferiu = useRef('');
@@ -514,6 +526,8 @@ function CartaoDoChip({
           </div>
         )}
       </div>
+
+      <SaudeDoChip chip={chip}/>
 
       <div className="chip-ia">
         {podeEditar && (naNuvem || noMotorLocal) ? (
