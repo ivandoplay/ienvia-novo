@@ -11,6 +11,7 @@ import {
 import { recuperarAtualizacaoInterrompida, verificarEAtualizar } from './atualizador.mjs';
 import { SupervisorDeSessoes } from './sessoes.mjs';
 import { iniciarPaginaLocal } from './pagina-local.mjs';
+import { iniciarEscoamento } from './escoamento.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.resolve(__dirname, '..');
@@ -160,10 +161,15 @@ async function rodarLoopPrincipal() {
     deviceToken: cfg.deviceToken,
   });
 
+  const pendencias = supervisor.filaHistorico.contagem();
+  console.log(`[motor] Fila prioritária: ${pendencias.live} novas; ${pendencias.history} históricas. Processamento independente ativado.`);
+  const pararEscoamento = args.once ? async () => {} : iniciarEscoamento(supervisor);
   let encerrado = false;
   const parar = async () => {
     if (encerrado) return;
     encerrado = true;
+    supervisor.encerrando = true;
+    await pararEscoamento();
     await supervisor.encerrarTudo();
   };
   process.once('SIGINT', parar);
@@ -216,7 +222,7 @@ async function rodarLoopPrincipal() {
       }
     }
 
-    await supervisor.escoarHistorico().catch(err => console.error('[motor] Histórico pendente:', err.message));
+    if (args.once) await supervisor.escoarHistorico().catch(err => console.error('[motor] Histórico pendente:', err.message));
 
     if (agora - ultimaChecagemUpdate >= 10 * 60_000) {
       ultimaChecagemUpdate = agora;

@@ -1,7 +1,7 @@
 {
   "name": "@ienvia/motor",
-  "version": "6.2.0",
-  "description": "Motor local do Ienvia \u2014 executa WhatsApp (Baileys) no PC ou Android/Termux com pareamento seguro e atualiza\u00e7\u00f5es assinadas.",
+  "version": "6.2.1",
+  "description": "Motor local do Ienvia — executa WhatsApp (Baileys) no PC ou Android/Termux com pareamento seguro e atualizações assinadas.",
   "type": "module",
   "private": true,
   "scripts": {

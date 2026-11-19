@@ -129,7 +129,7 @@ export class SupervisorDeSessoes {
     this.sessoes = new Map();
     this.encerrando = false;
     this.filaHistorico = abrirFila(path.join(rootDir,'data','fila-historico'));
-    this.escoandoHistorico = false;
+    this.escoandoHistorico = new Set();
   }
 
   headers(extra = {}) {
@@ -267,11 +267,12 @@ export class SupervisorDeSessoes {
     });
   }
 
-  async escoarHistorico() {
-    if (this.escoandoHistorico) return;
-    this.escoandoHistorico = true;
+  async escoarHistorico({ tipo = 'all' } = {}) {
+    if (this.encerrando || this.escoandoHistorico.has(tipo) || this.escoandoHistorico.has('all') || (tipo === 'all' && this.escoandoHistorico.size)) return;
+    this.escoandoHistorico.add(tipo);
     try {
-      for (const item of this.filaHistorico.listar(10)) {
+      for (const item of this.filaHistorico.listar(tipo === 'history' ? 2 : 10, tipo)) {
+        if (this.encerrando) break;
         const { instanceId } = item.valor;
         const msg = JSON.parse(item.valor.msg, BufferJSON.reviver);
         const sock = this.sessoes.get(instanceId)?.sock;
@@ -292,7 +293,7 @@ export class SupervisorDeSessoes {
           if (['accepted','duplicate','ignored'].includes(r.result)) this.filaHistorico.confirmar(item.nome);
         } catch (err) { this.onLog(`[motor] Histórico preservado para nova tentativa: ${err.message}`); }
       }
-    } finally { this.escoandoHistorico = false; }
+    } finally { this.escoandoHistorico.delete(tipo); }
   }
 
   async enviarMidiaRecebida(messageId, msg, mediaMeta) {
