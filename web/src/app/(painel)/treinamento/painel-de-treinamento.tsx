@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CampoDeTexto } from '@/components/ui/campo-de-texto';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
@@ -39,6 +39,7 @@ import {
   verInstrucoes,
 } from './acoes';
 import { AbasDoEstudio } from './estudio-abas';
+import { ChatDoTreinamento } from './chat-do-treinamento';
 
 interface Props {
   lista: ListaDeBases | null;
@@ -51,7 +52,7 @@ interface Recado {
   texto: string;
 }
 
-type Aba = 'identidade' | 'regras' | 'perguntas' | 'mensagens' | 'skills' | 'cerebro' | 'arquivos';
+type Aba = 'identidade' | 'regras' | 'perguntas' | 'mensagens' | 'skills' | 'cerebro' | 'arquivos' | 'ia';
 
 type Janela =
   | null
@@ -79,6 +80,11 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
   /** A base mudou em outro lugar depois que esta tela abriu: salvar daqui apagaria a mudança mais nova. */
   const [desatualizada, setDesatualizada] = useState(false);
   const campoDoArquivo = useRef<HTMLInputElement>(null);
+  useEffect(()=>{
+    const quadro=requestAnimationFrame(()=>document.getElementById(`treino-aba-${aba}`)?.scrollIntoView({block:'nearest',inline:'nearest'}));
+    return ()=>cancelAnimationFrame(quadro);
+  },[aba]);
+
 
   if (!lista) {
     return (
@@ -305,15 +311,18 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
     { id: 'skills', rotulo: `Estúdio de Skills${totalSkillsEObjecoes ? ` (${totalSkillsEObjecoes})` : ''}` },
     { id: 'cerebro', rotulo: 'Cérebro e Pacote' },
     { id: 'arquivos', rotulo: `Arquivos${base.arquivos.length ? ` (${base.arquivos.length})` : ''}` },
+    ...(podeEditar ? [{id:'ia' as const, rotulo:'Editar com IA'}] : []),
   ];
 
   return (
-    <div className="treino">
+    <div className={aba === 'ia' ? 'treino treino--chat' : 'treino'}>
       <Cabecalho>
         <span className="estado estado--ok">{lista.bases.length === 1 ? '1 base de treinamento' : `${lista.bases.length} bases de treinamento`}</span>
       </Cabecalho>
-      <Avisos podeEditar={podeEditar} />
+      {aba !== 'ia' ? <Avisos podeEditar={podeEditar} /> : null}
 
+      <details className="treino-gerenciar-bases" open={aba === 'ia' ? undefined : true}>
+      <summary hidden={aba !== 'ia'}>Base atual: <strong>{base.rotulo}</strong><span>Gerenciar bases</span></summary>
       <section className="panel" aria-labelledby="treino-bases">
         <h2 id="treino-bases" className="panel-title">
           Bases de treinamento
@@ -414,8 +423,16 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
         {mudou && <span className="campo-dica">Salve para ver as instruções com as alterações.</span>}
       </div>
 
-      <form onSubmit={(evento) => void salvar(evento)} noValidate>
-        <div className="subabas" role="tablist" aria-label="Partes do treinamento">
+      </details>
+      <form onSubmit={(evento) => { if (aba === 'ia') { evento.preventDefault(); return; } void salvar(evento); }} noValidate>
+        <div className="subabas" role="tablist" aria-label="Partes do treinamento" onKeyDown={(evento)=>{
+          if(!['ArrowLeft','ArrowRight','Home','End'].includes(evento.key))return;
+          const atual=ABAS.findIndex(item=>item.id===aba);
+          const indice=evento.key==='Home'?0:evento.key==='End'?ABAS.length-1:(atual+(evento.key==='ArrowRight'?1:-1)+ABAS.length)%ABAS.length;
+          const proxima=ABAS[indice];if(!proxima)return;
+          evento.preventDefault();setAba(proxima.id);
+          const botao=evento.currentTarget.querySelector<HTMLButtonElement>(`#treino-aba-${proxima.id}`);botao?.focus();botao?.scrollIntoView({block:'nearest',inline:'nearest'});
+        }}>
           {ABAS.map((item) => (
             <button
               key={item.id}
@@ -423,15 +440,21 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
               role="tab"
               id={`treino-aba-${item.id}`}
               aria-selected={aba === item.id}
+              tabIndex={aba === item.id ? 0 : -1}
               aria-controls={`treino-painel-${item.id}`}
               className={aba === item.id ? 'subaba subaba--ativa' : 'subaba'}
-              onClick={() => setAba(item.id)}
+              onClick={(evento) => {setAba(item.id);evento.currentTarget.scrollIntoView({block:'nearest',inline:'nearest'});}}
             >
               {item.rotulo}
             </button>
           ))}
         </div>
 
+        {aba === 'ia' && podeEditar ? <div role="tabpanel" id="treino-painel-ia" aria-labelledby="treino-aba-ia"><ChatDoTreinamento key={base.id} baseId={base.id} bloqueado={mudou || desatualizada} aoAtualizar={(novaBase,novaLista)=>{
+          if(novaBase){setBase(novaBase);setRascunho(camposDaBase(novaBase));setDesatualizada(false);}
+          else {setDesatualizada(true);}
+          if(novaLista)setLista(novaLista);
+        }}/></div> : null}
         <section className="panel" role="tabpanel" id="treino-painel-identidade" aria-labelledby="treino-aba-identidade" hidden={aba !== 'identidade'}>
           <h2 className="panel-title">Identidade de atendimento</h2>
           <div className="lista-de-interruptores">
@@ -632,7 +655,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
         </section>
 
         <AbasDoEstudio
-          aba={aba}
+          aba={aba === 'ia' ? 'identidade' : aba}
           rascunho={rascunho}
           podeEditar={podeEditar}
           ocupado={parado}
@@ -651,7 +674,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
           }}
         />
 
-        {podeEditar && aba !== 'arquivos' && (
+        {podeEditar && aba !== 'arquivos' && aba !== 'ia' && (
           <div className="barra-de-salvar">
             {/*
               O estado tem de estar sempre visível, com a mesma frase: era isso que parecia bug —

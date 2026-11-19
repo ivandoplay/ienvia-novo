@@ -48,6 +48,9 @@ async function comoAdmin<T>(fn: () => Promise<T>): Promise<T> {
 const povoar = () =>
   comoAdmin(() =>
     banco.db.exec(`
+      -- O cenário é compartilhado pela rodada e pode ter sido criado há vários minutos.
+      -- A conversa inicial deve continuar sendo a mais recente nesta fixture, sem depender da duração da suíte.
+      update public.conversations set last_message_at=now() where id='${CONVERSA_A}' and workspace_id='${LOJA_A}';
       insert into public.instances (id, workspace_id, channel, engine, display_name, status) values
         ('${CHIP_2}', '${LOJA_A}', 'whatsapp', 'evolution', 'Segundo chip', 'disconnected');
       insert into public.contacts (id, workspace_id, instance_id, channel, external_user_id, display_name, phone_e164) values

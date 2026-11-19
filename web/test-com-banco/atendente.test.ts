@@ -83,6 +83,10 @@ const porta = http.createServer((req, res) => {
       return res.end(guardado.dados);
     }
 
+    // O fluxo híbrido consulta a tabela mesmo quando a empresa ainda não cadastrou Groq.
+    // Sem linha preserva o caminho Gemini legado; não é erro de rede nem de permissão.
+    if (req.method === 'GET' && endereco === '/rest/v1/workspace_transcription_settings') return responder(200, []);
+
     if (!endereco.startsWith('/rest/v1/rpc/')) return responder(404, { message: `não imitado: ${endereco}` });
     const funcao = endereco.replace('/rest/v1/rpc/', '');
     const parametros = JSON.parse(corpo.toString('utf8') || '{}') as Record<string, unknown>;

@@ -198,6 +198,7 @@ export const FUNCOES_DA_IA = [
   'delete_my_ai_agent_document',
   'set_my_instance_ai_agent',
   'teach_my_ai_from_message',
+  'read_my_training_ai_chat','begin_my_training_ai_turn','finish_my_training_ai_turn','transition_my_training_ai_proposal','read_my_training_ai_proposal_agent',
 ];
 
 /**
@@ -205,6 +206,7 @@ export const FUNCOES_DA_IA = [
  */
 export function criarIaDoBanco({ tabelas, responder }) {
   let estado = cenarioInicial();
+  let editorThreads = [], editorTurns = [];
 
   const papelDe = (usuario, workspaceId) =>
     PARTICIPACOES.find((p) => p.user_id === usuario.id && p.workspace_id === workspaceId && p.status === 'active')?.role ?? null;
@@ -283,6 +285,39 @@ export function criarIaDoBanco({ tabelas, responder }) {
       if (!papel) return erro(403, '42501', 'Workspace membership required');
     } else if (!ehDono) {
       return erro(403, '42501', 'Workspace owner required');
+    }
+
+    /* Editor: transporte e persistência em memória apenas para testes de navegador.
+       Autorização e transações reais são cobertas nos testes SQL isolados. */
+    if (nome.includes('training_ai_')) {
+      if(!ehDono)return erro(403,'42501','Workspace owner required');
+      const allThreads=editorThreads.filter(t=>t.workspace_id===workspaceId);
+      const turn=editorTurns.find(t=>t.id===corpo.p_turn_id&&t.workspace_id===workspaceId);
+      if(nome==='read_my_training_ai_proposal_agent')return responder(res,200,turn?.agent_id??null);
+      if(nome==='read_my_training_ai_chat')return responder(res,200,{threads:allThreads.filter(t=>t.agent_id===corpo.p_agent_id),turns:editorTurns.filter(t=>t.workspace_id===workspaceId&&t.agent_id===corpo.p_agent_id&&t.thread_id===corpo.p_thread_id)});
+      if(nome==='begin_my_training_ai_turn'){
+        const base=baseDaEmpresa(corpo.p_agent_id);if(!base)return invalido('agent');
+        const thread=corpo.p_thread_id??crypto.randomUUID();
+        if(!corpo.p_thread_id)editorThreads.push({id:thread,workspace_id:workspaceId,agent_id:base.id,title:corpo.p_text.slice(0,80),updated_at:agora()});
+        const context={agent:{resource:'treinamento',id:base.id,label:base.label,data:Object.fromEntries(['label',...Object.keys(BASE_VAZIA)].map(k=>[k,base[k]])),version:base.revision},catalog:[],voices:[]};
+        const history=editorTurns.filter(t=>t.thread_id===thread);
+        editorTurns.push({id:corpo.p_request_id,workspace_id:workspaceId,agent_id:base.id,thread_id:thread,provider:corpo.p_provider,user_text:corpo.p_text,reply_text:'',status:'generating',context_snapshot:context,mutations:[],error_detail:null,created_at:agora()});
+        return responder(res,200,{thread_id:thread,context,history});
+      }
+      if(!turn)return invalido('turn');
+      if(nome==='finish_my_training_ai_turn'){
+        if(corpo.p_error){turn.status='failed';turn.error_detail=corpo.p_error;}
+        else {turn.reply_text=corpo.p_reply;turn.mutations=corpo.p_changes.map(c=>({resource:c.resource,id:c.id,label:turn.context_snapshot.agent.label,field:c.field,before:turn.context_snapshot.agent.data[c.field],after:c.value}));turn.status=turn.mutations.length?'proposed':'discussed';}
+        return responder(res,200,{ok:true});
+      }
+      if(nome==='transition_my_training_ai_proposal'){
+        if(corpo.p_action==='discard'){turn.status='discarded';return responder(res,200,{ok:true});}
+        const base=baseDaEmpresa(turn.agent_id),undo=corpo.p_action==='undo';
+        if(base.revision!==(undo?turn.applied_revision:turn.context_snapshot.agent.version))return erro(409,'55000','editor_conflict');
+        for(const m of turn.mutations)base[m.field]=undo?m.before:m.after;
+        base.revision++;base.updated_at=agora();turn.applied_revision=base.revision;turn.status=undo?'undone':'applied';
+        return responder(res,200,{ok:true});
+      }
     }
 
     /* ---------- Motor de IA ---------- */
@@ -556,7 +591,7 @@ export function criarIaDoBanco({ tabelas, responder }) {
     },
     /** Só para os testes: põe o Motor de IA e o Treinamento de volta no começo. */
     reiniciarIa() {
-      estado = cenarioInicial();
+      estado = cenarioInicial();editorThreads=[];editorTurns=[];
     },
     chavesDoWorkspace(workspaceId) {
       const out = {};

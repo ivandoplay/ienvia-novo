@@ -137,14 +137,14 @@ describe('a faixa da IA numa conversa aberta', () => {
     expect(repassada).toEqual({
       tom: 'atencao',
       titulo: 'A IA passou esta conversa para você',
-      detalhe: 'A IA volta a responder aqui às 14:35, ou antes, se você devolver a conversa.',
+      detalhe: 'A IA volta a responder aqui às 14:35, ou antes, se você usar Retomar IA.',
       recado: RECADO,
       podeAssumir: false,
       podeDevolver: true,
     });
     // Com a trava, ela só volta quando alguém devolver.
     expect(faixa(ia({ motivo: 'handoff', travada: true, recado: RECADO }), 'waiting_human')).toMatchObject({
-      detalhe: 'A IA só volta a responder aqui quando você devolver a conversa.',
+      detalhe: 'A IA só volta a responder aqui quando você usar Retomar IA.',
       podeDevolver: true,
     });
   });
@@ -185,7 +185,7 @@ describe('a faixa da IA numa conversa aberta', () => {
     expect(faixa(ia({ motivo: 'human_reply', pausadaAte: DAQUI_A_POUCO }), 'waiting_customer')).toEqual({
       tom: 'neutro',
       titulo: 'Uma pessoa respondeu, e a IA parou nesta conversa',
-      detalhe: 'Ela volta a responder aqui às 14:35, ou antes, se você devolver a conversa.',
+      detalhe: 'Ela volta a responder aqui às 14:35, ou antes, se você usar Retomar IA.',
       recado: null,
       podeAssumir: true,
       podeDevolver: true,
