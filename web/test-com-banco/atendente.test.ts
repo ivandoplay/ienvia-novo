@@ -843,6 +843,32 @@ describe('catálogo, áudios estratégicos e PIX automático', () => {
     });
   });
 
+  test('duas perguntas: áudio compatível primeiro, complemento digitado depois sem repetir a transcrição', async () => {
+    await banco.comoServico(async () => {
+      await preparar();
+      const audioId = '00000000-0000-4000-8000-000000000803';
+      const audioKey = `${LOJA_A}/audios/${audioId}/00000000-0000-4000-8000-000000000813/chuva.ogg`;
+      const audioBuf = audioDeExemplo(2);
+      deposito.set(audioKey, { dados: audioBuf, conteudo: 'audio/ogg' });
+      await sql(`insert into public.voice_library_items
+        (id, workspace_id, name, transcription, when_to_use, ai_enabled, object_key, file_name, content_type, byte_size, duration_sec)
+        values ('${audioId}', '${LOJA_A}', 'Chuva', 'Pode andar na chuva leve, sem alagamentos.', 'Perguntas sobre chuva', true, '${audioKey}', 'chuva.ogg', 'audio/ogg; codecs=opus', ${audioBuf.length}, 6);`);
+      roteiro = (pedido) => {
+        expect(pedido.sistema).toContain('TODAS as perguntas restantes');
+        expect(pedido.sistema).toContain('PRIMEIRO');
+        return `[[ENVIAR_AUDIO:${audioId}]] Qual modelo você quer consultar para eu confirmar o preço?`;
+      };
+      await chegou('Posso andar na chuva? E qual o preço da moto?');
+      await rodarOQueFicouParaDepois();
+      const envios = (await enviadasPelaEvolution()) as Array<{ tipo?: string; texto?: string; bytes?: number }>;
+      expect(envios).toHaveLength(2);
+      expect(envios[0]).toMatchObject({ tipo: 'audio', bytes: audioBuf.length });
+      expect(envios[1]?.texto).toBe('Qual modelo você quer consultar para eu confirmar o preço?');
+      expect(envios[1]?.texto).not.toContain('chuva');
+      expect(await vezesDe(CONVERSA_A)).toMatchObject([{ status: 'answered' }]);
+    });
+  });
+
   test('envia áudio estratégico PTT puro, bloqueia repetição na 2a vez e respeita Skill S06', async () => {
     await banco.comoServico(async () => {
       await preparar();

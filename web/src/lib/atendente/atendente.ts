@@ -948,12 +948,19 @@ async function responder(ambiente: Ambiente, workspaceId: string, pacote: Json):
     return null;
   }
 
+  // Áudio estratégico responde à parte coberta pela biblioteca antes do complemento em texto.
+  // Mantém fotos/documentos do catálogo na ordem anterior e não toca no áudio recebido do cliente.
+  for (const midia of midiasParaEnviar.filter((item) => Boolean(item.sentVoiceId))) {
+    const parada = await enviarParteMidia(midia);
+    if (parada) return parada;
+  }
+
   for (const balao of baloes) {
     const parada = await enviarParteTexto(balao);
     if (parada) return parada;
   }
 
-  for (const midia of midiasParaEnviar) {
+  for (const midia of midiasParaEnviar.filter((item) => !item.sentVoiceId)) {
     const parada = await enviarParteMidia(midia);
     if (parada) return parada;
   }

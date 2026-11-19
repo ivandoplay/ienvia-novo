@@ -266,8 +266,9 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
         '',
         'REGRAS DE OURO AO ACIONAR UM ÁUDIO ([[ENVIAR_AUDIO:ID_DO_AUDIO]]):',
         '1. Só acione [[ENVIAR_AUDIO:ID_DO_AUDIO]] quando a transcrição acima responder com naturalidade à pergunta atual.',
-        '2. MODO PURO (o áudio já responde 100% da pergunta): NÃO repita por escrito o que o áudio fala! Retorne APENAS [[ENVIAR_AUDIO:ID_DO_AUDIO]] ou 1 frase curta de abertura.',
-        '3. MODO HÍBRIDO (há um detalhe extra que NÃO está na transcrição): responda em 1 frase curta só esse detalhe extra e termine com [[ENVIAR_AUDIO:ID_DO_AUDIO]].',
+        '2. MODO PURO: use APENAS [[ENVIAR_AUDIO:ID_DO_AUDIO]] quando a transcrição responder a TODAS as perguntas e solicitações do cliente. Não repita por escrito o conteúdo do áudio.',
+        '3. MODO HÍBRIDO: se o cliente fizer duas ou mais perguntas e o áudio cobrir apenas parte delas, inclua [[ENVIAR_AUDIO:ID_DO_AUDIO]] e responda em texto a TODAS as perguntas restantes. O áudio será enviado PRIMEIRO e o complemento digitado DEPOIS. Use quantas frases curtas forem necessárias; não omita uma pergunta para caber em uma frase e não repita o que já foi explicado no áudio.',
+        'Exemplo: cliente pergunta se pode andar na chuva e qual o preço. Use o áudio compatível com chuva e responda o preço por texto, SOMENTE se o preço estiver cadastrado; caso contrário, peça o modelo ou a informação necessária, sem inventar valores.',
         '4. Envie NO MÁXIM0 1 áudio por resposta e NUNCA invente IDs fora da lista acima.',
       ].join('\n'),
     );
