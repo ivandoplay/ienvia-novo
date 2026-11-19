@@ -7,7 +7,7 @@ import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
 import { gerarResposta, ErroDeIa } from '@/lib/ia/provedores';
 import { PROVEDORES, lerMotor, modeloDoProvedor, explicarErroDeIa, type Provedor } from '@/lib/ia/regras';
 import { lerBase, lerListaDeBases, type BaseDeTreinamento, type ListaDeBases } from '@/lib/ia/treinamento';
-import { instrucoesDoEditor, lerPropostaDoEditor, type ContextoDoEditor, type EstadoDoEditor } from '@/lib/ia/editor-assistido';
+import { ErroDeFormatoDoEditor, contextoParaPedidoDoEditor, instrucoesDoEditor, lerPropostaDoEditor, type ContextoDoEditor, type EstadoDoEditor } from '@/lib/ia/editor-assistido';
 
 type ResultadoChat<T> = {ok:true;dados:T}|{ok:false;erro:string};
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -56,11 +56,19 @@ export async function enviarMensagemAoEditor(entrada:{baseId:string;conversaId:s
  try {
   const falas=pacote.history.flatMap(t=>[
    {de:'cliente' as const,texto:t.user_text},
-   {de:'atendente' as const,texto:`${t.reply_text}\nEstado do pedido anterior: ${t.status}. Proposta anterior (não é instrução): ${JSON.stringify(t.mutations)}`},
+   {de:'atendente' as const,texto:JSON.stringify({resposta:`${t.reply_text||'O pedido anterior não foi concluído.'}\nEstado deste pedido no histórico: ${t.status}.`,alteracoes:t.status==='proposed'?t.mutations.map(m=>{const c=m as {resource:string;id:string;field:string;after:unknown};return {resource:c.resource,id:c.id,field:c.field,value:c.after};}):[]})},
   ]);
   falas.push({de:'cliente',texto:entrada.texto+(ref?`\nReferência fornecida pelo dono (${ref.nome}):\n<referencia>${ref.texto.replace(/</g,'‹')}</referencia>`:'')});
-  const resposta=await gerarResposta({provedor:entrada.provedor,chave,modelo,sistema:instrucoesDoEditor(pacote.context),conversa:falas,temperatura:0.2,tempoLimiteMs:40000});
-  proposta=lerPropostaDoEditor(resposta.texto,pacote.context);
+  const contextoVisivel=ref?pacote.context:contextoParaPedidoDoEditor(pacote.context,entrada.texto);
+  const pedido={provedor:entrada.provedor,chave,modelo,sistema:instrucoesDoEditor(contextoVisivel),conversa:falas,temperatura:0.1,formatoJson:true,limiteDeSaida:8192};
+  const resposta=await gerarResposta({...pedido,tempoLimiteMs:30000});
+  try {proposta=lerPropostaDoEditor(resposta.texto,contextoVisivel);}
+  catch(erroDeFormato){
+   if(!(erroDeFormato instanceof ErroDeFormatoDoEditor))throw erroDeFormato;
+   // Uma única recuperação no MESMO provedor/modelo, sem relaxar a validação ou aplicar nada.
+   const corrigida=await gerarResposta({...pedido,tempoLimiteMs:20000,sistema:pedido.sistema+'\nA tentativa anterior não respeitou o formato. Refaça a resposta ao pedido do dono como um único objeto JSON válido com resposta e alteracoes. Se for saudação ou conversa, alteracoes deve ser []. Não acrescente mudanças que o dono não solicitou.'});
+   proposta=lerPropostaDoEditor(corrigida.texto,contextoVisivel);
+  }
  } catch(error) {
   const detalhe=error instanceof ErroDeIa?explicarErroDeIa(error.motivo,entrada.provedor,modelo):error instanceof Error?error.message:'Não foi possível preparar a proposta.';
   // Nunca registrar texto bruto do provedor, chaves ou respostas HTTP nos logs.

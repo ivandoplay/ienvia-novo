@@ -53,6 +53,9 @@ export interface PedidoDeResposta {
   /** 0 = previsível, 1 = solta. */
   temperatura?: number;
   tempoLimiteMs?: number;
+  /** Protocolo estruturado opt-in do editor; não muda as respostas do WhatsApp. */
+  formatoJson?: boolean;
+  limiteDeSaida?: number;
 }
 
 export interface RespostaDeIa {
@@ -217,7 +220,7 @@ async function gerarComGemini(pedido: PedidoDeResposta, tempoLimiteMs: number): 
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: pedido.sistema }] },
         contents: conteudos,
-        generationConfig: { temperature: pedido.temperatura ?? 0.35, maxOutputTokens: LIMITE_DE_SAIDA },
+        generationConfig: { temperature: pedido.temperatura ?? 0.35, maxOutputTokens: Math.min(8192, Math.max(1024, pedido.limiteDeSaida ?? LIMITE_DE_SAIDA)), ...(pedido.formatoJson ? { responseMimeType: 'application/json' } : {}) },
       }),
     },
     tempoLimiteMs,
@@ -464,7 +467,8 @@ async function gerarNoFormatoDeConversa(
     else mensagens.push({ role: 'user', content: [imagem] });
   }
 
-  const corpoDoPedido: Json = { model: modelo, messages: mensagens, temperature: pedido.temperatura ?? 0.35, max_tokens: LIMITE_DE_SAIDA };
+  const corpoDoPedido: Json = { model: modelo, messages: mensagens, temperature: pedido.temperatura ?? 0.35, max_tokens: Math.min(8192, Math.max(1024, pedido.limiteDeSaida ?? LIMITE_DE_SAIDA)) };
+  if (pedido.formatoJson) corpoDoPedido.response_format = { type: 'json_object' };
   // Quase todo modelo novo da NVIDIA "pensa" antes de responder e, sem este pedido, gasta ~10 s (ou a resposta
   // inteira) raciocinando. Com ele, o modelo padrão respondeu em menos de 1 s. Quem não conhece o campo ignora.
   if (provedor === 'nvidia') corpoDoPedido.chat_template_kwargs = { enable_thinking: false };
