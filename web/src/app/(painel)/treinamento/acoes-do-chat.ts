@@ -18,6 +18,8 @@ async function contexto() {
 }
 function erroSeguro(message?:string) {
  if(message?.includes('editor_conflict'))return 'O conteúdo mudou depois que a proposta foi preparada. Nada foi sobrescrito. Gere uma nova proposta com os dados atuais.';
+ if(message?.includes('editor_history_busy'))return 'Uma conversa anterior ainda está preparando uma resposta. Aguarde antes de abrir outra conversa.';
+ if(message?.includes('editor_thread_not_found'))return 'Esta conversa saiu do histórico. São mantidas apenas as duas conversas mais recentes de cada base. Abra uma nova conversa.';
  if(message?.includes('editor_busy'))return 'Já existe uma resposta sendo preparada nesta conversa. Aguarde.';
  if(message?.includes('editor_rate_limit'))return 'Limite de uso do editor atingido. Aguarde antes de enviar outra mensagem.';
  if(message?.includes('editor_request_already_used'))return 'Este pedido já foi recebido. Reabra a conversa para conferir o resultado antes de tentar novamente.';
@@ -31,7 +33,7 @@ export async function carregarChatDoTreinamento(baseId:string,conversaId:string|
   ctx.supabase.rpc('read_my_training_ai_chat',{p_workspace_id:ctx.workspaceId,p_agent_id:baseId,p_thread_id:conversaId}),
   ctx.supabase.rpc('read_my_ai_settings',{p_workspace_id:ctx.workspaceId}),
  ]);
- if(chat.error||motor.error)return {ok:false,erro:'Não foi possível carregar o editor com IA. Tente novamente; o editor manual continua disponível.'};
+ if(chat.error||motor.error)return {ok:false,erro:chat.error?.message?.includes('editor_history_busy')?erroSeguro(chat.error.message):'Não foi possível carregar o editor com IA. Tente novamente; o editor manual continua disponível.'};
  const cfg=lerMotor(motor.data);
  return {ok:true,dados:{...chat.data as EstadoDoEditor,provedores:PROVEDORES.filter(p=>cfg.chaves[p].cadastrada)}};
 }

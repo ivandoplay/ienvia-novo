@@ -30,6 +30,7 @@ export function ChatDoTreinamento({baseId,bloqueado,aoAtualizar}:Props) {
    const r=await carregarChatDoTreinamento(baseId,thread);
    if(!vivo.current||seq!==sequencia.current)return;
    if(!r.ok){setErro(r.erro);return;}
+   if(r.dados.thread_expired){setConversaId(null);setAviso('Esta conversa antiga foi removida. As duas mais recentes continuam disponíveis, com suas propostas e opções de desfazer.');}
    setEstado(r.dados);setProvedores(r.dados.provedores);setProvedor(p=>r.dados.provedores.includes(p as Provedor)?p:r.dados.provedores[0]??' ');
   } catch {if(vivo.current)setErro('A conexão foi interrompida. Atualize a conversa antes de tentar novamente.');}
   finally {if(vivo.current&&seq===sequencia.current)setCarregando(false);}
@@ -63,7 +64,7 @@ export function ChatDoTreinamento({baseId,bloqueado,aoAtualizar}:Props) {
  const desativado=ocupado||carregando||bloqueado;
  return <section className="panel treino-chat" aria-labelledby={`${id}-titulo`}>
   <div className="treino-chat-topo"><h2 className="panel-title" id={`${id}-titulo`}>Editar com IA</h2><div><button type="button" className="btn btn-secondary btn-sm" disabled={desativado} aria-expanded={historico} aria-controls={`${id}-historico`} onClick={()=>setHistorico(!historico)}>Conversas</button><button type="button" className="btn btn-secondary btn-sm" disabled={desativado} onClick={()=>void abrir(null)}>Nova conversa</button></div></div>
-  {historico?<div className="treino-chat-historico" id={`${id}-historico`}><div><strong>Conversas desta base</strong><button type="button" className="btn btn-secondary btn-sm" aria-label="Fechar conversas" onClick={()=>setHistorico(false)}>Fechar</button></div>{estado.threads.length?estado.threads.map(t=><button key={t.id} type="button" aria-current={t.id===conversaId?'true':undefined} disabled={desativado} onClick={()=>void abrir(t.id)}>{t.title}<small>{new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(t.updated_at))}</small></button>):<p className="campo-dica">Nenhuma conversa nesta base.</p>}</div>:null}
+  {historico?<div className="treino-chat-historico" id={`${id}-historico`}><div><strong>Últimas 2 conversas</strong><button type="button" className="btn btn-secondary btn-sm" aria-label="Fechar conversas" onClick={()=>setHistorico(false)}>Fechar</button></div><p className="campo-dica">Só as duas conversas mais recentes desta base são mantidas. Ao enviar em uma terceira, a mais antiga é apagada, inclusive suas propostas. As edições já salvas não são revertidas.</p>{estado.threads.length?estado.threads.map(t=><button key={t.id} type="button" aria-current={t.id===conversaId?'true':undefined} disabled={desativado} onClick={()=>void abrir(t.id)}>{t.title}<small>{new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(t.updated_at))}</small></button>):<p className="campo-dica">Nenhuma conversa nesta base.</p>}</div>:null}
   <div className="treino-chat-conversa" aria-busy={ocupado||carregando}>
    {bloqueado?<p className="aviso aviso--atencao">Salve ou desfaça as alterações do editor manual antes de usar o chat. Se a base ficou desatualizada, recarregue a página.</p>:null}
    {carregando?<p className="campo-dica" role="status">Carregando conversa…</p>:null}

@@ -1,19 +1,17 @@
-# Próxima entrega — retenção do editor IA
+# Retenção do editor IA — implementada
 
-Pedido confirmado pelo usuário: manter somente as DUAS conversas completas mais recentes POR BASE de treinamento na lista Conversas. Não se trata de limitar a duas mensagens por conversa. As conversas antigas devem ser apagadas automaticamente, com suas mensagens/propostas, sem desfazer alterações já aplicadas ao treinamento.
+Regra confirmada pelo usuário: somente as duas conversas completas mais recentes por base. As anteriores são apagadas com suas mensagens/propostas; mudanças já aplicadas ao treinamento não são revertidas. As duas preservadas mantêm o mecanismo de desfazer, sujeito às verificações de conflito já existentes.
 
-Publicação: NÃO fazer commit agora. Incluir implementação e testes no próximo commit/entrega. Não executar limpeza em produção neste momento.
+## Implementação
+- A leitura do histórico limpa o excedente legado da base acessada. A criação de nova conversa limpa o excedente na mesma transação do primeiro pedido.
+- Ordenação por última atividade, criação e ID para desempate determinístico.
+- Geração ativa candidata à remoção bloqueia a operação de limpeza/nova conversa, em vez de apagar seu contexto. Gerações interrompidas há mais de dois minutos seguem a expiração já usada pelo editor.
+- Lock por workspace serializa criação/limpeza entre abas concorrentes.
+- Registro privado e mínimo de solicitações (ID, empresa, instante; sem mensagens ou propostas) preserva os limites de uso e impede repetir um pedido cujo chat já foi apagado.
+- UI informa a retenção e trata uma conversa que desapareceu quando outra aba criou uma mais recente.
+- Acesso continua restrito ao proprietário; tabelas privadas sem leitura direta por authenticated/anon.
 
-Critérios de implementação:
-- Ordenação determinística por última atividade e ID; escopo workspace + base.
-- Remover excedentes existentes quando a regra entrar em vigor e manter o limite nas novas conversas.
-- Exclusão das conversas remove a possibilidade de consultar/desfazer propostas dessas conversas; comunicar isso na interface.
-- Preservar treinamento, catálogo, áudios e auditoria já aplicados. Não enviar mensagens ao WhatsApp.
-- Preservar autorização owner/RLS e limites de uso: o contador atual usa training_ai_turns; excluir conversas não pode permitir burlar rate limit. Projetar contador independente antes da limpeza.
-- Tratar concorrência e gerações em andamento para não apagar uma resposta ativa inadvertidamente.
-- Testar isolamento de bases/workspaces, retenção de duas conversas, cascata de mensagens, persistência de edições já aplicadas e limites de uso.
+## Validação
+21 testes de banco aprovados (oito novos de retenção e treze existentes do editor). Cobrem cascata, preservação das edições, desfazer na penúltima conversa, isolamento entre bases/empresas, geração ativa, dados legados, limites e idempotência. Outros 33 testes de ações/protocolo aprovados. TypeScript produção/testes e lint dos fontes alterados aprovados.
 
-Estado: regra registrada; implementação, migration, testes e ativação ainda pendentes para a próxima entrega. Nenhum histórico excluído.
-
-## Atualização de autorização
-O usuário autorizou o commit das alterações pendentes de frontend. Esta funcionalidade segue pendente de implementação e não é ativada pelo commit; este documento apenas registra o pedido. Nenhuma limpeza de conversas ou envio administrativo é executado nesta entrega.
+A ativação na conta autorizada preserva as duas conversas mais recentes e confere hashes completos de suas mensagens/propostas e do treinamento antes/depois. Não exige chamadas aos provedores nem envio de WhatsApp.

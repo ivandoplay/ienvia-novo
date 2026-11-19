@@ -17,7 +17,7 @@ export interface ContextoDoEditor { agent:AlvoDoEditor; catalog:AlvoDoEditor[]; 
 export interface MutacaoDoEditor {resource:string;id:string;label:string;field:string;before:unknown;after:unknown}
 export interface TurnoDoEditor {id:string;thread_id:string;provider:Provedor;user_text:string;reply_text:string;status:'generating'|'proposed'|'discussed'|'applied'|'discarded'|'undone'|'failed';mutations:MutacaoDoEditor[];error_detail:string|null;created_at:string}
 export interface ConversaDoEditor {id:string;title:string;updated_at:string}
-export interface EstadoDoEditor {threads:ConversaDoEditor[];turns:TurnoDoEditor[]}
+export interface EstadoDoEditor {threads:ConversaDoEditor[];turns:TurnoDoEditor[];thread_expired?:boolean}
 
 /** Falhas reparáveis de formato, distintas de tentativas de edição proibida. */
 export class ErroDeFormatoDoEditor extends Error {}
