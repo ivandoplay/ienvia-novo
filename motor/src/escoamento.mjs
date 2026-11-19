@@ -11,8 +11,8 @@ export function iniciarEscoamento(supervisor, { intervaloMs = 500, onError = con
     emCurso.set(tipo,tarefa);
   }
   // O primeiro scan classifica também as mensagens vivas dos pacotes antigos.
-  executar('live');executar('history');
-  const timer=setInterval(()=>{executar('live');executar('history');},intervaloMs);
+  executar('live');executar('history');executar('receipts');
+  const timer=setInterval(()=>{executar('live');executar('history');executar('receipts');},intervaloMs);
   return async function parar() {
     parado=true;clearInterval(timer);
     await Promise.allSettled([...emCurso.values()]);

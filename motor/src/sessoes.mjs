@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { BufferJSON } from '@whiskeysockets/baileys';
 import { abrirFila } from './fila-historico.mjs';
+import { resolverDestinatario } from './destinatario.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import QRCode from 'qrcode';
@@ -130,6 +131,8 @@ export class SupervisorDeSessoes {
     this.encerrando = false;
     this.filaHistorico = abrirFila(path.join(rootDir,'data','fila-historico'));
     this.escoandoHistorico = new Set();
+    this.filaRecibos = abrirFila(path.join(rootDir,'data','fila-recibos'));
+    this.proximoRecibo = 0;
   }
 
   headers(extra = {}) {
@@ -185,6 +188,7 @@ export class SupervisorDeSessoes {
     this.sessoes.set(instanceId, registro);
 
     sock.ev.on('creds.update', saveCreds);
+    this.registrarRecibos(sock, instanceId);
 
     sock.ev.on('connection.update', async (update) => {
       if (this.sessoes.get(instanceId)?.sock !== sock) return;
@@ -267,7 +271,38 @@ export class SupervisorDeSessoes {
     });
   }
 
+  registrarRecibos(sock, instanceId) {
+    const guardar=(key,status)=>{
+      if(key?.fromMe!==true||!key.id||![0,3,4,5].includes(status))return;
+      try{this.filaRecibos.guardar(`${instanceId}:${key.id}:${status}`,{historical:false,instanceId,receipt:{id:key.id,status},queuedAt:Date.now()});}
+      catch(err){this.onLog(`[motor] Falha ao preservar confirmação: ${err.message}`);}
+    };
+    sock.ev.on('messages.update',updates=>{for(const {key,update} of updates||[])guardar(key,update?.status);});
+    sock.ev.on('message-receipt.update',updates=>{for(const {key,receipt} of updates||[]){
+      const status=receipt?.playedTimestamp?5:receipt?.readTimestamp?4:receipt?.receiptTimestamp?3:null;
+      if(status!==null)guardar(key,status);
+    }});
+  }
+
+  async escoarRecibos() {
+    if(this.encerrando||this.proximoRecibo>Date.now())return;
+    this.proximoRecibo=Date.now()+5000;
+    const itens=this.filaRecibos.listar(20,'live');
+    const grupos=new Map();
+    for(const item of itens){
+      if(Date.now()-item.valor.queuedAt>86400000){this.filaRecibos.confirmar(item.nome);continue;}
+      const id=item.valor.instanceId;if(!grupos.has(id))grupos.set(id,[]);grupos.get(id).push(item);
+    }
+    for(const [instanceId,lote] of grupos){
+      const result=await this.chamarApi('/api/motor/recibos',{instance_id:instanceId,receipts:lote.map(i=>i.valor.receipt)});
+      if(result.result!=='ok'||!Array.isArray(result.confirmed))continue;
+      const confirmed=new Set(result.confirmed);
+      for(const item of lote)if(confirmed.has(item.valor.receipt.id))this.filaRecibos.confirmar(item.nome);
+    }
+  }
+
   async escoarHistorico({ tipo = 'all' } = {}) {
+    if (tipo === 'receipts') return this.escoarRecibos();
     if (this.encerrando || this.escoandoHistorico.has(tipo) || this.escoandoHistorico.has('all') || (tipo === 'all' && this.escoandoHistorico.size)) return;
     this.escoandoHistorico.add(tipo);
     try {
@@ -333,6 +368,7 @@ export class SupervisorDeSessoes {
   }
 
   async executarComando(cmd) {
+    let envioIniciado = false;
     const concluir = (outcome, extra = {}) =>
       this.chamarApi('/api/motor/comandos', {
         command_id: cmd.id,
@@ -371,8 +407,9 @@ export class SupervisorDeSessoes {
       }
 
       if (cmd.command_type === 'send_text') {
-        const jid = cmd.payload?.recipient;
+        const jid = await resolverDestinatario(registro.sock, cmd.payload?.recipient);
         const texto = cmd.payload?.body_text;
+        envioIniciado = true;
         const enviado = await registro.sock.sendMessage(jid, { text: texto });
         const waId = enviado?.key?.id || null;
         await concluir(waId ? 'sent' : 'uncertain', { provider_message_id: waId });
@@ -394,7 +431,7 @@ export class SupervisorDeSessoes {
           return;
         }
         const buf = Buffer.from(await mediaResp.arrayBuffer());
-        const jid = cmd.payload?.recipient;
+        const jid = await resolverDestinatario(registro.sock, cmd.payload?.recipient);
         const caption = att.caption || undefined;
         let payloadWa;
         if (att.kind === 'image') payloadWa = { image: buf, mimetype: att.content_type, caption };
@@ -402,6 +439,7 @@ export class SupervisorDeSessoes {
         else if (att.kind === 'audio') payloadWa = { audio: buf, mimetype: att.content_type || 'audio/ogg; codecs=opus', ptt: att.is_voice !== false };
         else payloadWa = { document: buf, mimetype: att.content_type, fileName: att.file_name || 'arquivo', caption };
 
+        envioIniciado = true;
         const enviado = await registro.sock.sendMessage(jid, payloadWa);
         const waId = enviado?.key?.id || null;
         await concluir(waId ? 'sent' : 'uncertain', { provider_message_id: waId });
@@ -412,7 +450,7 @@ export class SupervisorDeSessoes {
     } catch (err) {
       // Se falhou durante envio sem confirmação clara do socket, marca como incerto para nunca reenviar.
       const ehEnvio = cmd.command_type === 'send_text' || cmd.command_type === 'send_media';
-      await concluir(ehEnvio ? 'uncertain' : 'failed', { error_detail: err.message }).catch(() => undefined);
+      await concluir(ehEnvio && envioIniciado ? 'uncertain' : 'failed', { error_detail: err.message }).catch(() => undefined);
     }
   }
 
