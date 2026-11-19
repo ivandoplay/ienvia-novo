@@ -425,6 +425,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
 
       </details>
       <form onSubmit={(evento) => { if (aba === 'ia') { evento.preventDefault(); return; } void salvar(evento); }} noValidate>
+        <div className="treino-navegacao-titulo"><strong>Organize seu treinamento</strong><span>Escolha uma seção para editar. As alterações manuais são salvas no final do formulário.</span></div>
         <div className="subabas" role="tablist" aria-label="Partes do treinamento" onKeyDown={(evento)=>{
           if(!['ArrowLeft','ArrowRight','Home','End'].includes(evento.key))return;
           const atual=ABAS.findIndex(item=>item.id===aba);
@@ -443,7 +444,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
               tabIndex={aba === item.id ? 0 : -1}
               aria-controls={`treino-painel-${item.id}`}
               className={aba === item.id ? 'subaba subaba--ativa' : 'subaba'}
-              onClick={(evento) => {setAba(item.id);evento.currentTarget.scrollIntoView({block:'nearest',inline:'nearest'});}}
+              onClick={() => setAba(item.id)}
             >
               {item.rotulo}
             </button>
@@ -687,9 +688,9 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
               ) : desatualizada ? (
                 <span className="recado--erro">Esta base foi alterada em outro lugar. Recarregue a página antes de salvar.</span>
               ) : mudou ? (
-                <span className="recado--atencao">Alterações ainda não salvas. Use Salvar treinamento para valer.</span>
+                <span className="recado--atencao">Alterações pendentes nesta base. Salve para atualizar o atendimento.</span>
               ) : (
-                <span className="barra-de-salvar-tudo-certo">Tudo salvo. Este é o treinamento que a IA está usando agora.</span>
+                <span className="barra-de-salvar-tudo-certo">Tudo salvo. Nenhuma alteração pendente.</span>
               )}
             </div>
             <div className="barra-de-salvar-acoes">

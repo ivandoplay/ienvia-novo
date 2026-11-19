@@ -430,3 +430,52 @@ a.treino-base:hover {
 /* Microtexto legível também no celular; contraste auditado no componente real. */
 .treino-chat-rodape{font-size:11px;color:var(--text-secondary)}
 @media(max-width:800px){.treino-chat-rodape{font-size:11px;flex-wrap:wrap}.treino-chat-rodape>span:first-child{flex:1;min-width:190px}}
+
+
+/* Navegação estável nas oito seções: sem carrossel escondendo opções. */
+.treino-navegacao-titulo { display: grid; gap: 4px; margin: 18px 0 12px; }
+.treino-navegacao-titulo strong { font-size: 14px; color: var(--text-main); }
+.treino-navegacao-titulo span { font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
+.treino .subabas {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px; padding: 8px; overflow: visible; margin-bottom: 20px;
+}
+.treino .subaba {
+  min-width: 0; min-height: 48px; padding: 10px 12px;
+  white-space: normal; overflow-wrap: anywhere; text-align: left; line-height: 1.45;
+  background: var(--bg-card); border-color: var(--border);
+}
+.treino .subaba--ativa { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-bright); }
+.treino .subaba:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+/* Fim de formulário real: nunca flutua sobre campos ou sobre a navegação mobile. */
+.treino .barra-de-salvar {
+  position: static; inset: auto; z-index: auto; box-shadow: none;
+  margin-top: 20px; padding: 16px; gap: 14px 20px;
+}
+.treino .barra-de-salvar-acoes { flex-wrap: wrap; }
+.treino .barra-de-salvar-acoes .btn { min-height: 44px; white-space: normal; }
+.treino form, .treino [role="tabpanel"], .treino .panel, .treino .estudio-card { min-width: 0; }
+.treino .treino-chat { height: clamp(500px, 72dvh, 780px); min-height: 0; }
+.treino .treino-chat-topo { flex-wrap: wrap; padding: 14px; }
+.treino .treino-chat-topo > div { flex-wrap: wrap; }
+.treino .treino-chat-proposta-topo { flex-wrap: wrap; }
+.treino .treino-chat-campo-acoes { flex-wrap: wrap; }
+.treino .treino-chat-campo-acoes select.campo { max-width: 100%; }
+.treino .treino-chat-rodape { flex-wrap: wrap; line-height: 1.5; }
+@media (max-width: 700px) {
+  .treino .subabas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 6px; margin-bottom: 16px; }
+  .treino .subaba { font-size: 12px; padding: 9px 10px; }
+  .treino .barra-de-salvar { padding: 14px; }
+  .treino .barra-de-salvar-recado { flex: 1 1 100%; }
+  .treino .barra-de-salvar-acoes { width: 100%; margin: 0; }
+  .treino .barra-de-salvar-acoes .btn { flex: 1 1 100px; }
+  .treino .treino-chat { height: max(520px, 75dvh); }
+  .treino .treino-chat-topo { gap: 10px; padding: 12px; }
+  .treino .treino-chat-topo > div { width: 100%; }
+  .treino .treino-chat-topo .btn { flex: 1; min-height: 44px; }
+  .treino .treino-chat-campo-acoes select.campo { width: 118px; }
+  .treino .treino-chat-campo-acoes .btn { min-height: 44px; }
+  .treino .treino-chat-proposta-acoes > .btn { flex: 1 1 100%; }
+  .treino-gerenciar-bases > summary { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .treino-gerenciar-bases > summary span { float: none; margin-left: auto; }
+}
