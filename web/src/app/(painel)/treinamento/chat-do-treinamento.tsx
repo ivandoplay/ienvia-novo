@@ -44,7 +44,7 @@ export function ChatDoTreinamento({baseId,bloqueado,aoAtualizar}:Props) {
    if(!vivo.current)return;
    if(!r.ok){setErro(r.erro);await recarregar(conversaId);return;}
    setTexto('');setReferencia(null);if(arquivo.current)arquivo.current.value='';setConversaId(r.dados.conversaId);await recarregar(r.dados.conversaId);
-   if(vivo.current)fim.current?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});
+   if(vivo.current){const lista=fim.current?.parentElement;if(lista)lista.scrollTo({top:lista.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}
   }catch{if(vivo.current)setErro('Não foi possível confirmar o resultado. Reabra a conversa antes de reenviar para evitar cobranças repetidas.');}
   finally{pedidoEmCurso.current=false;if(vivo.current)setOcupado(false);}
  }

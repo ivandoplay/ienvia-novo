@@ -1762,7 +1762,11 @@ function Conversa({
     setMensagemEmFoco(mensagemId);
     pertoDoFim.current = false;
     const alvo = document.getElementById(`mensagem-${mensagemId}`);
-    alvo?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const area = rolagem.current;
+    if (alvo && area) {
+      const destino = area.scrollTop + alvo.getBoundingClientRect().top - area.getBoundingClientRect().top - (area.clientHeight - alvo.clientHeight) / 2;
+      area.scrollTo({ top: destino, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
     window.setTimeout(() => setMensagemEmFoco((atual) => (atual === mensagemId ? null : atual)), 4_000);
   }
 

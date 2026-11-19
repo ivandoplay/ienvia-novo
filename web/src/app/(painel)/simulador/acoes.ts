@@ -17,6 +17,7 @@ import {
   truncarHistoricoSimulador,
   type MensagemSimulador,
 } from '@ienvia/shared/simulador';
+import { transcreverDaEmpresa } from '@/lib/ia/transcricao';
 import { lerMotorDeIa } from '@/lib/dados/ia';
 import { carregarRecursosDaInbox } from '@/lib/dados/recursos';
 import { lerBaseDeTreinamento, lerBasesDeTreinamento } from '@/lib/dados/treinamento';
@@ -28,6 +29,7 @@ import {
   modeloDoProvedor,
   NOME_DO_PROVEDOR,
   ordemDeUso,
+  PROVEDORES,
   provedorRecebe,
   type Provedor,
 } from '@/lib/ia/regras';
@@ -110,6 +112,7 @@ export interface ResultadoSimulacao {
 
 export async function enviarMensagemSimulador(entrada: {
   agentId: string | null;
+  provedor?: Provedor | 'automatico';
   nomeContato: string;
   texto: string;
   anexo?: {
@@ -121,6 +124,7 @@ export async function enviarMensagemSimulador(entrada: {
   const sessao = await obterSessao();
   if (!sessao?.workspaceAtivo) return { ok: false, erro: SESSAO_EXPIRADA };
   const workspaceId = sessao.workspaceAtivo.id;
+  if (entrada.provedor && entrada.provedor !== 'automatico' && !PROVEDORES.includes(entrada.provedor)) return {ok:false,erro:'Provedor de teste inválido.'};
   const ehDono = sessao.workspaceAtivo.papel === 'owner';
 
   const textoLimpo = (entrada.texto ?? '').trim().slice(0, 4000);
@@ -130,6 +134,7 @@ export async function enviarMensagemSimulador(entrada: {
   }
 
   let anexoParaIa: AnexoParaIa | null = null;
+  let transcricao = '';
   let tipoAnexoRotulo: 'image' | 'audio' | 'document' | null = null;
   if (entrada.anexo?.base64) {
     const dados = Buffer.from(entrada.anexo.base64, 'base64');
@@ -146,7 +151,8 @@ export async function enviarMensagemSimulador(entrada: {
       anexoParaIa = { tipo: av.tipo, dados };
     } else if (av.tipo.startsWith('audio/')) {
       tipoAnexoRotulo = 'audio';
-      anexoParaIa = { tipo: av.tipo, dados };
+      try { transcricao = (await transcreverDaEmpresa(workspaceId, dados, av.tipo)).texto; }
+      catch { return {ok:false,erro:'Não foi possível transcrever o áudio. Confira a configuração Groq em Motor de IA.'}; }
     } else {
       return { ok: false, erro: 'No simulador, anexe uma imagem (JPG/PNG/WebP) ou um áudio (OGG/MP3/M4A/WAV).' };
     }
@@ -165,7 +171,7 @@ export async function enviarMensagemSimulador(entrada: {
     return { ok: false, erro: 'Não foi possível ler as configurações do Motor de IA.' };
   }
   const motor = resMotor.motor.configuracao;
-  const provedoresOrdem = ordemDeUso(motor);
+  const provedoresOrdem: Provedor[] = entrada.provedor && entrada.provedor !== 'automatico' ? [entrada.provedor] : ordemDeUso(motor);
   const chaves = await lerChavesDoWorkspace(workspaceId, ehDono, supabase, provedoresOrdem);
   const comChave = provedoresOrdem.filter((p) => Boolean(chaves[p]));
   if (comChave.length === 0) {
@@ -199,7 +205,7 @@ export async function enviarMensagemSimulador(entrada: {
 
   const audiosJaEnviados = extrairAudiosJaEnviadosNoSimulador(sessaoAtual.history);
   const falasClienteRecentes = sessaoAtual.history.filter((m) => m.papel === 'user').map((m) => m.texto).filter(Boolean);
-  const mensagemAtualTexto = textoLimpo || (tipoAnexoRotulo === 'audio' ? '[Áudio enviado para teste]' : '[Foto enviada para teste]');
+  const mensagemAtualTexto = [textoLimpo, transcricao].filter(Boolean).join('\n\n') || (tipoAnexoRotulo === 'audio' ? '[Áudio enviado para teste]' : '[Foto enviada para teste]');
   const clienteRecusouAudio = detectarRecusaDeAudioDoCliente(mensagemAtualTexto, falasClienteRecentes.slice(-5));
 
   const instrucoes = montarInstrucoes(leituraBase.base, {
@@ -237,7 +243,7 @@ export async function enviarMensagemSimulador(entrada: {
   }
   conversaFalas.push({ de: 'cliente', texto: mensagemAtualTexto });
 
-  const rota = tipoAnexoRotulo
+  const rota = tipoAnexoRotulo && !transcricao
     ? comChave.filter((p) => provedorRecebe(p, tipoAnexoRotulo === 'image' ? 'foto' : tipoAnexoRotulo === 'audio' ? 'audio' : 'documento'))
     : comChave;
 
@@ -359,7 +365,7 @@ export async function enviarMensagemSimulador(entrada: {
   const msgUser: MensagemSimulador = {
     id: randomUUID(),
     papel: 'user',
-    texto: textoLimpo || (tipoAnexoRotulo === 'audio' ? '[Áudio enviado]' : '[Foto enviada]'),
+    texto: [textoLimpo, transcricao].filter(Boolean).join('\n\n') || (tipoAnexoRotulo === 'audio' ? '[Áudio enviado]' : '[Foto enviada]'),
     criadoEm: agoraIso,
     anexoSimulado: entrada.anexo && tipoAnexoRotulo ? { nome: entrada.anexo.fileName, tipo: tipoAnexoRotulo } : null,
   };

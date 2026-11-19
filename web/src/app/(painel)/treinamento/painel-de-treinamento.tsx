@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { CampoDeTexto } from '@/components/ui/campo-de-texto';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
@@ -80,10 +80,6 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
   /** A base mudou em outro lugar depois que esta tela abriu: salvar daqui apagaria a mudança mais nova. */
   const [desatualizada, setDesatualizada] = useState(false);
   const campoDoArquivo = useRef<HTMLInputElement>(null);
-  useEffect(()=>{
-    const quadro=requestAnimationFrame(()=>document.getElementById(`treino-aba-${aba}`)?.scrollIntoView({block:'nearest',inline:'nearest'}));
-    return ()=>cancelAnimationFrame(quadro);
-  },[aba]);
 
 
   if (!lista) {
@@ -432,7 +428,7 @@ export function PainelDeTreinamento({ lista: listaInicial, base: baseInicial, fa
           const indice=evento.key==='Home'?0:evento.key==='End'?ABAS.length-1:(atual+(evento.key==='ArrowRight'?1:-1)+ABAS.length)%ABAS.length;
           const proxima=ABAS[indice];if(!proxima)return;
           evento.preventDefault();setAba(proxima.id);
-          const botao=evento.currentTarget.querySelector<HTMLButtonElement>(`#treino-aba-${proxima.id}`);botao?.focus();botao?.scrollIntoView({block:'nearest',inline:'nearest'});
+          const botao=evento.currentTarget.querySelector<HTMLButtonElement>(`#treino-aba-${proxima.id}`);botao?.focus({preventScroll:true});
         }}>
           {ABAS.map((item) => (
             <button

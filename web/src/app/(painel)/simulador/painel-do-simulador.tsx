@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { formatarDuracaoAudio } from '@ienvia/shared/recursos';
 import { avaliarMidiaSimulador, type MensagemSimulador } from '@ienvia/shared/simulador';
+import { NOME_DO_PROVEDOR, PROVEDORES, type Provedor } from '@/lib/ia/regras';
 import { Icone } from '@/components/ui/icone';
 import type { DadosDoSimulador } from '@/lib/dados/recursos';
 import { enderecoDoRecurso } from '@/lib/inbox/arquivos';
@@ -48,11 +49,7 @@ export function PainelDoSimulador({ dados }: Props) {
   const [verPrompt, setVerPrompt] = useState(false);
 
   const [pendente, iniciarTransacao] = useTransition();
-  const fimChatRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    fimChatRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [historico.length]);
+  const [provedor, setProvedor] = useState<Provedor | 'automatico'>('automatico');
 
   async function escolherAnexo(arquivo: File | null | undefined) {
     if (!arquivo) return;
@@ -91,6 +88,7 @@ export function PainelDoSimulador({ dados }: Props) {
       const res = await enviarMensagemSimulador({
         agentId: agentId || null,
         nomeContato,
+        provedor,
         texto: conteudo,
         anexo: anexoAtual
           ? { fileName: anexoAtual.fileName, contentType: anexoAtual.contentType, base64: anexoAtual.base64 }
@@ -98,6 +96,8 @@ export function PainelDoSimulador({ dados }: Props) {
       });
       if (!res.ok) {
         setErro(res.erro);
+        if (!textoDireto) setTexto(conteudo);
+        setAnexo(anexoAtual);
         return;
       }
       setHistorico(res.historico);
@@ -125,7 +125,7 @@ export function PainelDoSimulador({ dados }: Props) {
   }
 
   return (
-    <div className="f6-pagina">
+    <div className="f6-pagina f6-simulador">
       <div className="page-header">
         <div>
           <h1>Simulador de Atendimento</h1>
@@ -177,6 +177,11 @@ export function PainelDoSimulador({ dados }: Props) {
                 ))}
               </select>
 
+              <label htmlFor="sim-provedor" className="so-leitor-de-tela">Provedor desta simulação</label>
+              <select id="sim-provedor" className="campo" value={provedor} disabled={pendente} onChange={e=>setProvedor(e.target.value as Provedor | 'automatico')}>
+                <option value="automatico">Automático (Motor de IA)</option>
+                {PROVEDORES.map(p=><option key={p} value={p}>{NOME_DO_PROVEDOR[p]}</option>)}
+              </select>
               <label htmlFor="sim-contato" className="so-leitor-de-tela">
                 Nome simulado do cliente
               </label>
@@ -193,7 +198,7 @@ export function PainelDoSimulador({ dados }: Props) {
 
             {dados.motorConfigurado ? (
               <span className="estado estado--ia">
-                {dados.nomeProvedorPrincipal} · {dados.modeloPrincipal}
+                {telemetria ? `${telemetria.provedor} · ${telemetria.modelo}` : provedor === 'automatico' ? `Automático · ${dados.nomeProvedorPrincipal}` : NOME_DO_PROVEDOR[provedor]}
               </span>
             ) : null}
           </div>
@@ -319,7 +324,7 @@ export function PainelDoSimulador({ dados }: Props) {
                 );
               })
             )}
-            <div ref={fimChatRef} />
+
           </div>
 
           <form
@@ -374,9 +379,9 @@ export function PainelDoSimulador({ dados }: Props) {
             </div>
 
             <div className="f6-sim-entrada">
-              <label className="btn btn-secondary btn-icon-only" title="Anexar foto ou áudio de teste">
+              <label className="btn btn-secondary btn-icon-only" title="Anexar foto ou áudio (transcrição Groq)">
                 <Icone nome="clipe" />
-                <span className="so-leitor-de-tela">Anexar foto ou áudio de teste</span>
+                <span className="so-leitor-de-tela">Anexar foto ou áudio (transcrição Groq)</span>
                 <input
                   type="file"
                   hidden

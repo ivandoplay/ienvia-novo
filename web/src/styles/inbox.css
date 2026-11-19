@@ -2928,3 +2928,34 @@ dl.inbox-ia-recado {
 .inbox-exclusao-acoes { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 .inbox-exclusao-confirmar { background: #b42318; color: white; border-color: #b42318; }
 .inbox-exclusao-confirmar:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Ajuste incremental da conversa no computador. Conserva componentes e ações. */
+@media (min-width: 901px) {
+  .content-area:has(.inbox[data-aberta="sim"]) { padding: 16px 20px; overflow: hidden; }
+  .content-area:has(.inbox[data-aberta="sim"]) > .pagina { height: 100%; min-height: 0; }
+  .inbox[data-aberta="sim"] { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .inbox[data-aberta="sim"] > .inbox-titulo { flex: 0 0 auto; margin-bottom: 12px; gap: 12px; }
+  .inbox[data-aberta="sim"] > .inbox-titulo h1 { font-size: 22px; }
+  .inbox[data-aberta="sim"] > .inbox-titulo p { display: none; }
+  .inbox[data-aberta="sim"] > .inbox-grade { flex: 1; height: auto; min-height: 0; grid-template-columns: clamp(260px, 24vw, 310px) minmax(0,1fr); }
+  .inbox[data-aberta="sim"] .inbox-contato { display: none; }
+  .inbox[data-aberta="sim"] .inbox-abrir-contato { display: inline-flex; }
+  .inbox[data-aberta="sim"] .inbox-conversa { height: 100%; min-height: 0; }
+  .inbox[data-aberta="sim"] .inbox-conversa-topo { flex: 0 0 auto; padding: 10px 14px; gap: 8px; }
+  .inbox[data-aberta="sim"] .inbox-conversa-acoes { gap: 5px; }
+  .inbox[data-aberta="sim"] .inbox-mobile-buscar { display: inline-flex !important; min-height: 36px; width: 36px; padding: 8px; }
+  .inbox[data-aberta="sim"] .inbox-busca-conversa { display: none; flex: 0 0 auto; }
+  .inbox[data-aberta="sim"] .inbox-busca-conversa--aberta { display: block; }
+  .inbox[data-aberta="sim"] .inbox-busca-conversa form { display: flex; gap: 8px; }
+  .inbox[data-aberta="sim"] .inbox-busca-conversa-campo { flex: 1; min-width: 0; }
+  .inbox[data-aberta="sim"] .inbox-ia { flex: 0 0 auto; padding: 8px 14px; font-size: 12px; }
+  .inbox[data-aberta="sim"] .inbox-ia-texto { min-width: 0; }
+  .inbox[data-aberta="sim"] .inbox-ia-titulo { font-size: 12px; }
+  .inbox[data-aberta="sim"] .inbox-ia-detalhe { font-size: 11px; }
+  .inbox[data-aberta="sim"] .inbox-mensagens { flex: 1 1 0; min-height: 0; overflow: auto; overflow-x: hidden; }
+  .inbox[data-aberta="sim"] .inbox-mensagens > * { flex-shrink: 0; }
+  .inbox[data-aberta="sim"] .inbox-escrever { flex: 0 0 auto; }
+  .inbox[data-aberta="sim"] .inbox-escrever-campo { min-height: 44px; }
+  .inbox[data-aberta="sim"] .inbox-escrever-linha > button[type="submit"] { min-height: 44px; }
+  .inbox[data-aberta="sim"] .inbox-busca-resultados { max-height: 180px; overflow: auto; }
+}

@@ -303,7 +303,7 @@ test.describe('Inbox — conversa aberta', () => {
     await expect(page.getByText('Ontem', { exact: true })).toBeVisible();
   });
 
-  test('dados do contato: ao lado no computador, numa janela no celular', async ({ page, isMobile }) => {
+  test('dados do contato: janela sob demanda sem ocupar a conversa', async ({ page, isMobile }) => {
     await abrirInbox(page, 'inbox', `/inbox?c=${CONVERSAS_DA_INBOX.bruno}`);
     await expect(page.getByRole('heading', { level: 2, name: 'Bruno Lima' })).toBeVisible();
 
@@ -317,12 +317,13 @@ test.describe('Inbox — conversa aberta', () => {
       await janela.getByRole('button', { name: 'Fechar' }).click();
       await expect(janela).toBeHidden();
     } else {
-      await expect(botao).toBeHidden();
-      const cartao = page.getByRole('complementary', { name: 'Dados do contato' });
+      await botao.click();
+      const cartao = page.getByRole('dialog', { name: 'Dados do contato' });
       await expect(cartao).toContainText('Bruno Lima');
       await expect(cartao).toContainText('+55 (85) 98888-0002');
       await expect(cartao).toContainText('Vendas (conectado)');
       await expect(cartao).toContainText('Com você');
+      await cartao.getByRole('button', { name: 'Fechar' }).click();
     }
   });
 

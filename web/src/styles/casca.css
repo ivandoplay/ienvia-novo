@@ -986,3 +986,11 @@
   cursor: default;
 }
 
+
+/* O painel tem uma única área principal de rolagem. O documento externo não
+   deve competir com ela, sobretudo quando um filho flex tem conteúdo longo. */
+html:has(.casca), body:has(.casca) { overflow-y: hidden; }
+.casca { position: relative; isolation: isolate; }
+.casca, .main-wrapper { min-height: 0; }
+.main-wrapper { overflow: hidden; }
+.content-area { min-height: 0; overscroll-behavior-y: contain; }

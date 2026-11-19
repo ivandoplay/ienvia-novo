@@ -10,9 +10,8 @@ import {
   type AudioEstrategico,
 } from '@ienvia/shared/recursos';
 import { DEPOSITO } from '@/lib/inbox/arquivos';
-import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
 import { transcreverDaEmpresa } from '@/lib/ia/transcricao';
-import { ErroDeIa, transcreverAudio } from '@/lib/ia/provedores';
+import { ErroDeIa } from '@/lib/ia/provedores';
 import { ehIdentificador } from '@/lib/instancias/regras';
 import { mapearAudioEstrategico } from '@/lib/recursos/mapeamento';
 import { obterSessao } from '@/lib/sessao';
@@ -173,8 +172,8 @@ export async function excluirAudioEstrategico(voiceId: string): Promise<{ ok: tr
 }
 
 /**
- * Transcreve o áudio que já foi enviado para o depósito, usando a chave do Gemini que o cliente
- * cadastrou em Motor de IA. Serve para o botão "Transcrever automaticamente" da biblioteca de áudios:
+ * Transcreve o áudio que já foi enviado para o depósito, usando a Groq e a reserva configurada pelo cliente
+ * em Motor de IA. Serve para o botão "Transcrever automaticamente" da biblioteca de áudios:
  * quem não quiser usar a IA continua digitando a transcrição à mão.
  */
 export async function transcreverAudioEstrategico(dados: {
@@ -230,20 +229,20 @@ export async function transcreverAudioEstrategico(dados: {
 function traduzirErroDaTranscricao(erro: ErroDeIa): string {
   switch (erro.motivo) {
     case 'chave_invalida':
-      return 'A chave do Gemini cadastrada não foi aceita. Confira em Motor de IA.';
+      return 'A chave do provedor de reserva cadastrada não foi aceita. Confira em Motor de IA.';
     case 'sem_credito':
-      return 'A conta do Gemini está sem crédito para transcrever.';
+      return 'A conta do provedor de reserva está sem crédito para transcrever.';
     case 'limite':
-      return 'O Gemini pediu para esperar um pouco (limite de uso). Tente de novo em alguns minutos.';
+      return 'O provedor de reserva pediu para esperar um pouco (limite de uso). Tente de novo em alguns minutos.';
     case 'modelo_inexistente':
-      return 'Nenhum modelo do Gemini disponível para transcrever nesta chave.';
+      return 'Nenhum modelo do provedor de reserva disponível para transcrever nesta chave.';
     case 'bloqueada':
-      return 'O Gemini recusou o conteúdo deste áudio.';
+      return 'O provedor de reserva recusou o conteúdo deste áudio.';
     case 'tempo':
       return 'A transcrição demorou demais. Tente um áudio mais curto.';
     case 'rede':
     case 'indisponivel':
-      return 'O Gemini não respondeu agora. Tente de novo em instantes.';
+      return 'O provedor de reserva não respondeu agora. Tente de novo em instantes.';
     default:
       return 'Não foi possível transcrever este áudio. Tente de novo ou digite a transcrição à mão.';
   }

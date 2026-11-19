@@ -7,7 +7,6 @@ import {
   type AudioEstrategico,
 } from '@ienvia/shared/recursos';
 import { comecarAGravarEmOgg, type GravadorDeVoz } from '@/lib/audio/gravador-de-voz';
-import { prepararTrechosDeTranscricao } from '@/lib/audio/transcricao-em-partes';
 import { prepararAudioDeVoz } from '@/lib/audio/voz-do-whatsapp';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
@@ -131,10 +130,9 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
   const [editando, setEditando] = useState<AudioRascunho | null>(null);
   const [erroModal, setErroModal] = useState<string | null>(null);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
-  // Transcrição automática pela chave do Gemini cadastrada em Motor de IA.
+  // Transcrição automática pela Groq, com reserva conforme a configuração em Motor de IA.
   const [transcrevendo, setTranscrevendo] = useState(false);
   const [progressoTranscricao, setProgressoTranscricao] = useState('');
-  const progressoRef = useRef<{ chave: string; trechos: string[]; textos: string[] } | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState<AudioEstrategico | null>(null);
 
   // Gravador no navegador
@@ -371,12 +369,12 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
   }
 
   return (
-    <div className="f6-pagina">
+    <div className="f6-pagina f6-audios">
       <div className="page-header">
         <div>
           <h1>Biblioteca de Áudios</h1>
           <p>
-            Grave ou suba mensagens de voz com transcrição real. A IA envia cada áudio como voz nativa (PTT) sem repetir na conversa e cai para texto automaticamente se o cliente pedir (Skill S06).
+            Organize suas mensagens de voz, transcreva com a Groq e escolha quando a IA pode enviá-las.
           </p>
         </div>
         {ehDono ? (
@@ -418,7 +416,7 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
             placeholder="Buscar por nome, transcrição ou código M01..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            style={{ minWidth: 260 }}
+            
           />
           <label htmlFor="f6-filtro-ia" className="so-leitor-de-tela">
             Filtrar uso pela IA
@@ -542,7 +540,7 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
           }}
           largo
         >
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div className="f6-audio-editor">
             {erroModal ? (
               <div className="aviso aviso--erro" role="alert">
                 {erroModal}
@@ -652,8 +650,8 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
               <label htmlFor="aud-transcricao">Transcrição: o que é falado no áudio (obrigatória)</label>
               <p className="campo-ajuda">
                 É o texto que a IA lê para saber o que o áudio diz — quando mandar o áudio, o que ele responde e o
-                texto que envia se o cliente pedir por escrito. Depois de gravar, o jeito mais rápido é mandar o
-                Gemini ouvir e escrever por você.
+                texto que envia se o cliente pedir por escrito. Grave ou envie o arquivo e use a Groq para
+                transcrever. Revise o resultado antes de salvar.
               </p>
 
               <div className="f6-transcricao-topo">
@@ -673,8 +671,8 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
                 </button>
                 <span className="f6-transcricao-nota">
                   {editando.objectKey
-                    ? 'O Gemini ouve o arquivo e preenche a caixa abaixo. Você pode corrigir o texto depois.'
-                    : 'Grave ou suba o áudio primeiro. Aí o Gemini consegue ouvir e escrever por você.'}
+                    ? 'A Groq transcreve o arquivo. Revise e corrija o texto antes de salvar. A reserva segue a configuração em Motor de IA.'
+                    : 'Grave ou envie um arquivo para habilitar a transcrição com a Groq.'}
                 </span>
               </div>
 
@@ -685,7 +683,7 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
                 id="aud-transcricao"
                 rows={4}
                 className="campo"
-                placeholder="Escreva exatamente o que você fala neste áudio — ou use o botão acima para o Gemini escrever."
+                placeholder="Escreva exatamente o que você fala neste áudio — use o botão acima para transcrever com a Groq."
                 value={editando.transcription}
                 onChange={(e) => setEditando((atual) => (atual ? { ...atual, transcription: e.target.value } : atual))}
               />

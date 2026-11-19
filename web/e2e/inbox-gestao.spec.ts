@@ -420,6 +420,7 @@ test.describe('procurar nesta conversa', () => {
     await conversaCom(page, 'Bruno').waitFor();
 
     const daConversa = conversaCom(page, 'Bruno');
+    await daConversa.getByRole('button', {name:'Buscar na conversa',exact:true}).click();
     await daConversa.getByPlaceholder('Procurar nesta conversa').fill('frete');
     await daConversa.getByRole('button', { name: 'Procurar nesta conversa' }).click();
 
@@ -441,6 +442,7 @@ test.describe('procurar nesta conversa', () => {
   test('não procura com menos de 2 letras', async ({ page }) => {
     await abrirInbox(page, `/inbox?c=${CONVERSAS_DA_INBOX.ana}`);
     await conversaCom(page, 'Ana').waitFor();
+    await conversaCom(page, 'Ana').getByRole('button', {name:'Buscar na conversa',exact:true}).click();
     await conversaCom(page, 'Ana').getByPlaceholder('Procurar nesta conversa').fill('a');
     await conversaCom(page, 'Ana').getByRole('button', { name: 'Procurar nesta conversa' }).click();
     await expect(page.getByRole('alert').filter({ hasText: 'pelo menos 2 letras' })).toBeVisible();

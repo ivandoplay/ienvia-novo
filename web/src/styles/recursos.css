@@ -647,3 +647,49 @@
     justify-content: center;
   }
 }
+
+
+/* Biblioteca de áudios: escopo próprio, sem alterar catálogo ou simulador. */
+.f6-audios { min-width: 0; }
+.f6-audios .page-header { align-items: flex-start; gap: 16px; }
+.f6-audios .page-header p { max-width: 660px; line-height: 1.6; }
+.f6-audios .f6-filtros { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 260px); gap: 12px; }
+.f6-audios .f6-filtros .campo { min-width: 0; width: 100%; }
+.f6-audios .f6-grade-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.f6-audios .f6-card, .f6-audios .f6-card-topo > *, .f6-audio-editor { min-width: 0; }
+.f6-audios .f6-card-titulo, .f6-audios .f6-card-sub, .f6-audios .f6-transcricao { overflow-wrap: anywhere; }
+.f6-audios audio, .f6-audio-editor audio { display: block; width: 100%; max-width: 100%; min-width: 0; }
+.f6-audios .f6-card-botoes { flex-wrap: wrap; }
+.f6-audios .f6-card-botoes .btn { min-height: 44px; }
+.f6-audio-editor { display: grid; gap: 20px; }
+.f6-audio-editor .campo-bloco { min-width: 0; }
+.f6-audio-editor .campo-ajuda { line-height: 1.65; margin: 6px 0 12px; color: var(--text-secondary); }
+.f6-audio-editor .f6-gravador { gap: 12px; padding: 16px; }
+.f6-audio-editor .f6-transcricao-topo { padding: 14px; gap: 12px; }
+.f6-audio-editor textarea { min-height: 140px; resize: vertical; }
+.f6-audio-editor .dialogo-acoes { position: static; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--border); }
+.f6-audio-editor .dialogo-acoes .btn { min-height: 44px; }
+@media (max-width: 640px) {
+  .f6-audios .page-header { flex-direction: column; align-items: stretch; }
+  .f6-audios .page-header > .btn { width: 100%; min-height: 44px; justify-content: center; white-space: normal; }
+  .f6-audios .f6-filtros { grid-template-columns: minmax(0, 1fr); }
+  .f6-audios .f6-card { padding: 14px; }
+  .f6-audios .f6-card-topo { flex-wrap: wrap; }
+  .f6-audios .f6-card-acoes { flex-wrap: wrap; }
+  .f6-audio-editor .f6-gravador > .btn { flex: 1 1 100%; min-height: 44px; justify-content: center; white-space: normal; }
+  .f6-audio-editor .f6-transcricao-topo { padding: 12px; }
+  .f6-audio-editor .dialogo-acoes .btn { flex: 1 1 100px; justify-content: center; }
+}
+
+/* Simulador: a conversa usa a rolagem da página, sem rolagem interna concorrente. */
+.f6-simulador .f6-sim-chat { min-height: 0; max-height: none; grid-template-rows: auto auto auto; }
+.f6-simulador .f6-sim-mensagens { overflow: visible; min-height: 180px; max-height: none; }
+.f6-simulador .f6-sim-topo > div { min-width: 0; width: 100%; }
+.f6-simulador .f6-sim-topo .campo { min-width: 0; max-width: 100%; }
+.f6-simulador .f6-sim-entrada { min-width: 0; }
+.f6-simulador audio { max-width: 100%; }
+@media(max-width:640px) {
+ .f6-simulador .f6-sim-topo .campo { width: 100% !important; }
+ .f6-simulador .f6-sim-layout { min-width: 0; }
+ .f6-simulador .f6-sim-bolha { overflow-wrap: anywhere; }
+}
