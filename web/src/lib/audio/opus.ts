@@ -80,24 +80,17 @@ export async function codificarOpus(buffer: AudioBuffer): Promise<Uint8Array | n
   const pacotes: Array<{ dados: Uint8Array; granulo: number }> = [];
   let erro: unknown = null;
 
+  // WebCodecs exige callbacks no construtor; não possui eventos ondata/onerror.
   const codificador = new api.Codificador({
-    codec: 'opus',
-    sampleRate: TAXA_OPUS,
-    numberOfChannels: 1,
-    bitrate: 32_000,
-  });
-  codificador.configure({ codec: 'opus', sampleRate: TAXA_OPUS, numberOfChannels: 1, bitrate: 32_000 });
-  codificador.onerror = (evento: unknown) => {
-    erro = evento;
-  };
-
-  // Cada pedaço de saída é um pacote Opus; o "granulo" é a posição em amostras de 48 kHz.
-  codificador.ondata = (pedaco) => {
+    output: (pedaco: PedacoCodificado) => {
       const dados = new Uint8Array(pedaco.byteLength);
       pedaco.copyTo(dados);
-    const granulo = Math.round(((pedaco.timestamp + (pedaco.duration ?? 0)) / 1_000_000) * TAXA_OPUS);
-    pacotes.push({ dados, granulo });
-  };
+      const granulo = Math.max(PRE_SKIP, Math.round(((pedaco.timestamp + (pedaco.duration ?? 0)) / 1_000_000) * TAXA_OPUS) + PRE_SKIP);
+      pacotes.push({ dados, granulo });
+    },
+    error: (evento: unknown) => { erro = evento; },
+  });
+  codificador.configure({ codec: 'opus', sampleRate: TAXA_OPUS, numberOfChannels: 1, bitrate: 32_000 });
 
   for (let inicio = 0; inicio < amostras.length; inicio += QUADRO) {
     const fim = Math.min(amostras.length, inicio + QUADRO);

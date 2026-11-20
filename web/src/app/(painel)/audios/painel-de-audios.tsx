@@ -193,7 +193,7 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
     setErroModal(null);
     setEnviandoArquivo(true);
     try {
-      const pronto = await prepararAudioDeVoz(blob, nomeOriginal);
+      const pronto = await prepararAudioDeVoz(blob, nomeOriginal, false, true);
       if (!pronto.virouVoz || !ehOggOpus(new Uint8Array(await pronto.arquivo.arrayBuffer()))) {
         setErroModal('Não foi possível converter para mensagem de voz Ogg/Opus. O áudio não foi cadastrado. Tente gravar novamente ou envie um arquivo Ogg/Opus.');
         return;

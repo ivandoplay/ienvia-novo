@@ -109,11 +109,13 @@ export async function prepararAudioDeVoz(
   nomeOriginal: string,
   /** O arquivo já saiu do gravador do navegador (que pode ter gravado OGG direto). */
   vozDoGravador = false,
+  /** Biblioteca estratégica: recodifica mesmo Ogg recebido, padronizando mono/48 kHz/32 kbps. */
+  normalizarPerfil = false,
 ): Promise<ResultadoDaConversao> {
   const tipo = tipoLimpo(arquivo.type || nomeOriginal);
   const nome = nomeOriginal || `audio.${EXTENSAO_DE_VOZ}`;
 
-  if (jaEhVozDoWhatsapp(tipo, nome)) {
+  if (!normalizarPerfil && jaEhVozDoWhatsapp(tipo, nome)) {
     return { arquivo, nome: trocarExtensao(nome, EXTENSAO_DE_VOZ), tipo: TIPO_DE_VOZ, virouVoz: true, motivo: null };
   }
 
@@ -122,7 +124,7 @@ export async function prepararAudioDeVoz(
    * fazendo a conversão em C++, sem passar por JavaScript — mais rápido e sem risco de o navegador não
    * ter o codificador Opus do WebCodecs (o caso do Chrome no Linux).
    */
-  if (!vozDoGravador && navegadorGravaOgg()) {
+  if (!normalizarPerfil && !vozDoGravador && navegadorGravaOgg()) {
     const convertido = await gravarEmOgg(arquivo);
     if (convertido) {
       return { arquivo: convertido, nome: trocarExtensao(nome, EXTENSAO_DE_VOZ), tipo: TIPO_DE_VOZ, virouVoz: true, motivo: null };
