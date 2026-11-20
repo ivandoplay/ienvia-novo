@@ -7,6 +7,7 @@ import {
   type AudioEstrategico,
 } from '@ienvia/shared/recursos';
 import { comecarAGravarEmOgg, type GravadorDeVoz } from '@/lib/audio/gravador-de-voz';
+import { ehOggOpus } from '@/lib/audio/validar-voz';
 import { prepararAudioDeVoz } from '@/lib/audio/voz-do-whatsapp';
 import { Dialogo } from '@/components/ui/dialogo';
 import { Icone } from '@/components/ui/icone';
@@ -192,6 +193,14 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
     setErroModal(null);
     setEnviandoArquivo(true);
     try {
+      const pronto = await prepararAudioDeVoz(blob, nomeOriginal);
+      if (!pronto.virouVoz || !ehOggOpus(new Uint8Array(await pronto.arquivo.arrayBuffer()))) {
+        setErroModal('Não foi possível converter para mensagem de voz Ogg/Opus. O áudio não foi cadastrado. Tente gravar novamente ou envie um arquivo Ogg/Opus.');
+        return;
+      }
+      blob = pronto.arquivo;
+      nomeOriginal = pronto.nome;
+      tipoMime = 'audio/ogg; codecs=opus';
       const mimeLimpo = (tipoMime || 'audio/ogg; codecs=opus').split(';')[0]!.trim() || 'audio/ogg';
       const prep = await prepararUploadAudioEstrategico({
         voiceId: editando.id,
@@ -231,6 +240,8 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
             }
           : atual,
       );
+    } catch {
+      setErroModal('Falha ao preparar o áudio. Nenhum arquivo incompatível foi cadastrado. Tente novamente.');
     } finally {
       setEnviandoArquivo(false);
     }
@@ -280,8 +291,7 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
         if (blob.size > 0) {
           // O WhatsApp só mostra "gravado agora" quando o arquivo é OGG/Opus: converte aqui.
           void (async () => {
-            const pronto = await prepararAudioDeVoz(blob, `gravacao.${extensao}`, /ogg/i.test(tipo));
-            await enviarAudioParaDeposito(pronto.arquivo, pronto.nome, pronto.tipo);
+            await enviarAudioParaDeposito(blob, `gravacao.${extensao}`, tipo);
           })();
         }
       };
@@ -580,8 +590,7 @@ export function PainelDeAudios({ dados, ehDono }: Props) {
                         const f = e.target.files?.[0];
                         if (f) {
                           void (async () => {
-                            const pronto = await prepararAudioDeVoz(f, f.name);
-                            await enviarAudioParaDeposito(pronto.arquivo, pronto.nome, pronto.tipo);
+                            await enviarAudioParaDeposito(f, f.name, f.type);
                           })();
                         }
                         e.target.value = '';

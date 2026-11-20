@@ -9,6 +9,7 @@ import {
   validarAudioEstrategicoParaSalvar,
   type AudioEstrategico,
 } from '@ienvia/shared/recursos';
+import { ehOggOpus } from '@/lib/audio/validar-voz';
 import { DEPOSITO } from '@/lib/inbox/arquivos';
 import { transcreverDaEmpresa } from '@/lib/ia/transcricao';
 import { ErroDeIa } from '@/lib/ia/provedores';
@@ -115,6 +116,16 @@ export async function salvarAudioEstrategico(entrada: {
   const workspaceId = sessao.workspaceAtivo.id;
   const supabase = await criarClienteServidor();
 
+  if (!entrada.objectKey.startsWith(`${workspaceId}/audios/`)) {
+    return { ok: false, erro: 'Arquivo de áudio inválido para esta conta.' };
+  }
+  // A validação do navegador não é uma barreira de confiança: confere os bytes no servidor.
+  const arquivo = await supabase.storage.from(DEPOSITO).download(entrada.objectKey);
+  if (arquivo.error || !arquivo.data || arquivo.data.size > 16 * 1024 * 1024 ||
+      !ehOggOpus(new Uint8Array(await arquivo.data.arrayBuffer()))) {
+    return { ok: false, erro: 'O áudio precisa estar em Ogg/Opus válido para envio como mensagem de voz. Grave ou envie novamente; o cadastro anterior foi preservado.' };
+  }
+
   const { data, error } = await supabase.rpc('save_my_voice_item', {
     p_workspace_id: workspaceId,
     p_voice: {
@@ -126,8 +137,8 @@ export async function salvarAudioEstrategico(entrada: {
       ai_enabled: entrada.aiEnabled !== false,
       object_key: entrada.objectKey,
       file_name: entrada.fileName || 'audio.ogg',
-      content_type: entrada.contentType || 'audio/ogg; codecs=opus',
-      byte_size: Math.max(1, Math.round(entrada.byteSize)),
+      content_type: 'audio/ogg; codecs=opus',
+      byte_size: arquivo.data.size,
       duration_sec:
         typeof entrada.durationSec === 'number' && Number.isFinite(entrada.durationSec) && entrada.durationSec >= 0
           ? Math.min(3600, Math.round(entrada.durationSec))
