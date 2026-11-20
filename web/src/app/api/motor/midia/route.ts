@@ -44,12 +44,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ erro: 'Arquivo indisponível no depósito.' }, { status: 404 });
   }
 
+  // A onda já foi analisada no cadastro; o motor não precisa de decodificador opcional.
+  const headers: Record<string, string> = {
+    'content-type': auth.content_type || 'application/octet-stream',
+    'cache-control': 'no-store',
+  };
+  if (auth.content_type?.startsWith('audio/')) {
+    const { data: voz } = await supabase.from('voice_library_items').select('waveform')
+      .eq('workspace_id', auth.workspace_id!).eq('object_key', auth.object_key).maybeSingle();
+    const onda: unknown = voz?.waveform;
+    if (Array.isArray(onda) && onda.length === 64 && onda.every(n => typeof n === 'number' && Number.isFinite(n))) {
+      headers['x-ienvia-audio-waveform'] = Buffer.from(onda.map(n => Math.max(0, Math.min(100, Math.round(n))))).toString('base64');
+    }
+  }
+
   return new NextResponse(blob, {
     status: 200,
-    headers: {
-      'content-type': auth.content_type || 'application/octet-stream',
-      'cache-control': 'no-store',
-    },
+    headers,
   });
 }
 

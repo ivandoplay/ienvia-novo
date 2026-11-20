@@ -17,6 +17,12 @@ const MAX_TEXTO = 65_536;
 const LIMITE_MIDIA_BYTES = 25 * 1024 * 1024;
 const logger = pino({ level: process.env.MOTOR_LOG_LEVEL || 'warn' });
 
+export function ondaDoCabecalho(valor) {
+  if (typeof valor !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(valor)) return undefined;
+  const bytes = Buffer.from(valor, 'base64');
+  return bytes.length === 64 && bytes.every(n => n <= 100) ? bytes : undefined;
+}
+
 export function normalizarJidParaContato(jid) {
   if (!jid || typeof jid !== 'string') return null;
   const limpo = jid.trim();
@@ -436,7 +442,13 @@ export class SupervisorDeSessoes {
         let payloadWa;
         if (att.kind === 'image') payloadWa = { image: buf, mimetype: att.content_type, caption };
         else if (att.kind === 'video') payloadWa = { video: buf, mimetype: att.content_type, caption };
-        else if (att.kind === 'audio') payloadWa = { audio: buf, mimetype: att.content_type || 'audio/ogg; codecs=opus', ptt: att.is_voice !== false };
+        else if (att.kind === 'audio') {
+          const waveform = ondaDoCabecalho(mediaResp.headers.get('x-ienvia-audio-waveform'));
+          payloadWa = { audio: buf, mimetype: att.content_type || 'audio/ogg; codecs=opus', ptt: att.is_voice !== false,
+            ...(waveform ? { waveform } : {}),
+            ...(Number.isFinite(att.duration_seconds) && att.duration_seconds > 0 ? { seconds: Math.round(att.duration_seconds) } : {}),
+          };
+        }
         else payloadWa = { document: buf, mimetype: att.content_type, fileName: att.file_name || 'arquivo', caption };
 
         envioIniciado = true;

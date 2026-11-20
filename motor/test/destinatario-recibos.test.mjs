@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {EventEmitter} from 'node:events';
-import {resolverDestinatario} from '../src/destinatario.mjs';import {SupervisorDeSessoes} from '../src/sessoes.mjs';
+import {resolverDestinatario} from '../src/destinatario.mjs';import {ondaDoCabecalho,SupervisorDeSessoes} from '../src/sessoes.mjs';
 const phone='5586981638438@s.whatsapp.net',canonical='558681638438@s.whatsapp.net';
 test('WhatsApp resolve o nono dígito; cache é exclusivo do socket',async()=>{
  let calls=0;const a={onWhatsApp:async j=>{calls++;assert.equal(j,phone);return [{exists:true,jid:canonical}];}};
@@ -37,4 +37,17 @@ test('recibos duráveis ignoram entrada alheia e sobrevivem a rede/confirmacão 
  fail=false;s.proximoRecibo=0;await s.escoarRecibos();assert.equal(s.filaRecibos.contagem().live,1);
  confirmed=['dossie'];s.proximoRecibo=0;await s.escoarRecibos();assert.equal(s.filaRecibos.contagem().live,0);
  sock.ev.emit('message-receipt.update',[{key:{fromMe:true,id:'dossie'},receipt:{readTimestamp:123}}]);assert.equal(s.filaRecibos.listar(1,'live')[0].valor.receipt.status,4);
+}));
+
+test('onda do WhatsApp preserva 64 amplitudes reais e rejeita entrada inválida',()=>{
+ const onda=Buffer.from(Array.from({length:64},(_,i)=>(i*7)%101));
+ assert.deepEqual(ondaDoCabecalho(onda.toString('base64')),onda);
+ for(const v of [null,'','oops',Buffer.alloc(64,255).toString('base64'),Buffer.alloc(63).toString('base64')])assert.equal(ondaDoCabecalho(v),undefined);
+});
+test('envia PTT com onda e duração explícitas sem alterar o arquivo de áudio',()=>temp(async root=>{
+ const onda=Buffer.from(Array.from({length:64},(_,i)=>i));const audio=Buffer.from('audio-original');let payload;
+ const s=new SupervisorDeSessoes({rootDir:root,panelUrl:'https://example.invalid',deviceToken:'x',fetchFn:async(u)=>u.includes('/midia?')?new Response(audio,{headers:{'x-ienvia-audio-waveform':onda.toString('base64')}}):new Response('{}')});
+ s.sessoes.set('i',{status:'connected',sock:{onWhatsApp:async()=>[{exists:true,jid:canonical}],sendMessage:async(j,b)=>{payload=b;return {key:{id:'wave-test'}};}}});
+ await s.executarComando({id:'cmd-wave',instance_id:'i',message_id:'m',command_type:'send_media',payload:{recipient:phone},attachment:{kind:'audio',content_type:'audio/ogg; codecs=opus',is_voice:true,duration_seconds:13}});
+ assert.deepEqual(payload.waveform,onda);assert.deepEqual(payload.audio,audio);assert.equal(payload.ptt,true);assert.equal(payload.seconds,13);
 }));

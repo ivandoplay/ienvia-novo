@@ -20,7 +20,7 @@ describe('regras do motor local', () => {
   });
 
   test('versão semântica estrita evita downgrade e rejeita formatos inválidos', () => {
-    expect(analisarVersao(VERSAO_ATUAL_DO_MOTOR)).toEqual([6, 2, 2]);
+    expect(analisarVersao(VERSAO_ATUAL_DO_MOTOR)).toEqual([6, 2, 3]);
     expect(ehVersaoMaisNova('6.0.0', '6.0.1')).toBe(true);
     expect(ehVersaoMaisNova('6.0.0', '6.1.0')).toBe(true);
     expect(ehVersaoMaisNova('6.0.0', '7.0.0')).toBe(true);
