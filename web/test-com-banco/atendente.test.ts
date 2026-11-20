@@ -873,6 +873,30 @@ describe('catálogo, áudios estratégicos e PIX automático', () => {
     });
   });
 
+  test('arquivo de áudio substituído volta a ficar elegível sem apagar o envio anterior', async () => {
+    await banco.comoServico(async () => {
+      await preparar();
+      const audioId = '00000000-0000-4000-8000-000000000831';
+      const antiga = `${LOJA_A}/audios/${audioId}/antiga.webm`;
+      const nova = `${LOJA_A}/audios/${audioId}/corrigida.ogg`;
+      const buf = audioDeExemplo(2);
+      deposito.set(nova, { dados: buf, conteudo: 'audio/ogg' });
+      await sql(`insert into public.voice_library_items (id, workspace_id, name, transcription, when_to_use, ai_enabled, object_key, file_name, content_type, byte_size)
+        values ('${audioId}', '${LOJA_A}', 'Pagamento', 'Aceitamos PIX.', 'Formas de pagamento', true, '${nova}', 'corrigida.ogg', 'audio/ogg; codecs=opus', ${buf.length});`);
+      await sql(`insert into public.messages (workspace_id, conversation_id, instance_id, direction, source_engine, actor_type, status, sent_voice_id, media_object_key, occurred_at)
+        values ('${LOJA_A}', '${CONVERSA_A}', '${CHIP_A}', 'outbound', 'evolution', 'ai', 'sent', '${audioId}', '${antiga}', clock_timestamp() - interval '5 minutes');`);
+      roteiro = (pedido) => {
+        expect(pedido.sistema).toContain(`[[ENVIAR_AUDIO:${audioId}]]`);
+        return `[[ENVIAR_AUDIO:${audioId}]]`;
+      };
+      await chegou('Quais as formas de pagamento?');
+      await rodarOQueFicouParaDepois();
+      expect(await enviadasPelaEvolution()).toMatchObject([{ tipo: 'audio' }]);
+      const msgs = await ler<{media_object_key:string}>('select media_object_key from public.messages where conversation_id=$1 and sent_voice_id=$2 order by occurred_at',[CONVERSA_A,audioId]);
+      expect(msgs.map(m=>m.media_object_key)).toEqual([antiga,nova]);
+    });
+  });
+
   test('envia áudio estratégico PTT puro, bloqueia repetição na 2a vez e respeita Skill S06', async () => {
     await banco.comoServico(async () => {
       await preparar();
