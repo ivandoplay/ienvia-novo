@@ -261,7 +261,7 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
     blocos.push(
       [
         '=== BIBLIOTECA DE ÁUDIOS ESTRATÉGICOS (VOZ HUMANA REAL PRÉ-GRAVADA) ===',
-        'Você possui os áudios abaixo na voz real do atendimento (enviados como mensagem de voz nativa no WhatsApp). Quando um áudio abaixo responder com precisão ao ponto atual da conversa, prefira acioná-lo em vez de escrever textão:',
+        'Você possui os áudios abaixo na voz real do atendimento (enviados como mensagem de voz nativa no WhatsApp). Quando um áudio abaixo responder com precisão ao ponto atual da conversa, envie-o usando o comando indicado em vez de substituí-lo por uma resposta digitada, mesmo curta. O campo Quando usar orienta a escolha, mas a transcrição deve ser compatível com a pergunta; nunca envie áudio só por coincidência de palavras:',
         ...listaAudios,
         '',
         'REGRAS DE OURO AO ACIONAR UM ÁUDIO ([[ENVIAR_AUDIO:ID_DO_AUDIO]]):',

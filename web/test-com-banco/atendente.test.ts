@@ -886,14 +886,18 @@ describe('catálogo, áudios estratégicos e PIX automático', () => {
         values ('${audioId}', '${LOJA_A}', 'Boas-vindas', 'Oi! Fazemos entregas até meia-noite.', 'Horário de entrega', 'M01', true, '${audioKey}', 'boas-vindas.ogg', 'audio/ogg; codecs=opus', ${audioBuf.length}, 6);
       `);
 
-      // Turno 1: IA decide enviar áudio puro (sem texto extra).
+      // Turno 1: resposta inicial ignora o áudio; a revisão recupera o PTT sem duplicar texto.
+      let chamadasAudio = 0;
       roteiro = (pedido) => {
+        chamadasAudio++;
         expect(pedido.sistema).toContain(`[[ENVIAR_AUDIO:${audioId}]]`);
+        if (!pedido.sistema.includes('REVISÃO OBRIGATÓRIA DA BIBLIOTECA')) return 'Entregamos até meia-noite.';
         return `[[ENVIAR_AUDIO:${audioId}]]`;
       };
       await chegou('Vocês entregam até que horas?');
       await rodarOQueFicouParaDepois();
 
+      expect(chamadasAudio).toBe(2);
       const enviosT1 = (await enviadasPelaEvolution()) as Array<{ tipo?: string; bytes?: number }>;
       expect(enviosT1).toHaveLength(1);
       expect(enviosT1[0]).toMatchObject({ tipo: 'audio', bytes: audioBuf.length });
