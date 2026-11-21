@@ -42,3 +42,13 @@ describe('autonomia v2 — opt-in e proteção', () => {
     expect(prompt).not.toContain('reconheça em uma frase curta');
   });
 });
+
+test('despedida acolhedora é opt-in: responde uma vez e não transforma gentileza em pressão comercial', () => {
+  const gerar = (gatilhosDeRepasse: string) => montarInstrucoes({ ...BASE_EM_BRANCO, arquivos: [], gatilhosDeRepasse }, { agora: new Date('2026-11-12T12:00:00Z') });
+  const prompt = gerar('[POLITICA_AUTONOMIA_V2]\n[DESPEDIDA_ACOLHEDORA_V1]');
+  expect(prompt).toContain('No primeiro agradecimento ou despedida, responda UMA vez');
+  expect(prompt).toContain('preço/orçamento tiver sido uma preocupação expressa');
+  expect(prompt).toContain('não faça pergunta comercial');
+  expect(prompt).not.toContain('quando a pessoa mandar só um "ok, obrigado" final');
+  expect(gerar('[POLITICA_AUTONOMIA_V2]')).toContain('quando a pessoa mandar só um "ok, obrigado" final');
+});

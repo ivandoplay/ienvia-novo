@@ -484,6 +484,12 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
       'Uma notificação por assunto pendente. Nunca combine NOTIFICAR_ADMIN com pausa, fechamento, opt-out ou despedida. ' +
       'As regras específicas de autonomia prevalecem sobre exemplos genéricos de repasse. Nunca envie PIX por conta própria neste modo.';
   }
+  if ((base.gatilhosDeRepasse ?? '').includes('[DESPEDIDA_ACOLHEDORA_V1]')) {
+    resultado = resultado.replace(
+      /\[\[SILENCIO_CORTESIA\]\] ->[^\n]*/,
+      '[[SILENCIO_CORTESIA]] -> usar somente se você JÁ respondeu à despedida/agradecimento e chegou apenas outra cortesia final sem pergunta nova. No primeiro agradecimento ou despedida, responda UMA vez com educação, conforme o contexto, sem notificar nem pausar. Deixe abertura para dúvidas sobre o modelo; mencione opções mais em conta somente se preço/orçamento tiver sido uma preocupação expressa. Não presuma falta de dinheiro, não pressione, não faça pergunta comercial nem reenvie catálogo/áudio. Pedido de parar contato e pausa manual continuam tendo prioridade.',
+    );
+  }
   return resultado;
 }
 
