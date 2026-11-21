@@ -5,7 +5,7 @@ import type {BancoDeTeste} from './helpers/banco';
 let banco:BancoDeTeste;beforeAll(async()=>{banco=await bancoComCenario();});
 async function rpc<T=Record<string,unknown>>(sql:string,p:unknown[]=[]){return (await banco.db.query<{r:T}>(sql,p)).rows[0]!.r;}
 async function base(){return (await rpc<{id:string}>("select public.save_my_ai_agent($1,null,$2) r",[LOJA_A,{label:'Retenção '+randomUUID().slice(0,8),golden_rules:'Original'}])).id;}
-async function begin(a:string,thread:string|null=null,id=randomUUID()){const data=await rpc<{thread_id:string}>('select public.begin_my_training_ai_turn($1,$2,$3,$4,$5,$6) r',[LOJA_A,a,thread,id,'gemini','Olá']);return {...data,id};}
+async function begin(a:string,thread:string|null=null,id:string=randomUUID()){const data=await rpc<{thread_id:string}>('select public.begin_my_training_ai_turn($1,$2,$3,$4,$5,$6) r',[LOJA_A,a,thread,id,'gemini','Olá']);return {...data,id};}
 async function finish(id:string,changes:unknown[]=[]){return rpc('select public.finish_my_training_ai_turn($1,$2,$3,$4,null) r',[LOJA_A,id,'Resposta',changes]);}
 async function read(a:string,t:string|null=null){return rpc<{threads:Array<{id:string}>;turns:Array<{id:string;status:string}>;thread_expired:boolean}>('select public.read_my_training_ai_chat($1,$2,$3) r',[LOJA_A,a,t]);}
 async function admin<T>(sql:string,p:unknown[]=[]){await banco.db.exec('reset role');const r=await banco.db.query<T>(sql,p);await banco.db.exec('set local role authenticated');return r.rows;}

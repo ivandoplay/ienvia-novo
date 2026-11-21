@@ -22,6 +22,7 @@ import { lerMotorDeIa } from '@/lib/dados/ia';
 import { carregarRecursosDaInbox } from '@/lib/dados/recursos';
 import { lerBaseDeTreinamento, lerBasesDeTreinamento } from '@/lib/dados/treinamento';
 import { contextoDaChaveDeIa, decifrar, lerChaveDoCofre } from '@/lib/ia/cofre';
+import { usaAutonomiaV2 } from '@/lib/ia/autonomia';
 import { lerResposta, montarInstrucoes } from '@/lib/ia/instrucoes';
 import { ErroDeIa, gerarResposta, type AnexoParaIa, type Fala, type RespostaDeIa } from '@/lib/ia/provedores';
 import {
@@ -288,7 +289,7 @@ export async function enviarMensagemSimulador(entrada: {
     return { ok: false, erro: ultimoErro || 'Nenhum provedor de IA conseguiu responder agora.' };
   }
 
-  const lida = lerResposta(resposta.texto);
+  const lida = lerResposta(resposta.texto, { autonomia: usaAutonomiaV2(leituraBase.base) });
 
   const itensResolvidos: NonNullable<MensagemSimulador['itensCatalogo']> = [];
   for (const idItem of lida.itensParaEnviar) {

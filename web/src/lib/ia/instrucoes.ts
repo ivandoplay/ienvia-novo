@@ -1,3 +1,4 @@
+import { lerAvisoSemPausa, usaAutonomiaV2, type TopicoDeAviso } from '@/lib/ia/autonomia';
 /**
  * As instruções que a IA recebe a cada conversa (o "cérebro"), montadas a partir de uma base de treinamento,
  * recursos do workspace (Catálogo, PIX, Biblioteca de Áudios) e a leitura dos comandos que ela escreve.
@@ -110,6 +111,7 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
   const atendente = base.nomeDoAtendente.trim();
   const nicho = base.nicho.trim() || 'Atendimento';
   const sozinho = base.primeiraPessoa;
+  const autonomia = usaAutonomiaV2(base);
   const tom = TONS.find((item) => item.valor === base.tom) ?? TONS[0]!;
   const blocos: string[] = [];
 
@@ -459,7 +461,30 @@ export function montarInstrucoes(base: DadosDaBase, contexto: ContextoDaConversa
   );
   blocos.push(comandos.join('\n'));
 
-  return blocos.join('\n\n');
+  let resultado = blocos.join('\n\n');
+  if (autonomia) {
+    // Substitui também as instruções genéricas de sistema que antes contradiziam a base.
+    resultado = resultado
+      .replace('- O que NÃO está escrito aqui você não sabe: preço, prazo, estoque, agenda, endereço, condição, ou se existe um produto ou serviço que não aparece aqui. Não invente, não chute e não diga nem que tem nem que não tem. Diga, em uma frase curta, que vai confirmar, e termine com [[CHAMAR_HUMANO:...]].', '- Consulte todas as fontes e o contexto. Modelo/cidade/detalhe faltante que o cliente pode esclarecer pede pergunta curta, não repasse. Informação realmente ausente: somente [[CHAMAR_HUMANO:motivo]], sem texto ou mídia.')
+      .replace('- Sempre que você disser que vai confirmar, verificar ou chamar alguém, a mensagem TEM de terminar com [[CHAMAR_HUMANO:...]]. Sem o comando ninguém é avisado, e o contato fica esperando à toa.', '- Não diga vou verificar, vou confirmar, vou passar ou equivalentes. Repasse com pausa não tem texto nem mídia para o cliente.')
+      .replace(/- Sempre que o cliente pedir a chave PIX[^\n]*/, '- Pedido de pagar ou chave PIX: somente [[CHAMAR_HUMANO:pagamento solicitado]], sem envio automático de chave ou QR Code.')
+      .replace('4. Envie NO MÁXIM0 1 áudio por resposta', '4. Envie até 3 áudios distintos pertinentes por resposta, todos antes do complemento por texto')
+      .replace('(máx. 1 por resposta; pode ir sozinho sem texto)', '(até 3 distintos por resposta; áudios antes do complemento em texto)')
+      .replace(/- Quando o contato mandar um comprovante de pagamento ou quiser confirmar um pedido com humano, reconheça em uma frase curta e termine com \[\[CHAMAR_HUMANO:\.\.\.\]\]\./, '- Comprovante ou fechamento real: somente [[CHAMAR_HUMANO:pagamento ou fechamento]], sem reconhecimento ao cliente.')
+      .replace(/- Se o contato pedir algo assim, mandar um comprovante ou quiser fechar um pedido:[^\n]*/, '- Pedido de recurso indisponível, comprovante ou fechamento real: repasse silencioso, sem texto ao cliente. Interesse inicial não é fechamento.')
+      .replace(/   - o contato quiser contratar, fechar pedido, combinar dia e horário,[^\n]*/, '   - houver fechamento efetivo/pagamento, negociação final, test-drive/reserva, informação realmente ausente ou outra situação de pausa explicitamente definida na política. Interesse inicial, dúvidas e visita futura não bastam.')
+      .replace(/   Antes do comando, escreva só um reconhecimento curto e natural[^\n]*/, '   Neste modo, responda SOMENTE com o comando de repasse: nenhum reconhecimento, texto, áudio ou foto.')
+      .replace(/- Quando precisar usar \[\[CHAMAR_HUMANO:[^\n]*/, '- Quando precisar pausar, use somente [[CHAMAR_HUMANO:motivo]], sem mensagem ao cliente.');
+    const coresExpressas = catalogoAtivo.filter(item => /(?:cores?|dispon[ií]vel).{0,35}(?:estoque|rosa|lil[aá]s|preto|vermelh|branc)/i.test(item.description));
+    if (coresExpressas.length) resultado += '\n\n=== CORES: LEITURA OBRIGATÓRIA ANTES DE REPASSAR ===\n' + coresExpressas.map(item => `${item.name}: ${item.description}`).join('\n') + '\nCor expressamente em estoque na descrição: responder diretamente, sem aviso. Isso não comprova disponibilidade numa unidade específica.';
+    resultado += '\n\n=== NOTIFICAÇÃO SEM PAUSA — EXCEÇÕES EXPLÍCITAS ===\n' +
+      'Use [[NOTIFICAR_ADMIN:visita_a_caminho|resumo]] somente se o cliente já estiver a caminho/chegando agora. ' +
+      'Use [[NOTIFICAR_ADMIN:simulacao_parcelamento|modelo, parcelas, entrada e contexto]] só depois de obter com/sem entrada e o valor se houver. ' +
+      'Estes dois comandos avisam sem pausar. Na simulação pode pedir um momento; não calcule taxas ou parcelas. ' +
+      'Uma notificação por assunto pendente. Nunca combine NOTIFICAR_ADMIN com pausa, fechamento, opt-out ou despedida. ' +
+      'As regras específicas de autonomia prevalecem sobre exemplos genéricos de repasse. Nunca envie PIX por conta própria neste modo.';
+  }
+  return resultado;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -483,6 +508,8 @@ export interface RespostaLida {
   itensParaEnviar: string[];
   /** ID do áudio solicitado via [[ENVIAR_AUDIO:ID]] (máx. 1 por resposta). */
   audiosParaEnviar: string[];
+  /** Aviso interno sem mudar a pausa; apenas no modo explicitamente habilitado. */
+  notificarAdmin?: { topico: TopicoDeAviso; motivo: string };
   /** `true` quando a IA acionou [[ENVIAR_PIX]] ou [[ENVIAR_PIX:VALOR]]. */
   enviarPix: boolean;
   /** Valor numérico opcional extraído de [[ENVIAR_PIX:VALOR]]. */
@@ -496,7 +523,7 @@ const limparMotivo = (motivo: string | undefined, padrao: string) => (motivo ?? 
  * em maiúsculas ou minúsculas, com ou sem motivo. Qualquer outro "[[...]]" que sobrar é retirado:
  * código interno nunca chega ao contato.
  */
-export function lerResposta(bruto: string): RespostaLida {
+export function lerResposta(bruto: string, opcoes: { autonomia?: boolean } = {}): RespostaLida {
   let texto = String(bruto ?? '');
   const lida: RespostaLida = {
     texto: '',
@@ -518,7 +545,7 @@ export function lerResposta(bruto: string): RespostaLida {
   });
   texto = texto.replace(/\[{1,2}\s*ENVIAR_AUDIO(?:\s*:\s*([^\]]*?))?\s*\]{1,2}/gi, (_, id?: string) => {
     const limpo = (id ?? '').trim();
-    if (limpo && lida.audiosParaEnviar.length < 1 && !lida.audiosParaEnviar.includes(limpo)) {
+    if (limpo && lida.audiosParaEnviar.length < (opcoes.autonomia ? 3 : 1) && !lida.audiosParaEnviar.includes(limpo)) {
       lida.audiosParaEnviar.push(limpo);
     }
     return '';
@@ -549,6 +576,22 @@ export function lerResposta(bruto: string): RespostaLida {
     lida.silencioDeCortesia = true;
     return '';
   });
+
+  texto = texto.replace(/\[{1,2}\s*NOTIFICAR_ADMIN(?:\s*:\s*([^\]]*?))?\s*\]{1,2}/gi, (_, valor?: string) => {
+    const aviso = opcoes.autonomia ? lerAvisoSemPausa(valor ?? '') : null;
+    if (aviso && !lida.notificarAdmin) lida.notificarAdmin = aviso;
+    return '';
+  });
+  if (opcoes.autonomia && (lida.chamarHumano !== null || lida.enviarPix)) {
+    // Falha fechada: nenhuma palavra/mídia de negociação ou PIX vaza num repasse silencioso.
+    lida.chamarHumano ??= 'Cliente solicitou pagamento PIX';
+    lida.pausaSilenciosa = lida.chamarHumano;
+    lida.audiosParaEnviar = [];
+    lida.itensParaEnviar = [];
+    lida.enviarPix = false;
+    lida.valorPix = null;
+  }
+  if (lida.pausaSilenciosa !== null || lida.chamarHumano !== null || lida.pararContato !== null || lida.encerrarContato !== null || lida.silencioDeCortesia) delete lida.notificarAdmin;
 
   // Qualquer comando desconhecido que sobrar não vai para o contato.
   texto = texto.replace(/\[\[[^\]]*\]\]/g, '');

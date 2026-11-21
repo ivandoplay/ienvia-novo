@@ -1014,3 +1014,63 @@ describe('segredos', () => {
     });
   });
 });
+
+describe('autonomia v2 sem regressão nas demais bases', () => {
+  test('repasse ignora texto indevido e fica bloqueado até liberação manual', async () => {
+    await banco.comoServico(async () => {
+      await preparar({ trava: true });
+      await sql(`update public.ai_agents set escalation_rules='[POLITICA_AUTONOMIA_V2]' where id='${BASE}';`);
+      roteiro = () => 'Vou verificar aqui! [[CHAMAR_HUMANO:menor valor]]';
+      await chegou('Qual o menor valor?');
+      await rodarOQueFicouParaDepois();
+      expect(await enviadasPelaEvolution()).toHaveLength(0);
+      expect(await conversaDe()).toMatchObject({ automation_paused: true, stage: 'waiting_human' });
+      await chegou('E aí?');
+      await rodarOQueFicouParaDepois();
+      expect(await enviadasPelaEvolution()).toHaveLength(0);
+    });
+  });
+
+  test('simulação permanece ativa e deduplica assunto até liberação manual', async () => {
+    await banco.comoServico(async () => {
+      await preparar();
+      await sql(`update public.workspace_ai_settings set admin_alert_enabled=true, admin_alert_whatsapp='5586999999999' where workspace_id='${LOJA_A}';`);
+      await sql(`update public.ai_agents set escalation_rules='[POLITICA_AUTONOMIA_V2]' where id='${BASE}';`);
+      roteiro = () => 'Aguarde um momento para a simulação, por favor. [[NOTIFICAR_ADMIN:simulacao_parcelamento|12x com entrada de 2000]]';
+      await chegou('12x com entrada de 2000');
+      await rodarOQueFicouParaDepois();
+      expect(await conversaDe()).toMatchObject({ automation_paused: false, ai_pause_reason: null });
+      expect(await ler('select topic from private.ai_topic_notices')).toEqual([{ topic: 'simulacao_parcelamento' }]);
+      await chegou('Estou aguardando');
+      await rodarOQueFicouParaDepois();
+      expect(await ler('select topic from private.ai_topic_notices')).toHaveLength(1);
+      expect(await vezesDe(CONVERSA_A)).toMatchObject([{ status: 'answered' }, { status: 'answered' }]);
+      await sql(`update public.conversations set automation_paused=true where id='${CONVERSA_A}'; update public.conversations set automation_paused=false where id='${CONVERSA_A}';`);
+      expect(await ler('select topic from private.ai_topic_notices')).toHaveLength(0);
+    });
+  });
+
+  test('envia dois áudios antes do complemento por texto', async () => {
+    await banco.comoServico(async () => {
+      await preparar();
+      await sql(`update public.ai_agents set escalation_rules='[POLITICA_AUTONOMIA_V2]' where id='${BASE}';`);
+      const ids = ['00000000-0000-4000-8000-000000000881', '00000000-0000-4000-8000-000000000882'];
+      const bytes = audioDeExemplo(2);
+      for (const [i,id] of ids.entries()) {
+        const key = `${LOJA_A}/audios/${id}/00000000-0000-4000-8000-000000000883/audio.ogg`;
+        deposito.set(key, { dados: bytes, conteudo: 'audio/ogg' });
+        await sql(`insert into public.voice_library_items(id,workspace_id,name,transcription,when_to_use,ai_enabled,object_key,file_name,content_type,byte_size,duration_sec)
+          values('${id}','${LOJA_A}','Assunto ${i}','Explicação do assunto ${i}','Quando perguntar ${i}',true,'${key}','audio.ogg','audio/ogg; codecs=opus',${bytes.length},6);`);
+      }
+      roteiro = () => `[[ENVIAR_AUDIO:${ids[0]}]][[ENVIAR_AUDIO:${ids[1]}]] A autonomia informada é de 40 a 50 km, conforme uso.`;
+      await chegou('Pagamento, garantia e autonomia?');
+      await rodarOQueFicouParaDepois();
+      const envios = await enviadasPelaEvolution() as Array<{ tipo?: string; texto: string }>;
+      expect(envios).toHaveLength(3);
+      expect(envios[0]?.tipo).toBe('audio');
+      expect(envios[1]?.tipo).toBe('audio');
+      expect(envios[2]?.texto).toContain('40 a 50');
+      expect(await vezesDe(CONVERSA_A)).toMatchObject([{ status: 'answered' }]);
+    });
+  });
+});
