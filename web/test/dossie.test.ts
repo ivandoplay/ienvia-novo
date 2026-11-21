@@ -61,3 +61,14 @@ describe('Dossiê administrativo no WhatsApp', () => {
     }
   });
 });
+
+test('aviso de simulação ou chegada não anuncia pausa ou modo manual ao administrador', () => {
+  for (const topico of ['simulacao_parcelamento', 'visita_a_caminho']) {
+    const texto = montarDossieParaAdmin({ tipo: 'handoff', agora: AGORA, detalhe: `notice_only:${topico}`, recado: 'Aviso sem pausa', mensagens: [] });
+    expect(texto).toContain('IA CONTINUA ATIVA');
+    expect(texto).toContain('a IA NÃO foi pausada');
+    expect(texto).not.toContain('MODO MANUAL ATIVADO');
+    expect(texto).not.toContain('A IA foi pausada nesta conversa para você assumir');
+    expect(texto).toContain(topico === 'simulacao_parcelamento' ? 'Preparar a simulação' : 'Acompanhar a chegada');
+  }
+});

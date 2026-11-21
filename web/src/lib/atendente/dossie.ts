@@ -147,7 +147,10 @@ function proximaJogadaPadrao(tipo: TipoDoDossie, gatilho: string): string {
 
 /** Constrói o texto completo (pronto para WhatsApp, com até ~4000 caracteres). */
 export function montarDossieParaAdmin(dados: DadosDoDossie): string {
-  const cab = TITULO_DO_TIPO[dados.tipo];
+  const somenteAviso = dados.tipo === 'handoff' && /^notice_only:(visita_a_caminho|simulacao_parcelamento)$/.test(dados.detalhe ?? '');
+  const cab = somenteAviso
+    ? { icone: '🔔', titulo: 'AVISO ADMINISTRATIVO — IA CONTINUA ATIVA', motivo: 'Solicitação que exige uma ação da equipe, sem pausar a conversa' }
+    : TITULO_DO_TIPO[dados.tipo];
   const fuso = dados.fuso || 'America/Fortaleza';
   const nomeCliente = nomeDoContatoLimpo(dados.nomeDoContato);
   const telefoneCliente = formatarTelefoneParaDossie(dados.telefoneDoContato, dados.recipientJid);
@@ -174,7 +177,11 @@ export function montarDossieParaAdmin(dados: DadosDoDossie): string {
       ? 'Lead de demonstração simulando uma solicitação comercial'
       : limparTexto(falasCliente[0], 180) || 'Atendimento em andamento no WhatsApp');
 
-  const proximaJogada = limparTexto(recadoLido?.proximaJogada, 260) || proximaJogadaPadrao(dados.tipo, gatilho);
+  const proximaJogada = limparTexto(recadoLido?.proximaJogada, 260) || (somenteAviso
+    ? dados.detalhe === 'notice_only:simulacao_parcelamento'
+      ? 'Preparar a simulação com modelo, parcelas e entrada informados. A IA continua disponível para outras dúvidas.'
+      : 'Acompanhar a chegada do cliente na unidade indicada. A IA continua disponível para outras dúvidas.'
+    : proximaJogadaPadrao(dados.tipo, gatilho));
 
   const linhas: string[] = [
     `${cab.icone} *${cab.titulo}*`,
@@ -207,9 +214,11 @@ export function montarDossieParaAdmin(dados: DadosDoDossie): string {
 
   linhas.push(
     '',
-    dados.tipo === 'test'
-      ? '_Teste de configuração concluído: nenhuma conversa real foi alterada._'
-      : '⚡ _A IA foi pausada nesta conversa para você assumir._',
+    somenteAviso
+      ? '⚡ _Somente aviso: a IA NÃO foi pausada nesta conversa._'
+      : dados.tipo === 'test'
+        ? '_Teste de configuração concluído: nenhuma conversa real foi alterada._'
+        : '⚡ _A IA foi pausada nesta conversa para você assumir._',
   );
 
   const texto = linhas.join('\n');
