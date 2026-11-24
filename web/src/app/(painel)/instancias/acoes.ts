@@ -440,14 +440,29 @@ export async function gerarQrCode(
 export async function conferirChip(
   chipId: string,
   completo = false,
-): Promise<Resultado<{ estado: string; telefone: string | null; pairingQr?: string | null; pairingCode?: string | null }>> {
+): Promise<Resultado<{ estado: string; telefone: string | null; pairingQr?: string | null; pairingCode?: string | null; erroConexao?: string | null }>> {
   const contexto = await abrirContexto();
   if ('erro' in contexto) return { ok: false, erro: contexto.erro };
   const chip = await buscarChip(contexto, chipId);
   if (!chip) return { ok: false, erro: CHIP_NAO_ENCONTRADO };
   if (chip.engine === 'baileys') {
+    const { data: ultimoComando, error: erroComando } = await contexto.supabase
+      .from('local_motor_commands')
+      .select('status, error_detail, created_at')
+      .eq('workspace_id', contexto.workspaceId)
+      .eq('instance_id', chip.id)
+      .in('command_type', ['connect_qr', 'connect_code', 'disconnect', 'clear_session'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const falhou = ultimoComando?.status === 'failed';
     return {
       ok: true,
+      erroConexao: falhou
+        ? (ultimoComando.error_detail?.includes('401')
+          ? 'O WhatsApp recusou a sessão salva. Solicite um novo QR ou código para iniciar outra sessão.'
+          : 'O motor não conseguiu concluir o pareamento. Solicite um novo QR ou código.')
+        : erroComando ? 'Não foi possível consultar o resultado da conexão. Tente novamente.' : null,
       estado: chip.status,
       telefone: chip.connected_phone ?? null,
       pairingQr: chip.pairing_qr ?? null,

@@ -170,7 +170,7 @@ export class SupervisorDeSessoes {
     return path.join(this.rootDir, 'data', 'wa_auth', instanceId);
   }
 
-  async iniciarConexao(instanceId, { mode = 'qr', phone = null, onReady = () => {}, onFailure = () => {}, tentativa = 0 } = {}) {
+  async iniciarConexao(instanceId, { mode = 'qr', phone = null, onReady = () => {}, onFailure = () => {}, tentativa = 0, recuperarSessao = false, sessaoRecuperada = false } = {}) {
     await this.pararSessao(instanceId, false);
     const pasta = this.pastaDaSessao(instanceId);
     fs.mkdirSync(pasta, { recursive: true, mode: 0o700 });
@@ -251,21 +251,38 @@ export class SupervisorDeSessoes {
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
+        const estavaConectado = registro.status === 'connected';
         registro.status = 'disconnected';
         this.sessoes.delete(instanceId);
+        const vaiRecuperar = !estavaConectado && !this.encerrando &&
+          ((!loggedOut && tentativa < 2) || (loggedOut && recuperarSessao && !sessaoRecuperada));
         await this.chamarApi('/api/motor/estado', {
           instance_id: instanceId,
-          status: 'disconnected',
+          status: vaiRecuperar ? 'connecting' : 'disconnected',
         }).catch(() => undefined);
         this.onLog(`[motor] conexão encerrada ${instanceId}; status=${statusCode ?? 'desconhecido'}; modo=${mode}; tentativa=${tentativa}`);
         // Reinício de handshake (515) não depende de creds.json já ter sido escrito.
         // Não trocar código por QR e não deixar timer velho ressuscitar sessão limpa.
         if (this.sessoes.has(instanceId)) return;
+        // Pedido explícito de pareamento: uma credencial recusada não pode bloquear
+        // todas as tentativas futuras. Preservar os arquivos e recuperar só uma vez.
+        if (loggedOut && recuperarSessao && !sessaoRecuperada && !estavaConectado && !this.encerrando) {
+          try {
+            const arquivo = path.join(this.rootDir, 'data', 'wa_auth_recusadas', instanceId + '-' + crypto.randomUUID());
+            fs.mkdirSync(path.dirname(arquivo), { recursive: true, mode: 0o700 });
+            fs.renameSync(pasta, arquivo);
+            await this.iniciarConexao(instanceId, { mode, phone, onReady, onFailure,
+              tentativa: 0, recuperarSessao, sessaoRecuperada: true });
+          } catch {
+            onFailure(new Error('Sessão recusada (401); não foi possível preparar novo pareamento.'));
+          }
+          return;
+        }
         if (!loggedOut && !this.encerrando && tentativa < 2) {
           const timer = setTimeout(() => {
             this.reconexoes.delete(instanceId);
             if (!this.encerrando && !this.sessoes.has(instanceId)) {
-              this.iniciarConexao(instanceId, { mode, phone, onReady, onFailure, tentativa: tentativa + 1 })
+              this.iniciarConexao(instanceId, { mode, phone, onReady, onFailure, tentativa: tentativa + 1, recuperarSessao, sessaoRecuperada })
                 .catch(onFailure);
             }
           }, 4000);
@@ -412,6 +429,7 @@ export class SupervisorDeSessoes {
               phone: cmd.payload?.phone,
               onReady: resolve,
               onFailure: reject,
+              recuperarSessao: true,
             }).catch(reject);
           });
           await concluir('succeeded');

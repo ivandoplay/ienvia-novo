@@ -1,4 +1,4 @@
-export const VERSAO_ATUAL_DO_MOTOR = '6.2.5';
+export const VERSAO_ATUAL_DO_MOTOR = '6.2.6';
 
 /** Janela máxima sem sinal do aparelho local para ainda considerá-lo on-line no painel. */
 export const JANELA_EXECUTOR_ONLINE_MS = 90_000;

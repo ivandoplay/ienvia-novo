@@ -52,6 +52,7 @@ interface Conexao {
   renovacoes: number;
   expirou: boolean;
   aguardandoMotor?: boolean;
+  erro?: string;
 }
 
 interface Recado {
@@ -144,7 +145,11 @@ export function PainelDeChips({
     const conferencia = setInterval(() => {
       void conferirChip(chipId)
         .then(async (resposta) => {
-          if (!ativo || !resposta.ok) return;
+          if (!ativo) return;
+          if (!resposta.ok) {
+            setConexao(atual => atual?.chipId === chipId ? { ...atual, erro: resposta.erro, expirou: true, aguardandoMotor: false, imagem: null, codigo: null } : atual);
+            return;
+          }
           if (resposta.estado === 'connected') {
             setConexao(null);
             avisar(chipId, { tipo: 'ok', texto: 'Chip conectado!' });
@@ -152,6 +157,12 @@ export function PainelDeChips({
             return;
           }
           if (motor === 'baileys') {
+            if (resposta.erroConexao || ['disconnected', 'error', 'revoked'].includes(resposta.estado)) {
+              setConexao(atual => atual?.chipId === chipId ? { ...atual,
+                erro: resposta.erroConexao || 'A tentativa de conexão terminou. Solicite um novo QR ou código.',
+                expirou: true, aguardandoMotor: false, imagem: null, codigo: null } : atual);
+              return;
+            }
             if (resposta.pairingCode) {
               setConexao((atual) =>
                 atual && atual.chipId === chipId
@@ -171,6 +182,12 @@ export function PainelDeChips({
         .catch(() => undefined);
     }, motor === 'baileys' ? INTERVALO_LOCAL : INTERVALO_DE_CONFERENCIA);
 
+    const limiteLocal = motor === 'baileys' && !conexao.imagem && !conexao.codigo
+      ? setTimeout(() => {
+          if (ativo) setConexao(atual => atual?.chipId === chipId ? { ...atual,
+            erro: 'O motor não disponibilizou QR ou código em 60 segundos. Confira se o aparelho está online e tente novamente.',
+            expirou: true, aguardandoMotor: false } : atual);
+        }, 60_000) : null;
     const renovacao =
       motor === 'evolution'
         ? setTimeout(() => {
@@ -196,6 +213,7 @@ export function PainelDeChips({
       ativo = false;
       clearInterval(conferencia);
       if (renovacao) clearTimeout(renovacao);
+      if (limiteLocal) clearTimeout(limiteLocal);
     };
   }, [conexao, router]);
 
@@ -571,7 +589,7 @@ function CartaoDoChip({
               )}
               <div>
                 {conexao.expirou ? (
-                  <p className="chip-conexao-dica">O QR Code venceu. Gere outro para continuar.</p>
+                  <p className="chip-conexao-dica">{conexao.erro || 'O QR Code venceu. Gere outro para continuar.'}</p>
                 ) : conexao.codigo ? (
                   <>
                     <p className="chip-codigo">{formatarCodigoDePareamento(conexao.codigo)}</p>
