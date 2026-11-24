@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { PresencaDeResposta } from './presenca.mjs';
 import { BufferJSON } from '@whiskeysockets/baileys';
 import { abrirFila } from './fila-historico.mjs';
 import { resolverDestinatario } from './destinatario.mjs';
@@ -141,6 +142,7 @@ export class SupervisorDeSessoes {
     this.escoandoHistorico = new Set();
     this.filaRecibos = abrirFila(path.join(rootDir,'data','fila-recibos'));
     this.proximoRecibo = 0;
+    this.presencaDeResposta = new PresencaDeResposta({ rootDir, onLog });
   }
 
   headers(extra = {}) {
@@ -307,6 +309,10 @@ export class SupervisorDeSessoes {
         if (!msg.key?.id) continue;
         try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: false, msg: JSON.stringify(msg, BufferJSON.replacer) }); }
         catch (err) { this.onLog(`[motor] Entrada não salva: ${err.message}`); }
+        if (type === 'notify') {
+          try { this.presencaDeResposta.receber(instanceId, msg); }
+          catch (err) { this.onLog(`[motor] Chave de leitura não salva: ${err.message}`); }
+        }
       }
     });
   }
@@ -462,8 +468,13 @@ export class SupervisorDeSessoes {
       if (cmd.command_type === 'send_text') {
         const jid = await resolverDestinatario(registro.sock, cmd.payload?.recipient);
         const texto = cmd.payload?.body_text;
-        envioIniciado = true;
-        const enviado = await registro.sock.sendMessage(jid, { text: texto });
+        const enviar = async () => {
+          envioIniciado = true;
+          return registro.sock.sendMessage(jid, { text: texto });
+        };
+        const enviado = cmd.payload?.admin_alert_delivery_id ? await enviar() : await this.presencaDeResposta.enviar({
+          instanceId: cmd.instance_id, sock: registro.sock, jid, tipo: 'text', texto, enviar,
+        });
         const waId = enviado?.key?.id || null;
         await concluir(waId ? 'sent' : 'uncertain', { provider_message_id: waId });
         return;
@@ -498,8 +509,11 @@ export class SupervisorDeSessoes {
         }
         else payloadWa = { document: buf, mimetype: att.content_type, fileName: att.file_name || 'arquivo', caption };
 
-        envioIniciado = true;
-        const enviado = await registro.sock.sendMessage(jid, payloadWa);
+        const enviado = await this.presencaDeResposta.enviar({
+          instanceId: cmd.instance_id, sock: registro.sock, jid,
+          tipo: att.kind === 'audio' && att.is_voice !== false ? 'audio' : 'media',
+          enviar: async () => { envioIniciado = true; return registro.sock.sendMessage(jid, payloadWa); },
+        });
         const waId = enviado?.key?.id || null;
         await concluir(waId ? 'sent' : 'uncertain', { provider_message_id: waId });
         return;
