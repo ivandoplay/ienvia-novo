@@ -127,7 +127,9 @@ export function extrairConteudoMensagemBaileys(msg) {
 }
 
 export class SupervisorDeSessoes {
-  constructor({ rootDir, panelUrl, deviceToken, fetchFn = fetch, onLog = console.log }) {
+  constructor({ rootDir, panelUrl, deviceToken, fetchFn = fetch, onLog = console.log, socketFactory = makeWASocket, authFactory = useMultiFileAuthState, versionFactory = fetchLatestBaileysVersion }) {
+    this.socketFactory = socketFactory; this.authFactory = authFactory; this.versionFactory = versionFactory;
+    this.reconexoes = new Map();
     this.rootDir = rootDir;
     this.panelUrl = panelUrl;
     this.deviceToken = deviceToken;
@@ -168,20 +170,20 @@ export class SupervisorDeSessoes {
     return path.join(this.rootDir, 'data', 'wa_auth', instanceId);
   }
 
-  async iniciarConexao(instanceId, { mode = 'qr', phone = null } = {}) {
+  async iniciarConexao(instanceId, { mode = 'qr', phone = null, onReady = () => {}, onFailure = () => {}, tentativa = 0 } = {}) {
     await this.pararSessao(instanceId, false);
     const pasta = this.pastaDaSessao(instanceId);
     fs.mkdirSync(pasta, { recursive: true, mode: 0o700 });
 
-    const { state, saveCreds } = await useMultiFileAuthState(pasta);
+    const { state, saveCreds } = await this.authFactory(pasta);
     let version;
     try {
-      ({ version } = await fetchLatestBaileysVersion());
+      ({ version } = await this.versionFactory());
     } catch {
       version = undefined;
     }
 
-    const sock = makeWASocket({
+    const sock = this.socketFactory({
       ...(version ? { version } : {}),
       auth: state,
       logger,
@@ -208,8 +210,10 @@ export class SupervisorDeSessoes {
             status: 'connecting',
             pairing_qr: dataUrl,
           });
+          onReady('qr');
         } catch (err) {
           this.onLog(`[motor] falha ao enviar QR da instância ${instanceId}: ${err.message}`);
+          onFailure(new Error('Não foi possível disponibilizar o QR no painel.'));
         }
       }
 
@@ -223,13 +227,17 @@ export class SupervisorDeSessoes {
             status: 'connecting',
             pairing_code: String(codigo || '').toUpperCase(),
           });
+          if (!codigo) throw new Error('WhatsApp retornou código vazio.');
+          onReady('code');
         } catch (err) {
           this.onLog(`[motor] falha ao gerar código de pareamento ${instanceId}: ${err.message}`);
+          onFailure(new Error('Falha ao solicitar código de pareamento ao WhatsApp.'));
         }
       }
 
       if (connection === 'open') {
         registro.status = 'connected';
+        onReady('connected');
         const jid = sock.user?.id || '';
         const phoneMatch = /^([1-9]\d{5,19})/.exec(jid);
         const connectedPhone = phoneMatch ? `+${phoneMatch[1]}` : null;
@@ -249,12 +257,21 @@ export class SupervisorDeSessoes {
           instance_id: instanceId,
           status: 'disconnected',
         }).catch(() => undefined);
-        if (!loggedOut && !this.encerrando) {
-          setTimeout(() => {
-            if (!this.encerrando && fs.existsSync(path.join(pasta, 'creds.json'))) {
-              this.iniciarConexao(instanceId, { mode: 'qr' }).catch(() => undefined);
+        this.onLog(`[motor] conexão encerrada ${instanceId}; status=${statusCode ?? 'desconhecido'}; modo=${mode}; tentativa=${tentativa}`);
+        // Reinício de handshake (515) não depende de creds.json já ter sido escrito.
+        // Não trocar código por QR e não deixar timer velho ressuscitar sessão limpa.
+        if (this.sessoes.has(instanceId)) return;
+        if (!loggedOut && !this.encerrando && tentativa < 2) {
+          const timer = setTimeout(() => {
+            this.reconexoes.delete(instanceId);
+            if (!this.encerrando && !this.sessoes.has(instanceId)) {
+              this.iniciarConexao(instanceId, { mode, phone, onReady, onFailure, tentativa: tentativa + 1 })
+                .catch(onFailure);
             }
           }, 4000);
+          this.reconexoes.set(instanceId, timer);
+        } else {
+          onFailure(new Error(`WhatsApp encerrou a conexão (status ${statusCode ?? 'desconhecido'}).`));
         }
       }
     });
@@ -358,6 +375,8 @@ export class SupervisorDeSessoes {
   }
 
   async pararSessao(instanceId, limparArquivos = false) {
+    clearTimeout(this.reconexoes.get(instanceId));
+    this.reconexoes.delete(instanceId);
     const atual = this.sessoes.get(instanceId);
     this.sessoes.delete(instanceId);
     if (atual?.sock) {
@@ -383,14 +402,24 @@ export class SupervisorDeSessoes {
       });
 
     try {
-      if (cmd.command_type === 'connect_qr') {
-        await this.iniciarConexao(cmd.instance_id, { mode: 'qr' });
-        await concluir('succeeded');
-        return;
-      }
-      if (cmd.command_type === 'connect_code') {
-        await this.iniciarConexao(cmd.instance_id, { mode: 'code', phone: cmd.payload?.phone });
-        await concluir('succeeded');
+      if (['connect_qr','connect_code'].includes(cmd.command_type)) {
+        let timeout;
+        try {
+          await new Promise((resolve, reject) => {
+            timeout = setTimeout(() => reject(new Error('Tempo esgotado: WhatsApp não disponibilizou QR/código em 45 segundos.')), 45_000);
+            this.iniciarConexao(cmd.instance_id, {
+              mode: cmd.command_type === 'connect_code' ? 'code' : 'qr',
+              phone: cmd.payload?.phone,
+              onReady: resolve,
+              onFailure: reject,
+            }).catch(reject);
+          });
+          await concluir('succeeded');
+        } catch (err) {
+          await this.pararSessao(cmd.instance_id, false);
+          await this.chamarApi('/api/motor/estado', { instance_id: cmd.instance_id, status: 'disconnected' }).catch(() => undefined);
+          await concluir('failed', { error_detail: String(err.message).slice(0, 500) });
+        } finally { clearTimeout(timeout); }
         return;
       }
       if (cmd.command_type === 'disconnect') {
