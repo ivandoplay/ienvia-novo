@@ -529,6 +529,17 @@ const limparMotivo = (motivo: string | undefined, padrao: string) => (motivo ?? 
  * em maiúsculas ou minúsculas, com ou sem motivo. Qualquer outro "[[...]]" que sobrar é retirado:
  * código interno nunca chega ao contato.
  */
+/** Corrige escapes que o modelo às vezes escreve literalmente, não o transporte JSON.
+ * Mantém exemplos de código, URLs e caminhos intactos. Nunca usar em texto digitado pelo operador.
+ */
+export function normalizarTextoGeradoParaWhatsApp(texto: string): string {
+  const protegidos = /(```[\s\S]*?```|`[^`\n]*`|https?:\/\/[^\s]+|[A-Za-z]:\\[^\s]+|\\\\(?![nr]\\)[^\\\s]+\\[^\s]+)/g;
+  return texto.split(protegidos).map((parte, i) => i % 2 ? parte : parte
+    .replace(/\\+(?:r\\+n|n)/g, '\n')
+    .replace(/R\$[ \t]*\$[ \t]*(?=\d)/g, 'R$ ')
+  ).join('');
+}
+
 export function lerResposta(bruto: string, opcoes: { autonomia?: boolean } = {}): RespostaLida {
   let texto = String(bruto ?? '');
   const lida: RespostaLida = {
@@ -603,6 +614,7 @@ export function lerResposta(bruto: string, opcoes: { autonomia?: boolean } = {})
   texto = texto.replace(/\[\[[^\]]*\]\]/g, '');
   // O WhatsApp destaca com *um* asterisco; dois aparecem crus na tela do cliente.
   texto = texto.replace(/\*\*([^*\n]+)\*\*/g, '*$1*');
+  texto = normalizarTextoGeradoParaWhatsApp(texto);
   texto = texto
     .split('\n')
     .map((linha) => linha.replace(/[ \t]+$/g, ''))
