@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { iniciarPainelTerminal } from './painel-terminal.mjs';
 import { invalidarAcessoRevogado, pedirNovoCodigo } from './repareamento.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -166,11 +167,22 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
     rootDir: ROOT_DIR,
     panelUrl: cfg.panelUrl,
     deviceToken: cfg.deviceToken,
+    onLog: () => {}, // O painel exibe estados; nao despejar logs internos na tela.
   });
 
+  let estadoPainel = 'Conectando';
+  let avisoOperacao = '';
+  const painel = args.once ? null : iniciarPainelTerminal({ obterVisao: () => {
+    const fila = supervisor.filaHistorico.contagem();
+    const chips = [...supervisor.estados].map(([id, e]) => ({ desde: e.desde, nome: supervisor.nomes.get(id) || 'WhatsApp', estado: e.estado, emSegundos: e.proxima ? Math.max(1, Math.ceil((e.proxima-Date.now())/1000)) : null }));
+    const comProblema = chips.find(c => c.estado === 'reconnecting' || c.estado === 'disconnected' || c.estado === 'pairing');
+    return { versao: versaoAtual, painel: estadoPainel, chips, live: fila.live, history: fila.history, recebidas: supervisor.historicoRecebido, envios: supervisor.enviosAtivos,
+      sincronizacao: fila.history ? 'Importando' : supervisor.ultimoHistorico ? 'Lotes recebidos processados' : 'Aguardando WhatsApp',
+      aviso: avisoOperacao || (comProblema?.estado === 'pairing' ? 'Abra o painel para concluir o QR ou codigo do WhatsApp.' : comProblema?.estado === 'reconnecting' ? (Date.now()-(comProblema.desde || Date.now()) > 300000 ? 'Sem WhatsApp ha mais de 5 min. Verifique a rede; novas tentativas continuam.' : 'Conexao caiu. Reconectando automaticamente.') : comProblema ? 'Abra o painel e verifique o numero desconectado.' : '') };
+  }});
   const pendencias = supervisor.filaHistorico.contagem();
   console.log(`[motor] Fila prioritária: ${pendencias.live} novas; ${pendencias.history} históricas. Processamento independente ativado.`);
-  const pararEscoamento = args.once ? async () => {} : iniciarEscoamento(supervisor);
+  const pararEscoamento = args.once ? async () => {} : iniciarEscoamento(supervisor, { onError: () => { avisoOperacao = 'Comunicacao instavel. Filas preservadas para nova tentativa.'; } });
   let encerrado = false;
   let acessoRevogado = false;
   const parar = async () => {
@@ -188,6 +200,7 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
   const plataforma = detectarPlataformaMotor();
   const meta = metadataDoAparelho();
 
+  try {
   while (!encerrado) {
     const agora = Date.now();
 
@@ -199,15 +212,23 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
           version: versaoAtual,
           metadata: meta,
         });
+        estadoPainel = 'Conectado';
+        avisoOperacao = '';
         for (const inst of pulso.instances || []) {
-          if (inst.status === 'connected' && !supervisor.sessoes.has(inst.id)) {
+          supervisor.nomes.set(inst.id, inst.display_name || inst.name || 'WhatsApp');
+          if (!supervisor.estados.has(inst.id)) supervisor.estados.set(inst.id, { estado: inst.status });
+          if ((inst.status === 'connected' || (['connecting','disconnected'].includes(inst.status) && supervisor.intencoes.tem(inst.id))) && !supervisor.sessoes.has(inst.id) && !supervisor.reconexoes.has(inst.id)) {
             const cred = path.join(ROOT_DIR, 'data', 'wa_auth', inst.id, 'creds.json');
             if (fs.existsSync(cred)) {
-              supervisor.iniciarConexao(inst.id, { mode: 'qr' }).catch(() => undefined);
+              supervisor.iniciarConexao(inst.id, { mode: 'qr' }).catch(() => {
+                if (!supervisor.encerrando) supervisor.agendarReconexao(inst.id, { mode: 'qr', tentativa: 1 }, 4000);
+              });
             }
           }
         }
       } catch (err) {
+        estadoPainel = 'Sem comunicacao';
+        avisoOperacao = 'Sem acesso ao painel. Verifique a internet; nova tentativa automatica.';
         if (err.status === 401) {
           console.error('[motor] Acesso revogado. Voltando ao pareamento com um novo código.');
           acessoRevogado = true;
@@ -224,6 +245,7 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
         await supervisor.executarComando(cmd);
       }
     } catch (err) {
+      avisoOperacao = 'Consulta de comandos indisponivel. Verifique a rede; nova tentativa automatica.';
       if (err.status === 401) {
         console.error('[motor] Acesso revogado. Voltando ao pareamento com um novo código.');
         acessoRevogado = true;
@@ -236,8 +258,15 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
 
     if (agora - ultimaChecagemUpdate >= 10 * 60_000) {
       ultimaChecagemUpdate = agora;
+      let drenagemDaAtualizacao = false;
       try {
-        const upd = await verificarEAtualizar({ rootDir: ROOT_DIR, panelUrl: cfg.panelUrl, versaoAtual });
+        const upd = await verificarEAtualizar({ rootDir: ROOT_DIR, panelUrl: cfg.panelUrl, versaoAtual, antesDeAplicar: async () => {
+          if (encerrado) throw new Error('Encerramento solicitado');
+          drenagemDaAtualizacao = true;
+          avisoOperacao = 'Atualizacao validada. Salvando filas e reiniciando automaticamente.';
+          painel?.atualizar();
+          await parar();
+        } });
         if (upd.updated) {
           console.log(`[motor] Atualizado para v${upd.newVersion}! Reinicie ou aguarde o launcher.`);
           await parar();
@@ -246,12 +275,19 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
           return;
         }
       } catch (err) {
+        if (drenagemDaAtualizacao) { process.exitCode = 42; return; }
+        if (encerrado) return;
+        avisoOperacao = 'Atualizacao adiada com seguranca. Nova tentativa automatica.';
         console.warn(`[motor] Checagem de atualização ignorada: ${err.message}`);
       }
     }
 
     if (args.once) break;
     await new Promise((r) => setTimeout(r, 2500));
+  }
+  } finally {
+    painel?.parar();
+    process.off('SIGINT', parar); process.off('SIGTERM', parar);
   }
   process.off('SIGINT', parar); process.off('SIGTERM', parar);
   if (acessoRevogado) {

@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { IntencoesDeConexao } from './intencoes.mjs';
+import { atrasoReconexao, podeRetomarSessao, ehMensagemHistorica } from './operacao.mjs';
 import { PresencaDeResposta } from './presenca.mjs';
 import { BufferJSON } from '@whiskeysockets/baileys';
 import { abrirFila } from './fila-historico.mjs';
@@ -9,6 +11,7 @@ import QRCode from 'qrcode';
 import pino from 'pino';
 import makeWASocket, {
   DisconnectReason,
+  Browsers,
   downloadMediaMessage,
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
@@ -16,7 +19,7 @@ import makeWASocket, {
 
 const MAX_TEXTO = 65_536;
 const LIMITE_MIDIA_BYTES = 25 * 1024 * 1024;
-const logger = pino({ level: process.env.MOTOR_LOG_LEVEL || 'warn' });
+const logger = pino({ level: 'silent' });
 
 export function ondaDoCabecalho(valor) {
   if (typeof valor !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(valor)) return undefined;
@@ -131,6 +134,15 @@ export class SupervisorDeSessoes {
   constructor({ rootDir, panelUrl, deviceToken, fetchFn = fetch, onLog = console.log, socketFactory = makeWASocket, authFactory = useMultiFileAuthState, versionFactory = fetchLatestBaileysVersion }) {
     this.socketFactory = socketFactory; this.authFactory = authFactory; this.versionFactory = versionFactory;
     this.reconexoes = new Map();
+    this.geracoes = new Map();
+    this.intencoes = new IntencoesDeConexao(rootDir);
+    this.estados = new Map();
+    this.nomes = new Map();
+    this.historicoRecebido = 0;
+    this.ultimoHistorico = 0;
+    this.enviosAtivos = 0;
+    this.retornosFila = new Map();
+    this.nomesContatos = new Map();
     this.rootDir = rootDir;
     this.panelUrl = panelUrl;
     this.deviceToken = deviceToken;
@@ -173,7 +185,11 @@ export class SupervisorDeSessoes {
   }
 
   async iniciarConexao(instanceId, { mode = 'qr', phone = null, onReady = () => {}, onFailure = () => {}, tentativa = 0, recuperarSessao = false, sessaoRecuperada = false } = {}) {
-    await this.pararSessao(instanceId, false);
+    const geracao = (this.geracoes.get(instanceId) || 0) + 1;
+    this.geracoes.set(instanceId, geracao);
+    await this.pararSessao(instanceId, false, true);
+    const inicioConexao = Date.now();
+    this.estados.set(instanceId, { estado: 'connecting', desde: this.estados.get(instanceId)?.desde });
     const pasta = this.pastaDaSessao(instanceId);
     fs.mkdirSync(pasta, { recursive: true, mode: 0o700 });
 
@@ -185,6 +201,7 @@ export class SupervisorDeSessoes {
       version = undefined;
     }
 
+    if (this.encerrando || this.geracoes.get(instanceId) !== geracao) return;
     const sock = this.socketFactory({
       ...(version ? { version } : {}),
       auth: state,
@@ -192,9 +209,11 @@ export class SupervisorDeSessoes {
       printQRInTerminal: false,
       markOnlineOnConnect: false,
       syncFullHistory: true,
+      browser: Browsers.macOS('Desktop'),
+      shouldSyncHistoryMessage: () => true,
     });
 
-    const registro = { sock, status: 'connecting', qrTimer: null, codeRequested: false };
+    const registro = { sock, status: 'connecting', qrTimer: null, codeRequested: false, estabelecida: false };
     this.sessoes.set(instanceId, registro);
 
     sock.ev.on('creds.update', saveCreds);
@@ -212,6 +231,7 @@ export class SupervisorDeSessoes {
             status: 'connecting',
             pairing_qr: dataUrl,
           });
+          this.estados.set(instanceId, { estado: 'pairing' });
           onReady('qr');
         } catch (err) {
           this.onLog(`[motor] falha ao enviar QR da instância ${instanceId}: ${err.message}`);
@@ -230,6 +250,7 @@ export class SupervisorDeSessoes {
             pairing_code: String(codigo || '').toUpperCase(),
           });
           if (!codigo) throw new Error('WhatsApp retornou código vazio.');
+          this.estados.set(instanceId, { estado: 'pairing' });
           onReady('code');
         } catch (err) {
           this.onLog(`[motor] falha ao gerar código de pareamento ${instanceId}: ${err.message}`);
@@ -239,6 +260,10 @@ export class SupervisorDeSessoes {
 
       if (connection === 'open') {
         registro.status = 'connected';
+        registro.estabelecida = true;
+        try { this.intencoes.definir(instanceId, true); } catch { this.onLog('[motor] Nao foi possivel salvar a retomada automatica.'); }
+        tentativa = 0;
+        this.estados.set(instanceId, { estado: 'connected' });
         onReady('connected');
         const jid = sock.user?.id || '';
         const phoneMatch = /^([1-9]\d{5,19})/.exec(jid);
@@ -256,8 +281,13 @@ export class SupervisorDeSessoes {
         const estavaConectado = registro.status === 'connected';
         registro.status = 'disconnected';
         this.sessoes.delete(instanceId);
-        const vaiRecuperar = !estavaConectado && !this.encerrando &&
-          ((!loggedOut && tentativa < 2) || (loggedOut && recuperarSessao && !sessaoRecuperada));
+        if ([401,403,411,440,500].includes(statusCode)) {
+          try { this.intencoes.definir(instanceId, false); } catch {}
+        }
+        const retomar = podeRetomarSessao(statusCode, registro.estabelecida || state.creds?.registered === true);
+        const vaiRecuperar = !this.encerrando && (retomar || (!estavaConectado &&
+          ((!loggedOut && tentativa < 2 && ![403,411,440,500].includes(statusCode)) || (loggedOut && recuperarSessao && !sessaoRecuperada))));
+        this.estados.set(instanceId, { estado: vaiRecuperar ? 'reconnecting' : 'disconnected', desde: this.estados.get(instanceId)?.desde || Date.now(), proxima: vaiRecuperar ? Date.now() + atrasoReconexao(tentativa) : null });
         await this.chamarApi('/api/motor/estado', {
           instance_id: instanceId,
           status: vaiRecuperar ? 'connecting' : 'disconnected',
@@ -280,22 +310,22 @@ export class SupervisorDeSessoes {
           }
           return;
         }
-        if (!loggedOut && !this.encerrando && tentativa < 2) {
-          const timer = setTimeout(() => {
-            this.reconexoes.delete(instanceId);
-            if (!this.encerrando && !this.sessoes.has(instanceId)) {
-              this.iniciarConexao(instanceId, { mode, phone, onReady, onFailure, tentativa: tentativa + 1, recuperarSessao, sessaoRecuperada })
-                .catch(onFailure);
-            }
-          }, 4000);
-          this.reconexoes.set(instanceId, timer);
+        if (!this.encerrando && (retomar || (!loggedOut && tentativa < 2 && ![403,411,440,500].includes(statusCode)))) {
+          this.agendarReconexao(instanceId, { mode, phone, onReady, onFailure, tentativa: tentativa + 1, recuperarSessao, sessaoRecuperada }, atrasoReconexao(tentativa));
         } else {
           onFailure(new Error(`WhatsApp encerrou a conexão (status ${statusCode ?? 'desconhecido'}).`));
         }
       }
     });
 
-    sock.ev.on('messaging-history.set', ({ messages }) => {
+    sock.ev.on('messaging-history.set', ({ messages, contacts, chats }) => {
+      this.historicoRecebido += (messages || []).length;
+      this.ultimoHistorico = Date.now();
+      for (const c of [...(contacts || []), ...(chats || [])]) {
+        const nome = c.notify || c.name || c.verifiedName;
+        if (this.nomesContatos.size >= 50000) this.nomesContatos.delete(this.nomesContatos.keys().next().value);
+        if (c.id && nome) this.nomesContatos.set(instanceId + ':' + c.id, String(nome).slice(0,150));
+      }
       for (const msg of messages || []) {
         if (!msg.key?.id) continue;
         try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: true, msg: JSON.stringify(msg, BufferJSON.replacer) }); }
@@ -307,9 +337,9 @@ export class SupervisorDeSessoes {
       if (!['notify','append'].includes(type)) return;
       for (const msg of messages || []) {
         if (!msg.key?.id) continue;
-        try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: false, msg: JSON.stringify(msg, BufferJSON.replacer) }); }
+        try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: ehMensagemHistorica(type, msg, inicioConexao), msg: JSON.stringify(msg, BufferJSON.replacer) }); }
         catch (err) { this.onLog(`[motor] Entrada não salva: ${err.message}`); }
-        if (type === 'notify') {
+        if (type === 'notify' && !ehMensagemHistorica(type, msg, inicioConexao)) {
           try { this.presencaDeResposta.receber(instanceId, msg); }
           catch (err) { this.onLog(`[motor] Chave de leitura não salva: ${err.message}`); }
         }
@@ -354,6 +384,7 @@ export class SupervisorDeSessoes {
     try {
       for (const item of this.filaHistorico.listar(tipo === 'history' ? 2 : 10, tipo)) {
         if (this.encerrando) break;
+        if ((this.retornosFila.get(item.nome)?.proxima || 0) > Date.now()) continue;
         const { instanceId } = item.valor;
         const msg = JSON.parse(item.valor.msg, BufferJSON.reviver);
         const sock = this.sessoes.get(instanceId)?.sock;
@@ -367,20 +398,24 @@ export class SupervisorDeSessoes {
           }
           const x = extrairConteudoMensagemBaileys(msg);
           if (!x) { this.filaHistorico.confirmar(item.nome); continue; }
-          const r = await this.chamarApi('/api/motor/eventos', { historical: item.valor.historical === true, instance_id: instanceId, event_id: msg.key.id, sender_jid: jid, push_name: msg.pushName || '', body_text: x.text, occurred_at: normalizarTimestampMsg(msg.messageTimestamp), from_me: Boolean(msg.key.fromMe), media: x.media });
-          if (r.result === 'accepted' && r.message_id && r.media?.status === 'pending' && x.mediaMessage) {
+          const r = await this.chamarApi('/api/motor/eventos', { historical: item.valor.historical === true, instance_id: instanceId, event_id: msg.key.id, sender_jid: jid, push_name: msg.pushName || this.nomesContatos.get(instanceId + ':' + msg.key?.remoteJid) || this.nomesContatos.get(instanceId + ':' + jid) || '', body_text: x.text, occurred_at: normalizarTimestampMsg(msg.messageTimestamp), from_me: Boolean(msg.key.fromMe), media: x.media });
+          if (['accepted','duplicate'].includes(r.result) && r.message_id && ['pending','failed'].includes(r.media?.status) && x.mediaMessage) {
             await this.enviarMidiaRecebida(r.message_id, x.mediaMessage, x.media);
           }
-          if (['accepted','duplicate','ignored'].includes(r.result)) this.filaHistorico.confirmar(item.nome);
-        } catch (err) { this.onLog(`[motor] Histórico preservado para nova tentativa: ${err.message}`); }
+          if (['accepted','duplicate','ignored'].includes(r.result)) { this.filaHistorico.confirmar(item.nome); this.retornosFila.delete(item.nome); }
+        } catch (err) {
+          const tentativas = (this.retornosFila.get(item.nome)?.tentativas || 0) + 1;
+          this.retornosFila.set(item.nome, { tentativas, proxima: Date.now() + atrasoReconexao(tentativas) });
+          this.onLog('[motor] Mensagem preservada. Nova tentativa automatica.');
+        }
       }
     } finally { this.escoandoHistorico.delete(tipo); }
   }
 
   async enviarMidiaRecebida(messageId, msg, mediaMeta) {
     const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger });
-    if (!Buffer.isBuffer(buffer) || buffer.length === 0) return;
-    if (buffer.length > LIMITE_MIDIA_BYTES) return;
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('Midia indisponivel; nova tentativa posterior.');
+    if (buffer.length > LIMITE_MIDIA_BYTES) throw new Error('Midia acima do limite de 25 MB.');
     const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
     const url = `${this.panelUrl}/api/motor/midia?message_id=${encodeURIComponent(messageId)}`;
     const resp = await this.fetchFn(url, {
@@ -397,7 +432,26 @@ export class SupervisorDeSessoes {
     }
   }
 
-  async pararSessao(instanceId, limparArquivos = false) {
+  agendarReconexao(instanceId, opcoes, atraso) {
+    clearTimeout(this.reconexoes.get(instanceId));
+    const geracao = this.geracoes.get(instanceId);
+    this.estados.set(instanceId, { estado: 'reconnecting', desde: this.estados.get(instanceId)?.desde || Date.now(), proxima: Date.now() + atraso });
+    const timer = setTimeout(() => {
+      this.reconexoes.delete(instanceId);
+      if (this.encerrando || this.sessoes.has(instanceId) || this.geracoes.get(instanceId) !== geracao) return;
+      this.iniciarConexao(instanceId, opcoes).catch(() => {
+        if (!this.encerrando && !this.sessoes.has(instanceId) && this.geracoes.get(instanceId) === geracao + 1)
+          this.agendarReconexao(instanceId, { ...opcoes, tentativa: opcoes.tentativa + 1 }, atrasoReconexao(opcoes.tentativa));
+      });
+    }, atraso);
+    this.reconexoes.set(instanceId, timer);
+  }
+
+  async pararSessao(instanceId, limparArquivos = false, preservarGeracao = false) {
+    if (!preservarGeracao) {
+      this.geracoes.set(instanceId, (this.geracoes.get(instanceId) || 0) + 1);
+      this.estados.set(instanceId, { estado: 'disconnected' });
+    }
     clearTimeout(this.reconexoes.get(instanceId));
     this.reconexoes.delete(instanceId);
     const atual = this.sessoes.get(instanceId);
@@ -416,6 +470,8 @@ export class SupervisorDeSessoes {
   }
 
   async executarComando(cmd) {
+    const ehComandoDeEnvio = ['send_text','send_media'].includes(cmd.command_type);
+    if (ehComandoDeEnvio) this.enviosAtivos++;
     let envioIniciado = false;
     const concluir = (outcome, extra = {}) =>
       this.chamarApi('/api/motor/comandos', {
@@ -447,12 +503,14 @@ export class SupervisorDeSessoes {
         return;
       }
       if (cmd.command_type === 'disconnect') {
+        this.intencoes.definir(cmd.instance_id, false);
         await this.pararSessao(cmd.instance_id, false);
         await this.chamarApi('/api/motor/estado', { instance_id: cmd.instance_id, status: 'disconnected' }).catch(() => undefined);
         await concluir('succeeded');
         return;
       }
       if (cmd.command_type === 'clear_session') {
+        this.intencoes.definir(cmd.instance_id, false);
         await this.pararSessao(cmd.instance_id, true);
         await this.chamarApi('/api/motor/estado', { instance_id: cmd.instance_id, status: 'disconnected' }).catch(() => undefined);
         await concluir('succeeded');
@@ -524,11 +582,15 @@ export class SupervisorDeSessoes {
       // Se falhou durante envio sem confirmação clara do socket, marca como incerto para nunca reenviar.
       const ehEnvio = cmd.command_type === 'send_text' || cmd.command_type === 'send_media';
       await concluir(ehEnvio && envioIniciado ? 'uncertain' : 'failed', { error_detail: err.message }).catch(() => undefined);
+    } finally {
+      if (ehComandoDeEnvio) this.enviosAtivos--;
     }
   }
 
   async encerrarTudo() {
     this.encerrando = true;
+    for (const timer of this.reconexoes.values()) clearTimeout(timer);
+    this.reconexoes.clear();
     await Promise.all([...this.sessoes.keys()].map((id) => this.pararSessao(id, false)));
   }
 }

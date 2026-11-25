@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: 'Aparelho não autorizado ou chip desvinculado.' }, { status: 401 });
   }
 
-  if (gravado.result === 'accepted' && gravado.workspace_id && gravado.ai?.scheduled && gravado.ai.turn_id && gravado.message_id) {
+  if (corpo.historical !== true && gravado.result === 'accepted' && gravado.workspace_id && gravado.ai?.scheduled && gravado.ai.turn_id && gravado.message_id) {
     const workspaceId = gravado.workspace_id;
     const vez = { vezId: gravado.ai.turn_id, gatilhoId: gravado.message_id };
     const esperaMs = typeof gravado.ai.wait_ms === 'number' && gravado.ai.wait_ms > 0 ? gravado.ai.wait_ms : 0;

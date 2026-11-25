@@ -208,6 +208,7 @@ export async function verificarEAtualizar({
   rootDir,
   panelUrl,
   versaoAtual,
+  antesDeAplicar = async () => {},
   chavePublicaPem = CHAVE_PUBLICA_ATUALIZACAO_MOTOR,
   fetchFn = fetch,
 }) {
@@ -220,6 +221,7 @@ export async function verificarEAtualizar({
   }
   const envelope = await resp.json();
   const manifesto = verificarManifestoAssinado(envelope, chavePublicaPem);
+  if (Number(process.versions.node.split('.')[0]) < manifesto.min_node_major) throw new Error('Esta atualizacao exige uma versao mais nova do Node.');
   if (!ehVersaoMaisNova(versaoAtual, manifesto.version)) {
     return { updated: false, currentVersion: versaoAtual, remoteVersion: manifesto.version };
   }
@@ -231,10 +233,12 @@ export async function verificarEAtualizar({
     throw new Error(`Falha ao baixar pacote v${manifesto.version}: HTTP ${pkgResp.status}`);
   }
   const zipBuffer = Buffer.from(await pkgResp.arrayBuffer());
+  if (zipBuffer.length !== manifesto.size) throw new Error('Tamanho do pacote nao confere. Atualizacao adiada.');
   const hashReal = sha256Hex(zipBuffer);
   if (hashReal !== manifesto.sha256.toLowerCase()) {
     throw new Error(`Hash SHA-256 do pacote v${manifesto.version} não confere.`);
   }
+  await antesDeAplicar();
   const aplicados = aplicarAtualizacaoAtomica({ rootDir, zipBuffer });
   return { updated: true, newVersion: manifesto.version, filesUpdated: aplicados };
 }

@@ -195,3 +195,29 @@ test('configuração local e normalizador de eventos Baileys', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('atualização só escreve após assinatura, download e drenagem concluída', async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'motor-drain-'));
+ try {
+  fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'src/teste.mjs'),'antigo');
+  const zip=criarZipDeTeste([{path:'ienvia-motor/src/teste.mjs',content:'novo'}]);
+  const {publicKey,privateKey}=crypto.generateKeyPairSync('ed25519',{publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}});
+  const manifest={version:'6.3.0',sha256:sha256Hex(zip),size:zip.length,published_at:'2026-11-12T00:00:00Z',min_node_major:24};
+  const envelope={manifest,algorithm:'ed25519',signature:crypto.sign(null,Buffer.from(serializarManifestoCanonico(manifest)),privateKey).toString('base64')};
+  let liberar;const trava=new Promise(r=>{liberar=r;});let drenando=false;
+  const run=verificarEAtualizar({rootDir:root,panelUrl:'https://example.invalid',versaoAtual:'6.2.8',chavePublicaPem:publicKey,fetchFn:async u=>u.endsWith('/versao')?Response.json(envelope):new Response(zip),antesDeAplicar:async()=>{drenando=true;assert.equal(fs.readFileSync(path.join(root,'src/teste.mjs'),'utf8'),'antigo');await trava;}});
+  await new Promise(setImmediate);assert.equal(drenando,true);assert.equal(fs.readFileSync(path.join(root,'src/teste.mjs'),'utf8'),'antigo');liberar();const result=await run;assert.equal(result.updated,true);assert.equal(fs.readFileSync(path.join(root,'src/teste.mjs'),'utf8'),'novo');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('falha na drenagem não aplica o pacote e preserva a versão anterior', async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'motor-drain-fail-'));
+ try {
+  fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'src/teste.mjs'),'antigo');
+  const zip=criarZipDeTeste([{path:'ienvia-motor/src/teste.mjs',content:'novo'}]);
+  const {publicKey,privateKey}=crypto.generateKeyPairSync('ed25519',{publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}});
+  const manifest={version:'6.3.0',sha256:sha256Hex(zip),size:zip.length,published_at:'2026-11-12T00:00:00Z',min_node_major:24};const envelope={manifest,algorithm:'ed25519',signature:crypto.sign(null,Buffer.from(serializarManifestoCanonico(manifest)),privateKey).toString('base64')};
+  await assert.rejects(()=>verificarEAtualizar({rootDir:root,panelUrl:'https://example.invalid',versaoAtual:'6.2.8',chavePublicaPem:publicKey,fetchFn:async u=>u.endsWith('/versao')?Response.json(envelope):new Response(zip),antesDeAplicar:async()=>{throw Error('ocupado');}}),/ocupado/);
+  assert.equal(fs.readFileSync(path.join(root,'src/teste.mjs'),'utf8'),'antigo');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});

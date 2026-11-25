@@ -62,7 +62,9 @@ test('falha de rede preserva arquivo; retomada não duplica item já confirmado'
  const s=new SupervisorDeSessoes({rootDir:root,panelUrl:'https://example.invalid',deviceToken:'teste',onLog:()=>{},fetchFn:async()=>{tentativas++;if(falhar)throw Error('offline');return new Response(JSON.stringify({result:'duplicate'}));}});
  s.sessoes.set('inst',{sock:{}});s.filaHistorico.guardar('v',valor('v',false));
  await s.escoarHistorico({tipo:'live'});assert.equal(s.filaHistorico.contagem().live,1);
- falhar=false;await s.escoarHistorico({tipo:'live'});await s.escoarHistorico({tipo:'live'});
+ falhar=false;await s.escoarHistorico({tipo:'live'});assert.equal(tentativas,1); // backoff evita martelar a rede
+ for(const espera of s.retornosFila.values())espera.proxima=0;
+ await s.escoarHistorico({tipo:'live'});await s.escoarHistorico({tipo:'live'});
  assert.equal(s.filaHistorico.contagem().live,0);assert.equal(tentativas,2);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
