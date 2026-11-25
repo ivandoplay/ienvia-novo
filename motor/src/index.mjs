@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { invalidarAcessoRevogado, pedirNovoCodigo } from './repareamento.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -93,8 +94,7 @@ async function esperarPareamento(pagina, cfgInicial) {
   return cfg;
 }
 
-async function rodarLoopPrincipal() {
-  const args = lerArgumentos(process.argv.slice(2));
+export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice(2))) {
   const versaoAtual = lerVersaoLocal(ROOT_DIR);
 
   if (recuperarAtualizacaoInterrompida(ROOT_DIR)) {
@@ -121,6 +121,13 @@ async function rodarLoopPrincipal() {
 
   // Sem pareamento: em vez de morrer com uma linha de erro, abre a página local para a pessoa
   // ligar o aparelho (senha da conta ou código). O loop só começa depois que o pareamento existe.
+  if ((!cfg.panelUrl || !cfg.deviceToken) && process.stdin.isTTY) {
+    const ok = await pedirNovoCodigo({
+      parear: code => parearComPainel({ rootDir: ROOT_DIR, panelUrl: panelUrl || 'https://app.ienvia.online', code, versaoAtual }),
+    });
+    if (!ok) return;
+    cfg = lerConfiguracao(ROOT_DIR);
+  }
   if (!cfg.panelUrl || !cfg.deviceToken) {
     if (args.semPagina) {
       console.error('[motor] Aparelho ainda não pareado.');
@@ -165,6 +172,7 @@ async function rodarLoopPrincipal() {
   console.log(`[motor] Fila prioritária: ${pendencias.live} novas; ${pendencias.history} históricas. Processamento independente ativado.`);
   const pararEscoamento = args.once ? async () => {} : iniciarEscoamento(supervisor);
   let encerrado = false;
+  let acessoRevogado = false;
   const parar = async () => {
     if (encerrado) return;
     encerrado = true;
@@ -201,7 +209,8 @@ async function rodarLoopPrincipal() {
         }
       } catch (err) {
         if (err.status === 401) {
-          console.error('[motor] Acesso deste aparelho foi revogado no painel. Encerrando.');
+          console.error('[motor] Acesso revogado. Voltando ao pareamento com um novo código.');
+          acessoRevogado = true;
           await parar();
           break;
         }
@@ -216,7 +225,8 @@ async function rodarLoopPrincipal() {
       }
     } catch (err) {
       if (err.status === 401) {
-        console.error('[motor] Token revogado. Encerrando.');
+        console.error('[motor] Acesso revogado. Voltando ao pareamento com um novo código.');
+        acessoRevogado = true;
         await parar();
         break;
       }
@@ -231,6 +241,7 @@ async function rodarLoopPrincipal() {
         if (upd.updated) {
           console.log(`[motor] Atualizado para v${upd.newVersion}! Reinicie ou aguarde o launcher.`);
           await parar();
+          process.off('SIGINT', parar); process.off('SIGTERM', parar);
           process.exitCode = 42;
           return;
         }
@@ -242,10 +253,24 @@ async function rodarLoopPrincipal() {
     if (args.once) break;
     await new Promise((r) => setTimeout(r, 2500));
   }
+  process.off('SIGINT', parar); process.off('SIGTERM', parar);
+  if (acessoRevogado) {
+    invalidarAcessoRevogado(ROOT_DIR, cfg.panelUrl);
+    if (args.once) { process.exitCode = 1; return; }
+    return 'reparear';
+  }
+}
+
+export async function iniciarMotor() {
+  let args = lerArgumentos(process.argv.slice(2));
+  while (await rodarLoopPrincipal(args) === 'reparear') {
+    // Código de uso único da primeira inicialização nunca é reutilizado.
+    args = { ...args, pair: '' };
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
-  rodarLoopPrincipal().catch((err) => {
+  iniciarMotor().catch((err) => {
     console.error('[motor] Erro fatal:', err.message);
     process.exitCode = 1;
   });
