@@ -96,6 +96,7 @@ async function esperarPareamento(pagina, cfgInicial) {
 }
 
 export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice(2))) {
+  if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('Node.js 24 ou superior necessario. No Linux, inicie por bash ./scripts/iniciar.sh para preparar o runtime correto.');
   const versaoAtual = lerVersaoLocal(ROOT_DIR);
 
   if (recuperarAtualizacaoInterrompida(ROOT_DIR)) {
