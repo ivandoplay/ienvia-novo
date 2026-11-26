@@ -1,3 +1,4 @@
+import { foraDaJanelaHistorica } from './janela-historico.mjs';
 import crypto from 'node:crypto';
 import { IntencoesDeConexao } from './intencoes.mjs';
 import { atrasoReconexao, podeRetomarSessao, ehMensagemHistorica } from './operacao.mjs';
@@ -151,7 +152,7 @@ export class SupervisorDeSessoes {
     this.onLog = onLog;
     this.sessoes = new Map();
     this.encerrando = false;
-    this.filaHistorico = abrirFila(path.join(rootDir,'data','fila-historico'));
+    this.filaHistorico = abrirFila(path.join(rootDir,'data','fila-historico'), { diasHistorico: 30 });
     this.escoandoHistorico = new Set();
     this.filaRecibos = abrirFila(path.join(rootDir,'data','fila-recibos'));
     this.proximoRecibo = 0;
@@ -341,7 +342,7 @@ export class SupervisorDeSessoes {
         if (c.id && nome) this.nomesContatos.set(instanceId + ':' + c.id, String(nome).slice(0,150));
       }
       for (const msg of messages || []) {
-        if (!msg.key?.id) continue;
+        if (!msg.key?.id || foraDaJanelaHistorica(msg)) continue;
         try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: true, msg: JSON.stringify(msg, BufferJSON.replacer) }); }
         catch (err) { this.onLog(`[motor] Histórico não salvo: ${err.message}`); }
       }
@@ -352,6 +353,7 @@ export class SupervisorDeSessoes {
       this.diagnostico(instanceId).upserts += (messages || []).length;
       for (const msg of messages || []) {
         if (!msg.key?.id) continue;
+        if (ehMensagemHistorica(type, msg, inicioConexao) && foraDaJanelaHistorica(msg)) continue;
         if (!msg.message) this.diagnostico(instanceId).semConteudo++;
         try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: ehMensagemHistorica(type, msg, inicioConexao), msg: JSON.stringify(msg, BufferJSON.replacer) }, { recuperarConteudo: recuperada }); this.diagnostico(instanceId).enfileiradas++; }
         catch (err) { this.onLog(`[motor] Entrada não salva: ${err.message}`); }

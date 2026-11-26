@@ -1,8 +1,9 @@
+import { foraDaJanelaHistorica } from './janela-historico.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-export function abrirFila(diretorio) {
+export function abrirFila(diretorio, { diasHistorico = null } = {}) {
   fs.mkdirSync(diretorio, { recursive: true, mode: 0o700 });
   // Classificação em memória, reconstruída dos arquivos legados a cada início.
   // Os arquivos continuam sendo a fonte durável; nenhuma migração destrutiva.
@@ -17,7 +18,19 @@ export function abrirFila(diretorio) {
   function indexar() {
     if (indexada) return;
     for (const nome of fs.readdirSync(diretorio).filter(n => /^[a-f0-9]{64}\.json$/.test(n))) {
-      try { classificar(nome, JSON.parse(fs.readFileSync(path.join(diretorio,nome),'utf8'))); }
+      try {
+        const valor = JSON.parse(fs.readFileSync(path.join(diretorio,nome),'utf8'));
+        if (diasHistorico && valor.historical !== false && valor.msg && foraDaJanelaHistorica(JSON.parse(valor.msg), Date.now(), diasHistorico)) {
+          const arquivo = path.join(diretorio, nome);
+          const destino = path.join(diretorio + '-fora-da-janela', nome);
+          fs.mkdirSync(path.dirname(destino), { recursive: true, mode: 0o700 });
+          // Nunca sobrescrever nem apagar arquivo previamente preservado.
+          const final = fs.existsSync(destino) ? destino + '.' + crypto.randomUUID() : destino;
+          fs.renameSync(arquivo, final);
+          continue;
+        }
+        classificar(nome, valor);
+      }
       catch { /* Arquivo ilegível é preservado, sem impedir o resto da fila. */ }
     }
     indexada = true;
