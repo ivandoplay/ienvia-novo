@@ -138,6 +138,7 @@ export class SupervisorDeSessoes {
     this.intencoes = new IntencoesDeConexao(rootDir);
     this.estados = new Map();
     this.nomes = new Map();
+    this.diagnosticos = new Map();
     this.historicoRecebido = 0;
     this.ultimoHistorico = 0;
     this.enviosAtivos = 0;
@@ -155,6 +156,15 @@ export class SupervisorDeSessoes {
     this.filaRecibos = abrirFila(path.join(rootDir,'data','fila-recibos'));
     this.proximoRecibo = 0;
     this.presencaDeResposta = new PresencaDeResposta({ rootDir, onLog });
+  }
+
+  diagnostico(instanceId) {
+    if (!this.diagnosticos.has(instanceId)) this.diagnosticos.set(instanceId, { upserts: 0, atualizacoesComConteudo: 0, semConteudo: 0, enfileiradas: 0, lidPendente: 0, apiFalhas: 0, apiConfirmadas: 0, errosWhatsApp: 0 });
+    return this.diagnosticos.get(instanceId);
+  }
+
+  diagnosticoOperacional() {
+    return { filas: this.filaHistorico.contagem(), chips: Object.fromEntries(this.diagnosticos) };
   }
 
   headers(extra = {}) {
@@ -205,7 +215,9 @@ export class SupervisorDeSessoes {
     const sock = this.socketFactory({
       ...(version ? { version } : {}),
       auth: state,
-      logger,
+      logger: pino({ level: 'warn', hooks: { logMethod: () => {
+        this.diagnostico(instanceId).errosWhatsApp++;
+      } } }),
       printQRInTerminal: false,
       markOnlineOnConnect: false,
       syncFullHistory: true,
@@ -335,16 +347,28 @@ export class SupervisorDeSessoes {
       }
       this.onLog(`[motor] Histórico enfileirado: ${(messages || []).length} mensagens.`);
     });
-    sock.ev.on('messages.upsert', ({ type, messages }) => {
-      if (!['notify','append'].includes(type)) return;
+    const receberMensagens = ({ type, messages, recuperada = false }) => {
+      if (this.sessoes.get(instanceId)?.sock !== sock || !['notify','append'].includes(type)) return;
+      this.diagnostico(instanceId).upserts += (messages || []).length;
       for (const msg of messages || []) {
         if (!msg.key?.id) continue;
-        try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: ehMensagemHistorica(type, msg, inicioConexao), msg: JSON.stringify(msg, BufferJSON.replacer) }); }
+        if (!msg.message) this.diagnostico(instanceId).semConteudo++;
+        try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: ehMensagemHistorica(type, msg, inicioConexao), msg: JSON.stringify(msg, BufferJSON.replacer) }, { recuperarConteudo: recuperada }); this.diagnostico(instanceId).enfileiradas++; }
         catch (err) { this.onLog(`[motor] Entrada não salva: ${err.message}`); }
         if (type === 'notify' && !ehMensagemHistorica(type, msg, inicioConexao)) {
           try { this.presencaDeResposta.receber(instanceId, msg); }
           catch (err) { this.onLog(`[motor] Chave de leitura não salva: ${err.message}`); }
         }
+      }
+    };
+    sock.ev.on('messages.upsert', receberMensagens);
+    // Baileys pode entregar conteudo recuperado em messages.update, sem outro upsert.
+    sock.ev.on('messages.update', (updates) => {
+      if (this.sessoes.get(instanceId)?.sock !== sock) return;
+      for (const { key, update } of updates || []) {
+        if (!key?.id || !update?.message) continue;
+        this.diagnostico(instanceId).atualizacoesComConteudo++;
+        receberMensagens({ type: update.messageTimestamp ? 'notify' : 'append', messages: [{ ...update, key }], recuperada: true });
       }
     });
   }
@@ -395,6 +419,7 @@ export class SupervisorDeSessoes {
           let jid = normalizarJidParaContato(msg.key?.remoteJid) || normalizarJidParaContato(msg.key?.remoteJidAlt);
           if (!jid && msg.key?.remoteJid?.endsWith('@lid')) jid = normalizarJidParaContato(await sock.signalRepository?.lidMapping?.getPNForLID(msg.key.remoteJid));
           if (!jid) {
+            this.diagnostico(instanceId).lidPendente++;
             if (!msg.key?.remoteJid?.endsWith('@lid')) this.filaHistorico.confirmar(item.nome);
             continue;
           }
@@ -404,8 +429,9 @@ export class SupervisorDeSessoes {
           if (['accepted','duplicate'].includes(r.result) && r.message_id && ['pending','failed'].includes(r.media?.status) && x.mediaMessage) {
             await this.enviarMidiaRecebida(r.message_id, x.mediaMessage, x.media);
           }
-          if (['accepted','duplicate','ignored'].includes(r.result)) { this.filaHistorico.confirmar(item.nome); this.retornosFila.delete(item.nome); }
+          if (['accepted','duplicate','ignored'].includes(r.result)) { this.diagnostico(instanceId).apiConfirmadas++; this.filaHistorico.confirmar(item.nome); this.retornosFila.delete(item.nome); }
         } catch (err) {
+          this.diagnostico(instanceId).apiFalhas++;
           const tentativas = (this.retornosFila.get(item.nome)?.tentativas || 0) + 1;
           this.retornosFila.set(item.nome, { tentativas, proxima: Date.now() + atrasoReconexao(tentativas) });
           this.onLog('[motor] Mensagem preservada. Nova tentativa automatica.');

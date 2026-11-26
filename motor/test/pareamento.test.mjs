@@ -80,3 +80,26 @@ test('recuperação de 401 preserva modo código e telefone',()=>cenario(async({
  sockets[0].ev.emit('connection.update',{connection:'close',lastDisconnect:{error:{output:{statusCode:401}}}});await tick();sockets[1].ev.emit('connection.update',{qr:'novo-token'});await p;
  assert.equal(reports.find(r=>r.pairing_code)?.pairing_code,'ABCD1234');assert.equal(reports.at(-1).outcome,'succeeded');
 }));
+
+test('conteudo recuperado por messages.update substitui stub sem perder fila e sem expor texto no diagnostico',()=>cenario(async({s,sockets})=>{
+ await s.iniciarConexao('i');
+ const key={id:'recuperado',remoteJid:'558681638438@s.whatsapp.net',fromMe:false};
+ sockets[0].ev.emit('messages.upsert',{type:'notify',messages:[{key,messageTimestamp:Math.floor(Date.now()/1000),messageStubType:2}]});
+ sockets[0].ev.emit('messages.update',[{key,update:{message:{conversation:'conteudo-secreto'},messageTimestamp:Math.floor(Date.now()/1000)}}]);
+ const itens=s.filaHistorico.listar(10,'live');assert.equal(itens.length,1);assert.equal(JSON.parse(itens[0].valor.msg).message.conversation,'conteudo-secreto');
+ assert.equal(s.diagnosticoOperacional().chips.i.atualizacoesComConteudo,1);assert.equal(JSON.stringify(s.diagnosticoOperacional()).includes('conteudo-secreto'),false);
+}));
+test('logger diagnostico registra somente contador, sem vazar payload do Baileys',()=>cenario(async({s})=>{
+ const original=s.socketFactory;s.socketFactory=cfg=>{cfg.logger.child({secret:'segredo'}).error({token:'segredo'},'payload privado');return original(cfg);};
+ await s.iniciarConexao('i');assert.equal(s.diagnosticoOperacional().chips.i.errosWhatsApp,1);assert.equal(JSON.stringify(s.diagnosticoOperacional()).includes('segredo'),false);
+}));
+test('update sem timestamp e tratado como historico, nunca como gatilho novo',()=>cenario(async({s,sockets})=>{
+ await s.iniciarConexao('i');sockets[0].ev.emit('messages.update',[{key:{id:'sem-hora',remoteJid:'558681638438@s.whatsapp.net'},update:{message:{conversation:'antiga'}}}]);
+ assert.equal(s.filaHistorico.listar(10,'live').length,0);assert.equal(s.filaHistorico.listar(10,'history').length,1);
+}));
+test('update nao sobrescreve conteudo ja preservado e socket antigo nao injeta entrada',()=>cenario(async({s,sockets})=>{
+ await s.iniciarConexao('i');const sock=sockets[0];const key={id:'original',remoteJid:'558681638438@s.whatsapp.net'};sock.ev.emit('messages.upsert',{type:'notify',messages:[{key,message:{conversation:'original'}}]});
+ sock.ev.emit('messages.update',[{key,update:{message:{conversation:'alterado'},messageTimestamp:Math.floor(Date.now()/1000)}}]);
+ assert.equal(JSON.parse(s.filaHistorico.listar(10)[0].valor.msg).message.conversation,'original');
+ await s.iniciarConexao('i');sock.ev.emit('messages.upsert',{type:'notify',messages:[{key:{...key,id:'velho'},message:{conversation:'ignorar'}}]});assert.equal(s.filaHistorico.listar(10).length,1);
+}));

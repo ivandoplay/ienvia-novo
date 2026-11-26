@@ -35,10 +35,16 @@ export function abrirFila(diretorio) {
     return itens;
   }
   return {
-    guardar(chave, valor) {
+    guardar(chave, valor, { recuperarConteudo = false } = {}) {
       const nome = crypto.createHash('sha256').update(chave).digest('hex') + '.json';
       const arquivo = path.join(diretorio, nome);
-      if (fs.existsSync(arquivo)) return;
+      if (fs.existsSync(arquivo)) {
+        if (!recuperarConteudo) return;
+        // Somente preencher stub sem conteudo. Nao rebaixar mensagem ou categoria.
+        const anterior = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
+        if (JSON.parse(anterior.msg).message || !JSON.parse(valor.msg).message) return;
+        valor = { ...valor, historical: anterior.historical };
+      }
       const tmp = arquivo + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(valor), { mode: 0o600 });
       fs.renameSync(tmp, arquivo);

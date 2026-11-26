@@ -211,7 +211,7 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
         const pulso = await supervisor.chamarApi('/api/motor/pulso', {
           platform: plataforma,
           version: versaoAtual,
-          metadata: meta,
+          metadata: { ...meta, diagnostico: supervisor.diagnosticoOperacional() },
         });
         estadoPainel = 'Conectado';
         avisoOperacao = '';
