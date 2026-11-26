@@ -209,7 +209,9 @@ export class SupervisorDeSessoes {
       printQRInTerminal: false,
       markOnlineOnConnect: false,
       syncFullHistory: true,
-      browser: Browsers.macOS('Desktop'),
+      // Desktop/DARWIN no rc14 pode encerrar o Noise handshake com 428 antes do QR.
+      // Manter solicitacao de historico, usando a identidade Web suportada.
+      browser: Browsers.ubuntu('Chrome'),
       shouldSyncHistoryMessage: () => true,
     });
 

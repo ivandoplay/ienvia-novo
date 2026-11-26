@@ -63,9 +63,9 @@ test('disconnect durante preparo assíncrono não ressuscita socket',()=>temp(as
  const {s,sockets}=supervisor(root);let liberar;s.authFactory=()=>new Promise(resolve=>{liberar=()=>resolve({state:{creds:{registered:true}},saveCreds:async()=>{}});});
  const p=s.iniciarConexao('chip');await tick();await s.pararSessao('chip');liberar();await p;assert.equal(sockets.length,0);await s.encerrarTudo();
 }));
-test('desktop sync completo, append histórico e notify novo vão às filas corretas',()=>temp(async root=>{
+test('Web compativel solicita historico completo, append histórico e notify novo vão às filas corretas',()=>temp(async root=>{
  const {s,sockets,options,reports}=supervisor(root);try{
- await s.iniciarConexao('chip');assert.equal(options[0].syncFullHistory,true);assert.equal(options[0].shouldSyncHistoryMessage({}),true);assert.ok(options[0].browser.includes('Desktop'));
+ await s.iniciarConexao('chip');assert.equal(options[0].syncFullHistory,true);assert.equal(options[0].shouldSyncHistoryMessage({}),true);assert.ok(options[0].browser.includes('Chrome'));
  const msg=id=>({key:{id,remoteJid:'5586981638438@s.whatsapp.net',fromMe:false},message:{conversation:'teste'},messageTimestamp:Math.floor(Date.now()/1000)});
  sockets[0].ev.emit('messaging-history.set',{messages:[msg('antiga')],contacts:[{id:'5586981638438@s.whatsapp.net',name:'Contato teste'}]});
  sockets[0].ev.emit('messages.upsert',{type:'append',messages:[msg('append')]});sockets[0].ev.emit('messages.upsert',{type:'notify',messages:[msg('nova')]});

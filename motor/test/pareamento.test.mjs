@@ -10,7 +10,7 @@ async function cenario(fn) {
  const s=new SupervisorDeSessoes({rootDir:root,panelUrl:'https://example.invalid',deviceToken:'fake',onLog:()=>{},
  fetchFn:async(u,o)=>{reports.push({u,...JSON.parse(o.body)});return new Response('{}');},
  authFactory:async()=>({state:{creds:{registered:false}},saveCreds:async()=>{}}),versionFactory:async()=>({version:[2,3000,1]}),
- socketFactory:()=>{const sock={ev:new EventEmitter(),end:()=>{},requestPairingCode:async(phone)=>{assert.equal(phone,'5586981638438');return 'ABCD1234';}};sockets.push(sock);return sock;}});
+ socketFactory:(config)=>{assert.equal(config.browser[1],'Chrome');assert.equal(config.syncFullHistory,true);const sock={ev:new EventEmitter(),end:()=>{},requestPairingCode:async(phone)=>{assert.equal(phone,'5586981638438');return 'ABCD1234';}};sockets.push(sock);return sock;}});
  try{await fn({s,reports,sockets,root});}finally{s.encerrando=true;for(const t of s.reconexoes.values())clearTimeout(t);fs.rmSync(root,{recursive:true,force:true});}
 }
 const tick=()=>new Promise(r=>setTimeout(r,20));
