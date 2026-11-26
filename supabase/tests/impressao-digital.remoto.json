@@ -1,48 +1,51 @@
 {
+  "origem": "Supabase rhcabqlwazvjcjjdknsc: consulta somente leitura",
+  "escopo": "Ienvia; exclui somente public.diagnostico_golpes, de projeto independente",
+  "sql_sha256": "913a73ef93c3feefff113b737dc28851a91077d12fe39895bcf021d3a114acb3",
   "categorias": {
     "colunas": {
-      "itens": 634,
-      "md5": "fe6e40eebfe8b7202cd3ced1a1f75149"
+      "itens": 701,
+      "md5": "f430972288acf1877f4a2d5cf1895448"
     },
     "deposito": {
       "itens": 4,
       "md5": "f697288d0636e569f349b9df5579a799"
     },
     "funcoes": {
-      "itens": 215,
-      "md5": "c2d2b4a40cbe709e0fed94f43c5ef9c7"
+      "itens": 238,
+      "md5": "a4734c4ea646f8a7ac4008bf14828d66"
     },
     "gatilhos": {
-      "itens": 26,
-      "md5": "3ba71bc02204a45ff8002650af0c3e5f"
+      "itens": 28,
+      "md5": "246a5f0a24d04f8803f67fbf28d519e4"
     },
     "indices": {
-      "itens": 177,
-      "md5": "01bb62cd50c8887822e3fc113459f833"
+      "itens": 193,
+      "md5": "0e2035a6ff8ebdc653804748599761ee"
     },
     "permissoes_coluna": {
       "itens": 32,
       "md5": "4f92ec1b1838543f578ff7a458d9cf17"
     },
     "permissoes_funcao": {
-      "itens": 645,
-      "md5": "62bfc8a86c6947e69160cb7f0fbe2210"
+      "itens": 714,
+      "md5": "20eef64c7016e190b2af57bc777f07c7"
     },
     "permissoes_tabela": {
-      "itens": 431,
-      "md5": "94babbf2c1632cc2e9b5115adddd17db"
+      "itens": 480,
+      "md5": "9900e76c16a5f2c24b9a565282247e1e"
     },
     "politicas": {
       "itens": 53,
       "md5": "cb022942cc6fbbccddfcea0996137c23"
     },
     "restricoes": {
-      "itens": 440,
-      "md5": "df94991b71ec28e6e1bafaa71cea44e6"
+      "itens": 476,
+      "md5": "1a10585853416b0b73add03682f8c77f"
     },
     "rls_ligado": {
-      "itens": 55,
-      "md5": "0a9e8b84461cc3fea3d0b76c367b4f7d"
+      "itens": 65,
+      "md5": "f057aa90ade05197d8ef5211819c2c32"
     }
   }
 }

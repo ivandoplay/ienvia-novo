@@ -1,3 +1,4 @@
+param([switch]$SomenteRuntime)
 # Instalador portatil para Windows (PowerShell), sem administrador.
 $ErrorActionPreference = "Stop"
 
@@ -46,8 +47,16 @@ if (-not $NodeBin) {
     Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
     $inner = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1
     New-Item -ItemType Directory -Path (Split-Path $RuntimeDir -Parent) -Force | Out-Null
-    if (Test-Path $RuntimeDir) { Remove-Item -Recurse -Force $RuntimeDir }
-    Move-Item -Path $inner.FullName -Destination $RuntimeDir
+    $prepared = Join-Path $inner.FullName "node.exe"
+    & $prepared -e "if(Number(process.versions.node.split('.')[0]) < 24) process.exit(1)"
+    if ($LASTEXITCODE -ne 0) { throw "O Node preparado nao funciona neste Windows. Dados preservados." }
+    $backup = $null
+    if (Test-Path $RuntimeDir) {
+      $backup = "$RuntimeDir-anterior-$([guid]::NewGuid().ToString('N'))"
+      Move-Item -Path $RuntimeDir -Destination $backup
+    }
+    try { Move-Item -Path $inner.FullName -Destination $RuntimeDir }
+    catch { if ($backup) { Move-Item -Path $backup -Destination $RuntimeDir }; throw }
     $NodeBin = $LocalNode
   } finally {
     Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
@@ -55,21 +64,11 @@ if (-not $NodeBin) {
 }
 
 $env:PATH = "$(Split-Path $NodeBin -Parent);$env:PATH"
-$NpmCmd = Join-Path (Split-Path $NodeBin -Parent) "npm.cmd"
-if (-not (Test-Path $NpmCmd)) { $NpmCmd = (Get-Command npm.cmd -ErrorAction Stop).Source }
-$Lock = Join-Path $RootDir "package-lock.json"
-$StampInput = (Get-FileHash (Join-Path $RootDir "package.json") -Algorithm SHA256).Hash
-if (Test-Path $Lock) { $StampInput += (Get-FileHash $Lock -Algorithm SHA256).Hash }
-$StampPath = Join-Path $RootDir "node_modules\.ienvia-deps-windows"
-$OldStamp = if (Test-Path $StampPath) { (Get-Content $StampPath -Raw).Trim() } else { "" }
-if ($StampInput -ne $OldStamp) {
-  Write-Host "[Ienvia] Instalando dependencias; data/ sera preservada."
-  if (Test-Path $Lock) {
-    & $NpmCmd ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
-  } else {
-    & $NpmCmd install --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
-  }
-  if ($LASTEXITCODE -ne 0) { throw "Falha na instalacao das dependencias (codigo $LASTEXITCODE)." }
-  Set-Content -Path $StampPath -Value $StampInput
+$Deps = Join-Path $RootDir "src\dependencias.mjs"
+$StableDeps = Join-Path $RootDir ".runtime\ienvia-bootstrap\dependencias.mjs"
+if (Test-Path $StableDeps) { $Deps = $StableDeps }
+if (-not $SomenteRuntime) {
+  & $NodeBin $Deps --preparar
+  if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar componentes. Sessoes preservadas." }
 }
 Write-Host "[Ienvia] Preparacao concluida."

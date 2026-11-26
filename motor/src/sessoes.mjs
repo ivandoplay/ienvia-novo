@@ -1,3 +1,4 @@
+import { prepararMensagemDeVoz } from './audio-voz.mjs';
 import { foraDaJanelaHistorica } from './janela-historico.mjs';
 import crypto from 'node:crypto';
 import { IntencoesDeConexao } from './intencoes.mjs';
@@ -132,7 +133,8 @@ export function extrairConteudoMensagemBaileys(msg) {
 }
 
 export class SupervisorDeSessoes {
-  constructor({ rootDir, panelUrl, deviceToken, fetchFn = fetch, onLog = console.log, socketFactory = makeWASocket, authFactory = useMultiFileAuthState, versionFactory = fetchLatestBaileysVersion }) {
+  constructor({ rootDir, panelUrl, deviceToken, fetchFn = fetch, onLog = console.log, socketFactory = makeWASocket, authFactory = useMultiFileAuthState, versionFactory = fetchLatestBaileysVersion, voiceFactory = prepararMensagemDeVoz }) {
+    this.voiceFactory = voiceFactory;
     this.socketFactory = socketFactory; this.authFactory = authFactory; this.versionFactory = versionFactory;
     this.reconexoes = new Map();
     this.geracoes = new Map();
@@ -165,10 +167,12 @@ export class SupervisorDeSessoes {
   }
 
   async conferirDestino(registro, cmd) {
+    if(process.env.IENVIA_TEST_ONLY_RECIPIENT && cmd.payload?.recipient !== process.env.IENVIA_TEST_ONLY_RECIPIENT)throw new Error('teste_bloqueado_destinatario_nao_autorizado');
+    if(process.env.IENVIA_TEST_ONLY_ORIGIN && normalizarJidParaContato(registro.sock.user?.id)!==process.env.IENVIA_TEST_ONLY_ORIGIN)throw new Error('teste_bloqueado_origem_divergente');
     const d = this.diagnostico(cmd.instance_id);
     d.ultimaConsulta = { origem: normalizarJidParaContato(registro.sock.user?.id), solicitado: normalizarJidParaContato(cmd.payload?.recipient), instante: new Date().toISOString() };
     return resolverDestinatario(registro.sock, cmd.payload?.recipient, {
-      exato: cmd.payload?.exact_recipient === true || cmd.payload?.diagnostic_only === true,
+      exato: cmd.payload?.exact_recipient === true || cmd.payload?.diagnostic_only === true || Boolean(process.env.IENVIA_TEST_ONLY_RECIPIENT),
       onResolution: ({ solicitado, registrado }) => {
         d.ultimaConsulta = { ...d.ultimaConsulta, solicitado, registrado, exato: solicitado === registrado };
       },
@@ -605,11 +609,9 @@ export class SupervisorDeSessoes {
         if (att.kind === 'image') payloadWa = { image: buf, mimetype: att.content_type, caption };
         else if (att.kind === 'video') payloadWa = { video: buf, mimetype: att.content_type, caption };
         else if (att.kind === 'audio') {
-          const waveform = ondaDoCabecalho(mediaResp.headers.get('x-ienvia-audio-waveform'));
-          payloadWa = { audio: buf, mimetype: att.content_type || 'audio/ogg; codecs=opus', ptt: att.is_voice !== false,
-            ...(waveform ? { waveform } : {}),
-            ...(Number.isFinite(att.duration_seconds) && att.duration_seconds > 0 ? { seconds: Math.round(att.duration_seconds) } : {}),
-          };
+          payloadWa = att.is_voice !== false
+            ? await this.voiceFactory(buf)
+            : {audio:buf,mimetype:att.content_type || 'audio/mpeg',ptt:false};
         }
         else payloadWa = { document: buf, mimetype: att.content_type, fileName: att.file_name || 'arquivo', caption };
 

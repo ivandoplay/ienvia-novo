@@ -47,24 +47,10 @@ if [ -z "$NODE_BIN" ]; then
   NODE_BIN="$RUNTIME_DIR/bin/node"
 fi
 export PATH="$(dirname "$NODE_BIN"):$PATH"
-export npm_config_allow_git=all
-export GIT_CONFIG_COUNT=2
-export GIT_CONFIG_KEY_0=url.https://github.com/.insteadOf
-export GIT_CONFIG_VALUE_0=ssh://git@github.com/
-export GIT_CONFIG_KEY_1=url.https://github.com/.insteadOf
-export GIT_CONFIG_VALUE_1=git@github.com:
-NPM_BIN="$(command -v npm || true)"
-if [ -z "$NPM_BIN" ]; then echo '[Ienvia] npm nao encontrado. Instale npm para o Node 24.'; exit 1; fi
-STAMP="$("$NODE_BIN" -e 'const fs=require("fs"),c=require("crypto");const p=JSON.parse(fs.readFileSync("package.json"));console.log(c.createHash("sha256").update(JSON.stringify(p.dependencies||{})).update(fs.existsSync("package-lock.json")?fs.readFileSync("package-lock.json"):"").digest("hex"))')"
-if [ ! -f node_modules/.ienvia-linux-deps ] || [ "$(cat node_modules/.ienvia-linux-deps)" != "$STAMP" ]; then
-  echo '[Ienvia] Preparando dependencias. Nenhuma sessao sera apagada.'
-  if [ -f package-lock.json ]; then
-    "$NPM_BIN" ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
-  else
-    "$NPM_BIN" install --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
-  fi
-  mkdir -p node_modules
-  printf '%s' "$STAMP" > node_modules/.ienvia-linux-deps
+DEPS="$ROOT_DIR/src/dependencias.mjs"
+if [ -f "$ROOT_DIR/.runtime/ienvia-bootstrap/dependencias.mjs" ]; then DEPS="$ROOT_DIR/.runtime/ienvia-bootstrap/dependencias.mjs"; fi
+if [ "${1:-}" != "--somente-runtime" ]; then
+  "$NODE_BIN" "$DEPS" --preparar
 fi
 chmod +x "$ROOT_DIR/scripts/iniciar.sh" 2>/dev/null || true
 echo '[Ienvia] Node 24+ pronto. Inicie com bash ./scripts/iniciar.sh --url https://app.ienvia.online'

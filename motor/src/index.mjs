@@ -1,3 +1,4 @@
+import { intervaloDeAtualizacao } from './agenda-atualizacao.mjs';
 import fs from 'node:fs';
 import { iniciarPainelTerminal } from './painel-terminal.mjs';
 import { invalidarAcessoRevogado, pedirNovoCodigo } from './repareamento.mjs';
@@ -10,7 +11,7 @@ import {
   normalizarCodigoPareamento,
   salvarConfiguracao,
 } from './config.mjs';
-import { recuperarAtualizacaoInterrompida, verificarEAtualizar } from './atualizador.mjs';
+import { recuperarAtualizacaoInterrompida, verificarEAtualizar, atualizacaoPendente } from './atualizador.mjs';
 import { SupervisorDeSessoes } from './sessoes.mjs';
 import { iniciarPaginaLocal } from './pagina-local.mjs';
 import { iniciarEscoamento } from './escoamento.mjs';
@@ -97,14 +98,22 @@ async function esperarPareamento(pagina, cfgInicial) {
 
 export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice(2))) {
   if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('Node.js 24 ou superior necessario. No Linux, inicie por bash ./scripts/iniciar.sh para preparar o runtime correto.');
-  const versaoAtual = lerVersaoLocal(ROOT_DIR);
-
   if (recuperarAtualizacaoInterrompida(ROOT_DIR)) {
     console.log('[motor] Atualização interrompida revertida com segurança.');
   }
+  const versaoAtual = lerVersaoLocal(ROOT_DIR);
 
   let cfg = lerConfiguracao(ROOT_DIR);
   const panelUrl = (args.url || cfg.panelUrl).trim().replace(/\/+$/, '');
+
+  // Antes de abrir sockets; falha de consulta nao impede usar a versao instalada.
+  if (!args.once && !args.checkUpdate && !atualizacaoPendente(ROOT_DIR)) {
+    try {
+      console.log('[Ienvia] Verificando atualizacoes antes de iniciar...');
+      const upd=await verificarEAtualizar({rootDir:ROOT_DIR,panelUrl:panelUrl || 'https://app.ienvia.online',versaoAtual});
+      if(upd.updated){process.exitCode=42;return;}
+    } catch { console.log('[Ienvia] Consulta indisponivel. Iniciando a versao instalada.'); }
+  }
 
   if (args.pair) {
     console.log('[motor] Pareando este aparelho com o painel...');
@@ -178,7 +187,7 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
     const chips = [...supervisor.estados].map(([id, e]) => ({ desde: e.desde, nome: supervisor.nomes.get(id) || 'WhatsApp', estado: e.estado, emSegundos: e.proxima ? Math.max(1, Math.ceil((e.proxima-Date.now())/1000)) : null }));
     const comProblema = chips.find(c => c.estado === 'reconnecting' || c.estado === 'disconnected' || c.estado === 'pairing');
     return { versao: versaoAtual, painel: estadoPainel, chips, live: fila.live, history: fila.history, recebidas: supervisor.historicoRecebido, envios: supervisor.enviosAtivos,
-      sincronizacao: fila.history ? 'Importando' : supervisor.ultimoHistorico ? 'Lotes recebidos processados' : 'Aguardando WhatsApp',
+      sincronizacao: fila.history ? (chips.some(c=>c.estado==='connected') ? 'Processando ultimos 30 dias' : 'Pausado: aguardando WhatsApp') : supervisor.ultimoHistorico ? 'Lotes recebidos processados' : 'Aguardando WhatsApp',
       aviso: avisoOperacao || (comProblema?.estado === 'pairing' ? 'Abra o painel para concluir o QR ou codigo do WhatsApp.' : comProblema?.estado === 'reconnecting' ? (Date.now()-(comProblema.desde || Date.now()) > 300000 ? 'Sem WhatsApp ha mais de 5 min. Verifique a rede; novas tentativas continuam.' : 'Conexao caiu. Reconectando automaticamente.') : comProblema ? 'Abra o painel e verifique o numero desconectado.' : '') };
   }});
   const pendencias = supervisor.filaHistorico.contagem();
@@ -197,7 +206,10 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
   process.once('SIGTERM', parar);
 
   let ultimoPulso = 0;
-  let ultimaChecagemUpdate = 0;
+  let ultimaChecagemUpdate = Date.now();
+  let tarefaUpdate = null;
+  let intervaloUpdate = intervaloDeAtualizacao();
+  if (process.send) process.send({type:'ienvia-ready'});
   const plataforma = detectarPlataformaMotor();
   const meta = metadataDoAparelho();
 
@@ -257,8 +269,10 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
 
     if (args.once) await supervisor.escoarHistorico().catch(err => console.error('[motor] Histórico pendente:', err.message));
 
-    if (agora - ultimaChecagemUpdate >= 10 * 60_000) {
+    if (!args.once && !tarefaUpdate && agora - ultimaChecagemUpdate >= intervaloUpdate) {
       ultimaChecagemUpdate = agora;
+      intervaloUpdate = intervaloDeAtualizacao();
+      tarefaUpdate = (async () => {
       let drenagemDaAtualizacao = false;
       try {
         const upd = await verificarEAtualizar({ rootDir: ROOT_DIR, panelUrl: cfg.panelUrl, versaoAtual, antesDeAplicar: async () => {
@@ -269,7 +283,7 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
           await parar();
         } });
         if (upd.updated) {
-          console.log(`[motor] Atualizado para v${upd.newVersion}! Reinicie ou aguarde o launcher.`);
+          console.log(`[motor] Atualizado para v${upd.newVersion}! Reiniciando automaticamente com suas sessoes preservadas.`);
           await parar();
           process.off('SIGINT', parar); process.off('SIGTERM', parar);
           process.exitCode = 42;
@@ -281,12 +295,14 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
         avisoOperacao = 'Atualizacao adiada com seguranca. Nova tentativa automatica.';
         console.warn(`[motor] Checagem de atualização ignorada: ${err.message}`);
       }
+      })().finally(() => { tarefaUpdate = null; });
     }
 
     if (args.once) break;
     await new Promise((r) => setTimeout(r, 2500));
   }
   } finally {
+    if (tarefaUpdate) await tarefaUpdate;
     painel?.parar();
     process.off('SIGINT', parar); process.off('SIGTERM', parar);
   }
@@ -299,6 +315,10 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
 }
 
 export async function iniciarMotor() {
+  if(process.env.IENVIA_SUPERVISIONADO!=='1'){
+    const {supervisionar}=await import('./supervisor.mjs');
+    process.exitCode=await supervisionar({rootDir:ROOT_DIR,args:process.argv.slice(2)});return;
+  }
   let args = lerArgumentos(process.argv.slice(2));
   while (await rodarLoopPrincipal(args) === 'reparear') {
     // Código de uso único da primeira inicialização nunca é reutilizado.

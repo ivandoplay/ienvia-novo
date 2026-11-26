@@ -139,7 +139,7 @@ function listarArquivosDoMotor(motorDir: string): EntradaZip[] {
     }
   };
 
-  for (const nome of ['INICIAR-WINDOWS.bat', 'INICIAR-TERMUX.sh', 'package-lock.json']) {
+  for (const nome of ['INICIAR-WINDOWS.bat', 'INICIAR-TERMUX.sh', 'INICIAR-LINUX.sh', 'LEIA-ME.md', 'package-lock.json']) {
     const arquivo = path.join(motorDir, nome);
     if (fs.existsSync(arquivo)) entradas.push({ path: `ienvia-motor/${nome}`, content: fs.readFileSync(arquivo), executable: nome.endsWith('.sh') });
   }
@@ -167,7 +167,12 @@ function listarArquivosDoMotor(motorDir: string): EntradaZip[] {
       'Nunca compartilhe data/, tokens, arquivos de autenticacao ou .env.',
       'Nao copie credenciais do servidor para o motor.',
       'Nao apague data/ ao atualizar. Ctrl+C encerra sem apagar a sessao.',
-      'Linux/VPS: use scripts/setup-linux.sh e scripts/iniciar.sh.',
+      'Linux/VPS: execute bash INICIAR-LINUX.sh.',
+      'Atualizacao: verificada antes de conectar e a cada 15 minutos (com pequena dispersao).',
+      'A troca reinicia o processo automaticamente. Dados e sessoes sao preservados.',
+      'Historico importado: ultimos 30 dias. A IA nao responde a importacoes.',
+      'Inicializacao automatica opcional: veja LEIA-ME.md. Nunca ativada sem sua escolha.',
+      'Mensagens de voz precisam de OGG/Opus valido; MP3 pode ser enviado como audio comum.',
       '',
     ].join('\n'),
   });

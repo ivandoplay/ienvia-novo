@@ -92,3 +92,9 @@ test('painel fixo redesenha apenas região usada, sem limpar tela inteira',()=>{
 test('encerramento cancela até timers longos, sem atrasar restart de atualização',()=>temp(async root=>{
  const {s}=supervisor(root);s.geracoes.set('chip',1);s.agendarReconexao('chip',{mode:'qr',tentativa:9},300000);assert.equal(s.reconexoes.size,1);await s.encerrarTudo();assert.equal(s.reconexoes.size,0);
 }));
+test('matriz visual adapta todos os estados sem ultrapassar telas pequenas ou expor dados extras',()=>{
+ for(const [w,h] of [[24,12],[32,16],[70,35],[120,40]])for(const estado of ['connected','connecting','pairing','reconnecting','disconnected']){
+  const lines=linhasDoPainel({versao:'6.4.0',painel:'Conectado',chips:[{nome:'Comercial longo demais para tela',estado}],history:100,live:2,aviso:'Aguarde a reconexao automatica.',token:'NAO-PODE-APARECER',body:'CONTEUDO-PRIVADO'},w,h);
+  assert.ok(lines.every(l=>l.length<=Math.min(w,78)));assert.ok(lines.length<=h-1);assert.ok(!lines.join('\n').includes('NAO-PODE'));assert.ok(!lines.join('\n').includes('CONTEUDO-PRIVADO'));
+ }
+});

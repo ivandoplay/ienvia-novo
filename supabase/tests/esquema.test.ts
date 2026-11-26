@@ -17,7 +17,7 @@ beforeAll(async () => {
 });
 
 describe('esquema do banco', () => {
-  test('as migrações do Git montam exatamente o mesmo banco que está no Supabase real', async () => {
+  test('as migrações do Git reproduzem o esquema Ienvia capturado no Supabase real', async () => {
     const sql = await fs.readFile(path.join(aqui, 'impressao-digital.sql'), 'utf8');
     const remoto = JSON.parse(await fs.readFile(path.join(aqui, 'impressao-digital.remoto.json'), 'utf8')) as Retrato;
 

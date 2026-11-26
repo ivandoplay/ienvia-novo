@@ -22,7 +22,7 @@ selecionar_node() {
 selecionar_node
 if [ -z "$NODE_BIN" ]; then
   if [ "$(uname -s)" = 'Linux' ] && [ -z "${TERMUX_VERSION:-}" ] && [[ "${PREFIX:-}" != *com.termux* ]]; then
-    bash "$ROOT_DIR/scripts/setup-linux.sh"
+    bash "$ROOT_DIR/scripts/setup-linux.sh" --somente-runtime
     selecionar_node
   else
     echo '[Ienvia] Node.js 24 ou superior necessario. No Termux, execute INICIAR-TERMUX.sh.'
@@ -41,7 +41,9 @@ fi
 
 while true; do
   set +e
-  "$NODE_BIN" "$ROOT_DIR/src/index.mjs" "$@"
+  SUPERVISOR="$ROOT_DIR/src/supervisor.mjs"
+  if [ -f "$ROOT_DIR/.runtime/ienvia-bootstrap/supervisor.mjs" ]; then SUPERVISOR="$ROOT_DIR/.runtime/ienvia-bootstrap/supervisor.mjs"; fi
+  "$NODE_BIN" "$SUPERVISOR" "$@"
   CODE=$?
   set -e
   if [ "$CODE" -eq 42 ]; then

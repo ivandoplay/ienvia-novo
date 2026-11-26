@@ -1,3 +1,4 @@
+import {prepararSupervisor} from './ajudar-supervisor.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,12 +18,13 @@ test('Linux: iniciar recusa Node 22 e usa runtime 24 preparado sem apagar sessã
  write(path.join(root,'bin/node'),'#!/usr/bin/env bash\nexit 1\n');
  write(path.join(root,'scripts/setup-linux.sh'),`#!/usr/bin/env bash\nset -e\ncd "$(dirname "$0")/.."\nmkdir -p .runtime/node/bin\nprintf '#!/usr/bin/env bash\\nexec "${process.execPath}" "$@"\\n' > .runtime/node/bin/node\nchmod +x .runtime/node/bin/node\ntouch preparado\n`);
  write(path.join(root,'src/index.mjs'),`import fs from 'node:fs';fs.writeFileSync('rodou',process.versions.node);`);
+ prepararSupervisor(root,motor);
  const r=spawnSync('bash',[path.join(root,'scripts/iniciar.sh')],{cwd:root,env:env(root),encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);assert.equal(fs.existsSync(path.join(root,'preparado')),true);assert.ok(Number(fs.readFileSync(path.join(root,'rodou'),'utf8').split('.')[0])>=24);intact(root);
 }));
 test('Linux: runtime portátil velho não vence Node 24 válido do PATH',linux,()=>temp(async root=>{
  preserve(root);write(path.join(root,'scripts/setup-linux.sh'),fs.readFileSync(path.join(motor,'scripts/setup-linux.sh')));write(path.join(root,'scripts/iniciar.sh'),'#!/bin/bash\n');write(path.join(root,'package.json'),'{"dependencies":{}}');
  const old='#!/bin/sh\nexit 1\n';write(path.join(root,'.runtime/node/bin/node'),old);
- write(path.join(root,'bin/node'),`#!/bin/sh\nexec "${process.execPath}" "$@"\n`);write(path.join(root,'bin/npm'),'#!/bin/sh\nmkdir -p node_modules\ntouch npm-usado\n');write(path.join(root,'bin/curl'),'#!/bin/sh\necho NAO-DEVERIA-BAIXAR >&2\nexit 90\n');
+ write(path.join(root,'bin/node'),`#!/bin/sh\ncase "$1" in *dependencias.mjs) touch npm-usado; exit 0;; esac\nexec "${process.execPath}" "$@"\n`);write(path.join(root,'bin/npm'),'#!/bin/sh\nmkdir -p node_modules\ntouch npm-usado\n');write(path.join(root,'bin/curl'),'#!/bin/sh\necho NAO-DEVERIA-BAIXAR >&2\nexit 90\n');
  const r=spawnSync('bash',[path.join(root,'scripts/setup-linux.sh')],{cwd:root,env:env(root),encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);assert.equal(fs.existsSync(path.join(root,'npm-usado')),true);assert.equal(fs.readFileSync(path.join(root,'.runtime/node/bin/node'),'utf8'),old);intact(root);
 }));
 test('Linux: checksum inválido interrompe instalação antes de substituir runtime antigo',linux,()=>temp(async root=>{
@@ -31,3 +33,7 @@ test('Linux: checksum inválido interrompe instalação antes de substituir runt
  write(path.join(root,'bin/curl'),`#!/usr/bin/env bash\nout="\${@: -1}"\nif [[ "$2" == *SHASUMS256.txt ]];then printf '%064d  node-v24.22.3-linux-x64.tar.xz\\n' 0 > "$out";else printf 'arquivo-invalido' > "$out";fi\n`);
  const r=spawnSync('bash',[path.join(root,'scripts/setup-linux.sh')],{cwd:root,env:env(root),encoding:'utf8',timeout:10000});assert.notEqual(r.status,0);assert.equal(fs.readFileSync(path.join(root,'.runtime/node/bin/node'),'utf8'),old);intact(root);
 }));
+test('iniciadores oficiais deixam dependencias para o supervisor apos recuperar transacao',()=>{
+ for(const f of ['INICIAR-LINUX.sh','INICIAR-TERMUX.sh','scripts/iniciar.sh'])assert.ok(fs.readFileSync(path.join(motor,f),'utf8').includes('--somente-runtime'));
+ for(const f of ['INICIAR-WINDOWS.bat','scripts/iniciar.bat'])assert.ok(fs.readFileSync(path.join(motor,f),'utf8').includes('-SomenteRuntime'));
+});

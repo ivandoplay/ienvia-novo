@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -18,7 +19,7 @@ export async function iniciarGuiado() {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   function executar(args) {
     return new Promise((resolve, reject) => {
-      const filho = spawn(process.execPath, [path.join(root,'src','index.mjs'), ...args], { cwd: root, stdio: 'inherit' });
+      const filho = spawn(process.execPath, [(fs.existsSync(path.join(root,'.runtime','ienvia-bootstrap','supervisor.mjs'))?path.join(root,'.runtime','ienvia-bootstrap','supervisor.mjs'):path.join(root,'src','supervisor.mjs')), ...args], { cwd: root, stdio: 'inherit' });
       filho.once('error', reject);
       filho.once('exit', (code, signal) => resolve(signal ? 130 : (code ?? 1)));
     });

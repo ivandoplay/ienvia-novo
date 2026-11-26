@@ -1,3 +1,4 @@
+import {prepararSupervisor} from './ajudar-supervisor.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,6 +14,7 @@ for(const modo of ['shell','guiado'])test(`launcher ${modo} reinicia código 42 
   fs.writeFileSync(path.join(root,'data/motor.json'),JSON.stringify({deviceToken:'test-salvo',panelUrl:'https://example.invalid'}));
   fs.writeFileSync(path.join(root,'src/index.mjs'),`import fs from 'node:fs';let n=0;try{n=Number(fs.readFileSync('data/starts','utf8'));}catch{}fs.writeFileSync('data/starts',String(n+1));process.exitCode=n===0?42:0;`);
   for(const f of ['src/iniciar-guiado.mjs','src/config.mjs','scripts/iniciar.sh'])fs.copyFileSync(path.join(motor,f),path.join(root,f));
+  prepararSupervisor(root,motor);
   const executable=modo==='shell'?'bash':process.execPath;const args=modo==='shell'?[path.join(root,'scripts/iniciar.sh')]:[path.join(root,'src/iniciar-guiado.mjs')];
   child=spawn(executable,args,{cwd:root,env:{...process.env,PATH:path.dirname(process.execPath)+path.delimiter+process.env.PATH},stdio:['ignore','pipe','pipe']});let text='';child.stderr.on('data',b=>{text+=b;});
   const result=await new Promise(resolve=>child.once('exit',(code,signal)=>resolve({code,signal})));

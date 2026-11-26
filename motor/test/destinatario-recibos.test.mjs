@@ -47,6 +47,7 @@ test('onda do WhatsApp preserva 64 amplitudes reais e rejeita entrada inválida'
 test('envia PTT com onda e duração explícitas sem alterar o arquivo de áudio',()=>temp(async root=>{
  const onda=Buffer.from(Array.from({length:64},(_,i)=>i));const audio=Buffer.from('audio-original');let payload;
  const s=new SupervisorDeSessoes({rootDir:root,panelUrl:'https://example.invalid',deviceToken:'x',fetchFn:async(u)=>u.includes('/midia?')?new Response(audio,{headers:{'x-ienvia-audio-waveform':onda.toString('base64')}}):new Response('{}')});
+ s.voiceFactory=async buf=>({audio:buf,ptt:true,mimetype:'audio/ogg; codecs=opus',seconds:13,waveform:onda});
  s.sessoes.set('i',{status:'connected',sock:{onWhatsApp:async()=>[{exists:true,jid:canonical}],sendMessage:async(j,b)=>{payload=b;return {key:{id:'wave-test'}};}}});
  await s.executarComando({id:'cmd-wave',instance_id:'i',message_id:'m',command_type:'send_media',payload:{recipient:phone},attachment:{kind:'audio',content_type:'audio/ogg; codecs=opus',is_voice:true,duration_seconds:13}});
  assert.deepEqual(payload.waveform,onda);assert.deepEqual(payload.audio,audio);assert.equal(payload.ptt,true);assert.equal(payload.seconds,13);

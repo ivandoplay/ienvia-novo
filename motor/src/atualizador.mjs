@@ -9,6 +9,7 @@ import { extractZipBuffer } from './zip.mjs';
 const PROTEGIDOS = new Set(['data', 'node_modules', '.runtime', '.git', '.env']);
 const DIR_TRANSACAO = 'ienvia-update-transaction';
 const ARQUIVO_LOCK = 'ienvia-update.lock';
+const ENTRADAS_BOOTSTRAP = new Set(['INICIAR-LINUX.sh','INICIAR-WINDOWS.bat','INICIAR-TERMUX.sh','scripts/iniciar.sh','scripts/iniciar.bat','scripts/setup-linux.sh','scripts/setup-windows.ps1','scripts/setup-termux.sh','src/iniciar-guiado.mjs']);
 
 export function caminhoEhProtegido(rel) {
   const primeiraParte = String(rel).split('/')[0].toLowerCase();
@@ -113,12 +114,14 @@ function reverterSeInterrompida(root, runtimeDir) {
     return false;
   }
   const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  if (m.committed && m.awaitingHealth) return false;
   if (m.committed) {
     fs.rmSync(stage, { recursive: true, force: true });
     return false;
   }
   for (let i = m.operations.length - 1; i >= 0; i--) {
     const op = m.operations[i];
+    if(m.rollbackHealth && ENTRADAS_BOOTSTRAP.has(op?.rel) && fs.existsSync(path.join(runtimeDir,'ienvia-bootstrap','supervisor.mjs')))continue;
     if (!op || typeof op.rel !== 'string' || caminhoEhProtegido(op.rel)) continue;
     const dest = validarDestino(root, op.rel);
     if (op.existed) {
@@ -142,7 +145,7 @@ export function recuperarAtualizacaoInterrompida(rootDir) {
   return comLockDeAtualizacao(root, (runtimeDir) => reverterSeInterrompida(root, runtimeDir));
 }
 
-export function aplicarAtualizacaoAtomica({ rootDir, zipBuffer }) {
+export function aplicarAtualizacaoAtomica({ rootDir, zipBuffer, aguardarSaude = false, newVersion = null }) {
   const root = fs.realpathSync(rootDir);
   const extraido = extractZipBuffer(zipBuffer);
   return comLockDeAtualizacao(root, (runtimeDir) => {
@@ -190,8 +193,8 @@ export function aplicarAtualizacaoAtomica({ rootDir, zipBuffer }) {
         if (process.platform !== 'win32') fs.chmodSync(item.dest, mode);
       }
 
-      escritaAtomica(manifestPath, JSON.stringify({ version: 1, operations: ops, committed: true }), 0o600);
-      fs.rmSync(stage, { recursive: true, force: true });
+      escritaAtomica(manifestPath, JSON.stringify({ version: 1, operations: ops, committed: true, awaitingHealth: aguardarSaude, newVersion }), 0o600);
+      if (!aguardarSaude) fs.rmSync(stage, { recursive: true, force: true });
       return arquivosElegiveis.length;
     } catch (erro) {
       try {
@@ -211,6 +214,7 @@ export async function verificarEAtualizar({
   antesDeAplicar = async () => {},
   chavePublicaPem = CHAVE_PUBLICA_ATUALIZACAO_MOTOR,
   fetchFn = fetch,
+  aguardarSaude = process.env.IENVIA_SUPERVISIONADO === '1',
 }) {
   const resp = await fetchFn(`${panelUrl}/api/motor/versao`, {
     headers: { accept: 'application/json' },
@@ -238,7 +242,28 @@ export async function verificarEAtualizar({
   if (hashReal !== manifesto.sha256.toLowerCase()) {
     throw new Error(`Hash SHA-256 do pacote v${manifesto.version} não confere.`);
   }
+  const rejeicao = path.join(rootDir,'.runtime','ienvia-versao-rejeitada.json');
+  try { const r=JSON.parse(fs.readFileSync(rejeicao,'utf8')); if(r.version===manifesto.version && Date.now()-r.at<86400000)return {updated:false,reason:'versao_em_quarentena'}; } catch {}
+  if (atualizacaoPendente(rootDir)) return {updated:false,reason:'aguardando_confirmacao_de_saude'};
   await antesDeAplicar();
-  const aplicados = aplicarAtualizacaoAtomica({ rootDir, zipBuffer });
+  const aplicados = aplicarAtualizacaoAtomica({ rootDir, zipBuffer, aguardarSaude, newVersion: manifesto.version });
   return { updated: true, newVersion: manifesto.version, filesUpdated: aplicados };
+}
+
+export function atualizacaoPendente(rootDir) {
+  try { const m=JSON.parse(fs.readFileSync(path.join(rootDir,'.runtime',DIR_TRANSACAO,'manifest.json'),'utf8'));return m.committed && m.awaitingHealth ? m : null; } catch { return null; }
+}
+export function confirmarSaudeDaAtualizacao(rootDir) {
+  return comLockDeAtualizacao(fs.realpathSync(rootDir), runtime=>{
+    if (!atualizacaoPendente(rootDir)) return false;
+    fs.rmSync(path.join(runtime,DIR_TRANSACAO),{recursive:true,force:true});return true;
+  });
+}
+export function reverterAtualizacaoSemSaude(rootDir) {
+  return comLockDeAtualizacao(fs.realpathSync(rootDir),runtime=>{
+    const m=atualizacaoPendente(rootDir);if(!m)return false;
+    escritaAtomica(path.join(runtime,DIR_TRANSACAO,'manifest.json'),JSON.stringify({...m,committed:false,awaitingHealth:false,rollbackHealth:true}),0o600);
+    reverterSeInterrompida(fs.realpathSync(rootDir),runtime);
+    escritaAtomica(path.join(runtime,'ienvia-versao-rejeitada.json'),JSON.stringify({version:m.newVersion,at:Date.now()}),0o600);return true;
+  });
 }

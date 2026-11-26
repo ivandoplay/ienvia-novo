@@ -1,35 +1,37 @@
 -- Impressão digital do esquema: um resumo (md5) por categoria de objeto.
 -- Rode este mesmo SQL no banco remoto (SQL Editor do Supabase) e no banco de teste:
--- se os md5 baterem, o que está no Git é exatamente o que está no banco.
+-- Compara o esquema Ienvia, nao outros projetos hospedados no mesmo banco.
+-- Exclusao nominal unica: public.diagnostico_golpes (Projeto Integrador independente).
+-- As demais tabelas, funcoes, grants e politicas continuam obrigatoriamente comparadas.
 with
 colunas as (
   select 'colunas' as categoria,
          table_schema || '.' || table_name || '.' || column_name || ':' || udt_name || ':' || is_nullable
            || ':' || coalesce(column_default, '') || ':' || coalesce(generation_expression, '') as item
   from information_schema.columns
-  where table_schema in ('public', 'private')
+  where table_schema in ('public', 'private') and not (table_schema='public' and table_name='diagnostico_golpes')
 ),
 restricoes as (
   select 'restricoes', conrelid::regclass::text || ':' || contype::text || ':' || pg_get_constraintdef(oid)
   from pg_constraint
-  where connamespace in ('public'::regnamespace, 'private'::regnamespace) and conrelid <> 0 and contype <> 'n'
+  where connamespace in ('public'::regnamespace, 'private'::regnamespace) and conrelid <> 0 and contype <> 'n' and conrelid <> coalesce(to_regclass('public.diagnostico_golpes'),0::oid)
 ),
 indices as (
   -- o Postgres escreve "extensions.gin_trgm_ops" ou só "gin_trgm_ops" conforme o search_path; é o mesmo índice
   select 'indices', schemaname || ':' || replace(indexdef, 'extensions.', '')
   from pg_indexes
-  where schemaname in ('public', 'private')
+  where schemaname in ('public', 'private') and not (schemaname='public' and tablename='diagnostico_golpes')
 ),
 politicas as (
   select 'politicas', schemaname || '.' || tablename || ':' || policyname || ':' || cmd || ':' || array_to_string(roles, ',')
            || ':' || coalesce(qual, '') || ':' || coalesce(with_check, '')
   from pg_policies
-  where schemaname in ('public', 'private')
+  where schemaname in ('public', 'private') and not (schemaname='public' and tablename='diagnostico_golpes')
 ),
 rls as (
   select 'rls_ligado', n.nspname || '.' || c.relname || ':' || c.relrowsecurity::text
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname in ('public', 'private') and c.relkind = 'r'
+  where n.nspname in ('public', 'private') and c.relkind = 'r' and not (n.nspname='public' and c.relname='diagnostico_golpes')
 ),
 funcoes as (
   select 'funcoes', n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
@@ -42,17 +44,17 @@ gatilhos as (
   select 'gatilhos', event_object_schema || '.' || event_object_table || ':' || trigger_name || ':' || action_timing
            || ':' || event_manipulation || ':' || action_statement
   from information_schema.triggers
-  where trigger_schema in ('public', 'private')
+  where trigger_schema in ('public', 'private') and not (event_object_schema='public' and event_object_table='diagnostico_golpes')
 ),
 permissoes_tabela as (
   select 'permissoes_tabela', table_schema || '.' || table_name || ':' || grantee || ':' || privilege_type
   from information_schema.role_table_grants
-  where table_schema in ('public', 'private') and grantee in ('anon', 'authenticated', 'service_role', 'PUBLIC')
+  where table_schema in ('public', 'private') and not (table_schema='public' and table_name='diagnostico_golpes') and grantee in ('anon', 'authenticated', 'service_role', 'PUBLIC')
 ),
 permissoes_coluna as (
   select 'permissoes_coluna', cp.table_schema || '.' || cp.table_name || '.' || cp.column_name || ':' || cp.grantee || ':' || cp.privilege_type
   from information_schema.column_privileges cp
-  where cp.table_schema in ('public', 'private') and cp.grantee in ('anon', 'authenticated', 'PUBLIC')
+  where cp.table_schema in ('public', 'private') and not (cp.table_schema='public' and cp.table_name='diagnostico_golpes') and cp.grantee in ('anon', 'authenticated', 'PUBLIC')
     -- só interessa a permissão dada coluna a coluna (quando a tabela inteira não foi liberada)
     and not exists (
       select 1 from information_schema.role_table_grants tg
