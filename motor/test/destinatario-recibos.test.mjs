@@ -51,3 +51,8 @@ test('envia PTT com onda e duração explícitas sem alterar o arquivo de áudio
  await s.executarComando({id:'cmd-wave',instance_id:'i',message_id:'m',command_type:'send_media',payload:{recipient:phone},attachment:{kind:'audio',content_type:'audio/ogg; codecs=opus',is_voice:true,duration_seconds:13}});
  assert.deepEqual(payload.waveform,onda);assert.deepEqual(payload.audio,audio);assert.equal(payload.ptt,true);assert.equal(payload.seconds,13);
 }));
+test('consulta exata bloqueia mudanca silenciosa do nono digito inclusive no cache',async()=>{
+ const sock={onWhatsApp:async()=>[{exists:true,jid:'5586981638438@s.whatsapp.net'}]};const original='558681638438@s.whatsapp.net';let audit;
+ await assert.rejects(()=>resolverDestinatario(sock,original,{exato:true,onResolution:r=>{audit=r;}}),/divergente/);assert.equal(audit.registrado,'5586981638438@s.whatsapp.net');
+ await resolverDestinatario(sock,original);await assert.rejects(()=>resolverDestinatario(sock,original,{exato:true}),/divergente/);
+});

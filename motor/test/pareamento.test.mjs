@@ -103,3 +103,8 @@ test('update nao sobrescreve conteudo ja preservado e socket antigo nao injeta e
  assert.equal(JSON.parse(s.filaHistorico.listar(10)[0].valor.msg).message.conversation,'original');
  await s.iniciarConexao('i');sock.ev.emit('messages.upsert',{type:'notify',messages:[{key:{...key,id:'velho'},message:{conversation:'ignorar'}}]});assert.equal(s.filaHistorico.listar(10).length,1);
 }));
+test('diagnostic_only consulta identidade sem enviar mensagem nem presenca',()=>cenario(async({s,sockets,reports})=>{
+ await s.iniciarConexao('i');s.sessoes.get('i').status='connected';const sock=sockets[0];sock.user={id:'558681303979:2@s.whatsapp.net'};sock.onWhatsApp=async jid=>[{exists:true,jid}];sock.sendMessage=()=>{throw Error('NAO PODE ENVIAR');};sock.sendPresenceUpdate=()=>{throw Error('NAO PODE PRESENCA');};
+ await s.executarComando({id:'diag',instance_id:'i',command_type:'send_text',payload:{recipient:'558681638438@s.whatsapp.net',diagnostic_only:true}});
+ assert.equal(reports.at(-1).outcome,'succeeded');assert.equal(s.diagnosticoOperacional().chips.i.ultimaConsulta.exato,true);assert.equal(s.diagnosticoOperacional().chips.i.ultimaConsulta.origem,'558681303979@s.whatsapp.net');
+}));

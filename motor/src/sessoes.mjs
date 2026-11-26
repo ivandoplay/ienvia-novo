@@ -164,6 +164,17 @@ export class SupervisorDeSessoes {
     return this.diagnosticos.get(instanceId);
   }
 
+  async conferirDestino(registro, cmd) {
+    const d = this.diagnostico(cmd.instance_id);
+    d.ultimaConsulta = { origem: normalizarJidParaContato(registro.sock.user?.id), solicitado: normalizarJidParaContato(cmd.payload?.recipient), instante: new Date().toISOString() };
+    return resolverDestinatario(registro.sock, cmd.payload?.recipient, {
+      exato: cmd.payload?.exact_recipient === true || cmd.payload?.diagnostic_only === true,
+      onResolution: ({ solicitado, registrado }) => {
+        d.ultimaConsulta = { ...d.ultimaConsulta, solicitado, registrado, exato: solicitado === registrado };
+      },
+    });
+  }
+
   diagnosticoOperacional() {
     return { filas: this.filaHistorico.contagem(), chips: Object.fromEntries(this.diagnosticos) };
   }
@@ -554,7 +565,11 @@ export class SupervisorDeSessoes {
       }
 
       if (cmd.command_type === 'send_text') {
-        const jid = await resolverDestinatario(registro.sock, cmd.payload?.recipient);
+        const jid = await this.conferirDestino(registro, cmd);
+        if (cmd.payload?.diagnostic_only === true) {
+          await concluir('succeeded');
+          return;
+        }
         const texto = cmd.payload?.body_text;
         const enviar = async () => {
           envioIniciado = true;
@@ -563,6 +578,7 @@ export class SupervisorDeSessoes {
         const enviado = cmd.payload?.admin_alert_delivery_id ? await enviar() : await this.presencaDeResposta.enviar({
           instanceId: cmd.instance_id, sock: registro.sock, jid, tipo: 'text', texto, enviar,
         });
+        this.diagnostico(cmd.instance_id).ultimoRetorno = { destino: normalizarJidParaContato(enviado?.key?.remoteJid), fromMe: enviado?.key?.fromMe === true, temId: Boolean(enviado?.key?.id) };
         const waId = enviado?.key?.id || null;
         await concluir(waId ? 'sent' : 'uncertain', { provider_message_id: waId });
         return;
@@ -583,7 +599,7 @@ export class SupervisorDeSessoes {
           return;
         }
         const buf = Buffer.from(await mediaResp.arrayBuffer());
-        const jid = await resolverDestinatario(registro.sock, cmd.payload?.recipient);
+        const jid = await this.conferirDestino(registro, cmd);
         const caption = att.caption || undefined;
         let payloadWa;
         if (att.kind === 'image') payloadWa = { image: buf, mimetype: att.content_type, caption };
@@ -602,6 +618,7 @@ export class SupervisorDeSessoes {
           tipo: att.kind === 'audio' && att.is_voice !== false ? 'audio' : 'media',
           enviar: async () => { envioIniciado = true; return registro.sock.sendMessage(jid, payloadWa); },
         });
+        this.diagnostico(cmd.instance_id).ultimoRetorno = { destino: normalizarJidParaContato(enviado?.key?.remoteJid), fromMe: enviado?.key?.fromMe === true, temId: Boolean(enviado?.key?.id) };
         const waId = enviado?.key?.id || null;
         await concluir(waId ? 'sent' : 'uncertain', { provider_message_id: waId });
         return;
