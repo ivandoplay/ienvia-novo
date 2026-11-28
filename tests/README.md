@@ -28,3 +28,7 @@ Capturas futuras em `web/.cache/evidencias/`; builds de E2E em `web/.cache/next-
 ## Testes reais
 
 Somente quando explicitamente autorizados e no destino permitido. Não executar automaticamente scripts antigos de envio/publicação a partir do histórico. A campanha real não é fixture de teste. Consultar `docs/CONTINUIDADE.md` e o estado privado antes de qualquer operação que possa ter efeitos externos.
+
+## Diagnóstico exploratório histórico
+
+`tests/exploratorios/auditoria-ampla.ts` preserva a varredura ampla anterior e usa somente dublês. Fica fora da suíte padrão: há achados conhecidos de hidratação e seletores desatualizados, documentados em continuidade. Não interpretar a existência desse arquivo como teste aprovado. Ao retomar essa auditoria, configurar uma execução Playwright explícita a partir da raiz e salvar resultados em `.cache/evidencias/`. Não copiá-lo para produção nem usar dados reais para fazê-lo passar.
