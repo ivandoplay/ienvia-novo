@@ -365,6 +365,39 @@ export function PainelDeCampanhas({ dados }: Props) {
     });
   }
 
+  function editarRascunho(id: string) {
+    setAviso(null);
+    iniciarTransicao(async () => {
+      const res = await carregarDetalheCampanha(id);
+      if (!res.ok) { setAviso({ tipo: 'erro', texto: res.erro }); return; }
+      const d = res.detalhe;
+      if (!['draft', 'awaiting_confirmation'].includes(d.campaign.status)) {
+        setAviso({ tipo: 'erro', texto: 'Esta campanha não está mais em rascunho. Atualize a lista.' }); return;
+      }
+      if (d.recipients.length !== d.stats.total) {
+        setAviso({ tipo: 'erro', texto: 'A lista não foi carregada por completo. Não é seguro editar agora.' }); return;
+      }
+      setCampaignId(d.campaign.id);
+      setNomeCampanha(d.campaign.name);
+      setDistribuicao(d.campaign.distribution);
+      setChipsSelecionados(d.campaign.instance_ids);
+      setBlocos(d.campaign.blocks);
+      setCadencia({ ...CADENCIA_PADRAO, ...d.campaign.cadence });
+      const scheduled = d.campaign.scheduled_for ? new Date(d.campaign.scheduled_for) : null;
+      setAgendarPara(scheduled ? new Date(scheduled.getTime() - scheduled.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
+      setTextoContatos('');
+      setContatosImportados(d.recipients.map((r) => ({
+        nome: r.display_name, telefone: r.phone_e164 ?? '',
+        miolo: (r.phone_e164 ?? '').replace(/\D/g, '').replace(/^55/, ''), campos: r.custom_fields ?? {},
+      })));
+      setColunasDetectadas(Array.from(new Set(d.recipients.flatMap((r) => Object.keys(r.custom_fields ?? {})))));
+      setResumoImportacao(null);
+      setPrevia(null);
+      setAba('criar');
+      setAviso({ tipo: 'ok', texto: 'Rascunho carregado. Confira os dados, gere a prévia e só então confirme o início do envio.' });
+    });
+  }
+
   function abrirDetalhe(id: string) {
     setAviso(null);
     iniciarTransicao(async () => {
@@ -572,6 +605,11 @@ export function PainelDeCampanhas({ dados }: Props) {
                       <button type="button" className="btn btn-secondary" disabled={pendente} onClick={() => abrirDetalhe(c.id)}>
                         Acompanhar
                       </button>
+                      {['draft', 'awaiting_confirmation'].includes(c.status) && (
+                        <button type="button" className="btn btn-primary" disabled={pendente} onClick={() => editarRascunho(c.id)}>
+                          Editar e preparar envio
+                        </button>
+                      )}
                       {(c.status === 'running' || c.status === 'scheduled') && (
                         <button
                           type="button"
@@ -1403,6 +1441,11 @@ export function PainelDeCampanhas({ dados }: Props) {
                 >
                   Atualizar
                 </button>
+                {['draft', 'awaiting_confirmation'].includes(detalhe.campaign.status) && (
+                  <button type="button" className="btn btn-primary" disabled={pendente} onClick={() => editarRascunho(detalhe.campaign.id)}>
+                    Editar e preparar envio
+                  </button>
+                )}
                 {detalhe.campaign.status === 'running' && (
                   <button
                     type="button"
