@@ -1,11 +1,13 @@
 // Canais independentes: uma requisição de histórico lenta não bloqueia entradas novas.
 // Cada canal permite só um lote em voo; o supervisor protege cada tipo também.
-export function iniciarEscoamento(supervisor, { intervaloMs = 500, onError = console.warn } = {}) {
+export function iniciarEscoamento(supervisor, { intervaloMs = 500, historicoIntervaloMs = 5000, onError = console.warn } = {}) {
   let parado = false;
   const emCurso = new Map();
   const falhas = new Map();
   const proxima = new Map();
+  let ultimoHistorico=0;
   function executar(tipo) {
+    if(tipo==='history'){if(Date.now()-ultimoHistorico<historicoIntervaloMs)return;ultimoHistorico=Date.now();}
     if (parado || emCurso.has(tipo) || (proxima.get(tipo) || 0) > Date.now()) return;
     const tarefa = Promise.resolve().then(()=>supervisor.escoarHistorico({tipo}))
       .then(() => { falhas.delete(tipo); proxima.delete(tipo); })

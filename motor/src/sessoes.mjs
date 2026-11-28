@@ -5,7 +5,7 @@ import { IntencoesDeConexao } from './intencoes.mjs';
 import { atrasoReconexao, podeRetomarSessao, ehMensagemHistorica } from './operacao.mjs';
 import { PresencaDeResposta } from './presenca.mjs';
 import { BufferJSON } from '@whiskeysockets/baileys';
-import { abrirFila } from './fila-historico.mjs';
+import { ignorarConversa, abrirFila } from './fila-historico.mjs';
 import { resolverDestinatario } from './destinatario.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -180,7 +180,7 @@ export class SupervisorDeSessoes {
   }
 
   diagnosticoOperacional() {
-    return { filas: this.filaHistorico.contagem(), chips: Object.fromEntries(this.diagnosticos) };
+    return { filas: this.filaHistorico.contagem(), identidadesPendentes: [...this.retornosFila.values()].filter(v=>v.motivo==='identidade_pendente').length, chips: Object.fromEntries(this.diagnosticos) };
   }
 
   headers(extra = {}) {
@@ -348,8 +348,15 @@ export class SupervisorDeSessoes {
       }
     });
 
+    const guardarMapeamentos=async(contatos=[])=>{
+      const pares=[];for(const c of contatos){const lid=c.lid||(c.id?.endsWith('@lid')?c.id:null);const pn=normalizarJidParaContato(c.phoneNumber)||normalizarJidParaContato(c.id);if(lid&&pn)pares.push({lid,pn});}
+      if(pares.length)try{await sock.signalRepository?.lidMapping?.storeLIDPNMappings(pares);}catch{this.onLog('[motor] Mapeamento de contato pendente.');}
+    };
+    sock.ev.on('contacts.upsert',guardarMapeamentos);
+    sock.ev.on('contacts.update',guardarMapeamentos);
     sock.ev.on('messaging-history.set', ({ messages, contacts, chats }) => {
-      this.historicoRecebido += (messages || []).length;
+      void guardarMapeamentos(contacts||[]);
+      this.historicoRecebido += (messages || []).filter(m=>!ignorarConversa({msg:JSON.stringify(m)})).length;
       this.ultimoHistorico = Date.now();
       for (const c of [...(contacts || []), ...(chats || [])]) {
         const nome = c.notify || c.name || c.verifiedName;
@@ -357,7 +364,7 @@ export class SupervisorDeSessoes {
         if (c.id && nome) this.nomesContatos.set(instanceId + ':' + c.id, String(nome).slice(0,150));
       }
       for (const msg of messages || []) {
-        if (!msg.key?.id || foraDaJanelaHistorica(msg)) continue;
+        if (!msg.key?.id || ignorarConversa({msg:JSON.stringify(msg)}) || foraDaJanelaHistorica(msg)) continue;
         try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: true, msg: JSON.stringify(msg, BufferJSON.replacer) }); }
         catch (err) { this.onLog(`[motor] Histórico não salvo: ${err.message}`); }
       }
@@ -367,7 +374,7 @@ export class SupervisorDeSessoes {
       if (this.sessoes.get(instanceId)?.sock !== sock || !['notify','append'].includes(type)) return;
       this.diagnostico(instanceId).upserts += (messages || []).length;
       for (const msg of messages || []) {
-        if (!msg.key?.id) continue;
+        if (!msg.key?.id || ignorarConversa({msg:JSON.stringify(msg)})) continue;
         if (ehMensagemHistorica(type, msg, inicioConexao) && foraDaJanelaHistorica(msg)) continue;
         if (!msg.message) this.diagnostico(instanceId).semConteudo++;
         try { this.filaHistorico.guardar(instanceId + ':' + msg.key.id, { instanceId, historical: ehMensagemHistorica(type, msg, inicioConexao), msg: JSON.stringify(msg, BufferJSON.replacer) }, { recuperarConteudo: recuperada }); this.diagnostico(instanceId).enfileiradas++; }
@@ -427,6 +434,7 @@ export class SupervisorDeSessoes {
     try {
       for (const item of this.filaHistorico.listar(tipo === 'history' ? 2 : 10, tipo)) {
         if (this.encerrando) break;
+        if(tipo==='history'&&this.filaHistorico.haPendentes('live',n=>(this.retornosFila.get(n)?.proxima||0)<=Date.now()))break;
         if ((this.retornosFila.get(item.nome)?.proxima || 0) > Date.now()) continue;
         const { instanceId } = item.valor;
         const msg = JSON.parse(item.valor.msg, BufferJSON.reviver);
@@ -437,6 +445,7 @@ export class SupervisorDeSessoes {
           if (!jid && msg.key?.remoteJid?.endsWith('@lid')) jid = normalizarJidParaContato(await sock.signalRepository?.lidMapping?.getPNForLID(msg.key.remoteJid));
           if (!jid) {
             this.diagnostico(instanceId).lidPendente++;
+            this.retornosFila.set(item.nome,{tentativas:0,proxima:Date.now()+15000,motivo:'identidade_pendente'});
             if (!msg.key?.remoteJid?.endsWith('@lid')) this.filaHistorico.confirmar(item.nome);
             continue;
           }
@@ -446,7 +455,7 @@ export class SupervisorDeSessoes {
           if (['accepted','duplicate'].includes(r.result) && r.message_id && ['pending','failed'].includes(r.media?.status) && x.mediaMessage) {
             await this.enviarMidiaRecebida(r.message_id, x.mediaMessage, x.media);
           }
-          if (['accepted','duplicate','ignored'].includes(r.result)) { this.diagnostico(instanceId).apiConfirmadas++; this.filaHistorico.confirmar(item.nome); this.retornosFila.delete(item.nome); }
+          if (['accepted','duplicate','ignored'].includes(r.result)) { this.diagnostico(instanceId).apiConfirmadas++; if(!msg.key.fromMe&&r.result!=='ignored'){this.diagnostico(instanceId).ultimaEntradaConfirmada=Date.now();} this.filaHistorico.confirmar(item.nome); this.retornosFila.delete(item.nome); }
         } catch (err) {
           this.diagnostico(instanceId).apiFalhas++;
           const tentativas = (this.retornosFila.get(item.nome)?.tentativas || 0) + 1;

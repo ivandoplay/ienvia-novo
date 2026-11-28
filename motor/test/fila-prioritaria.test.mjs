@@ -48,8 +48,9 @@ test('histórico com rede bloqueada não bloqueia as seis mensagens vivas com LI
   }});
   supervisor.sessoes.set('inst',{sock:{}});
   supervisor.filaHistorico.guardar('h',valor('h',true));
-  for(let i=0;i<6;i++)supervisor.filaHistorico.guardar('v'+i,valor('v'+i,false));
   const history=supervisor.escoarHistorico({tipo:'history'});
+  await new Promise(resolve=>setImmediate(resolve));
+  for(let i=0;i<6;i++)supervisor.filaHistorico.guardar('v'+i,valor('v'+i,false));
   await supervisor.escoarHistorico({tipo:'live'});
   assert.equal(chamadas.filter(x=>!x.historical).length,6);
   assert.ok(chamadas.every(x=>x.sender_jid==='5586981638438@s.whatsapp.net'));
@@ -74,4 +75,28 @@ test('executor independente não sobrepõe lotes do mesmo tipo; parada aguarda t
  try{await new Promise(r=>setTimeout(r,35));assert.equal(historicas,1);assert.ok(vivas>=2);
  const fim=parar();liberar();await fim;const total=vivas;await new Promise(r=>setTimeout(r,20));assert.equal(vivas,total);
  }finally{liberar();await parar();}
+});
+test('ordena por data real decrescente, inclusive apos reinicio, sem depender de hash',()=>{
+ const r=tmp();try{let f=abrirFila(r);for(const [id,t] of [['antiga',100],['nova',300],['media',200]]){const v=valor(id,true);const m=JSON.parse(v.msg);m.messageTimestamp=t;v.msg=JSON.stringify(m);f.guardar(id,v);}
+ f=abrirFila(r);assert.deepEqual(f.listar(3,'history').map(x=>JSON.parse(x.valor.msg).key.id),['nova','media','antiga']);
+ }finally{fs.rmSync(r,{recursive:true,force:true});}
+});
+test('nova entrada fura a rodada anterior, retentativa nao deixa entradas antigas morrerem',()=>{
+ const r=tmp();try{const f=abrirFila(r);for(let i=1;i<=3;i++){const v=valor('m'+i,false);const m=JSON.parse(v.msg);m.messageTimestamp=i;v.msg=JSON.stringify(m);f.guardar('m'+i,v);}
+ assert.equal(JSON.parse(f.listar(1,'live')[0].valor.msg).key.id,'m3');const v=valor('recentissima',false);const m=JSON.parse(v.msg);m.messageTimestamp=99;v.msg=JSON.stringify(m);f.guardar('z',v);
+ assert.equal(JSON.parse(f.listar(1,'live')[0].valor.msg).key.id,'recentissima');assert.deepEqual(f.listar(2,'live').map(x=>JSON.parse(x.valor.msg).key.id),['m2','m1']);
+ }finally{fs.rmSync(r,{recursive:true,force:true});}
+});
+test('grupos novos nao entram; legados sao preservados fora da fila ativa',()=>{
+ const r=tmp();try{const v=valor('g',false);const m=JSON.parse(v.msg);m.key.remoteJid='12345@g.us';v.msg=JSON.stringify(m);
+ const f=abrirFila(r);assert.equal(f.guardar('g',v),false);fs.writeFileSync(path.join(r,'a'.repeat(64)+'.json'),JSON.stringify(v));
+ assert.deepEqual(abrirFila(r).contagem(),{live:0,history:0});assert.equal(fs.readdirSync(r+'-nao-individuais').length,1);
+ }finally{fs.rmSync(r,{recursive:true,force:true});fs.rmSync(r+'-nao-individuais',{recursive:true,force:true});}
+});
+test('historico cede ao live e retoma durante backoff de identidade sem perder a entrada',async()=>{
+ const r=tmp();try{const calls=[];const s=new SupervisorDeSessoes({rootDir:r,panelUrl:'https://example.invalid',deviceToken:'x',onLog:()=>{},fetchFn:async(_,o)=>{calls.push(JSON.parse(o.body));return new Response(JSON.stringify({result:'accepted'}));}});s.sessoes.set('inst',{sock:{}});
+ const unresolved=valor('lid',false);const msg=JSON.parse(unresolved.msg);delete msg.key.remoteJidAlt;unresolved.msg=JSON.stringify(msg);s.filaHistorico.guardar('lid',unresolved);s.filaHistorico.guardar('hist',valor('hist',true));
+ await s.escoarHistorico({tipo:'history'});assert.equal(calls.length,0);await s.escoarHistorico({tipo:'live'});await s.escoarHistorico({tipo:'history'});
+ assert.equal(calls.length,1);assert.equal(calls[0].historical,true);assert.equal(s.filaHistorico.contagem().live,1);assert.equal(s.diagnosticoOperacional().identidadesPendentes,1);
+ }finally{fs.rmSync(r,{recursive:true,force:true});}
 });

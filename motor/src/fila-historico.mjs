@@ -1,25 +1,35 @@
-import { foraDaJanelaHistorica } from './janela-historico.mjs';
+import { timestampHistorico, foraDaJanelaHistorica } from './janela-historico.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+
+export function ignorarConversa(valor){
+  try{const jid=JSON.parse(valor.msg)?.key?.remoteJid;return typeof jid==='string'&&(jid.endsWith('@g.us')||jid.endsWith('@broadcast')||jid.endsWith('@newsletter'));}catch{return false;}
+}
 
 export function abrirFila(diretorio, { diasHistorico = null } = {}) {
   fs.mkdirSync(diretorio, { recursive: true, mode: 0o700 });
   // Classificação em memória, reconstruída dos arquivos legados a cada início.
   // Os arquivos continuam sendo a fonte durável; nenhuma migração destrutiva.
   const grupos = { live: new Set(), history: new Set() };
-  const cursores = { live: '', history: '' };
+  const vistos = {live:new Set(),history:new Set()};
+  const datas=new Map();
+  const caches={live:null,history:null};
   const grupoDe = new Map();
   let indexada = false;
   function classificar(nome, valor) {
+    let msg;try{msg=JSON.parse(valor.msg);}catch{}
     const grupo = valor.historical === false ? 'live' : 'history';
-    grupos[grupo].add(nome);grupoDe.set(nome, grupo);
+    grupos[grupo].add(nome);grupoDe.set(nome, grupo);datas.set(nome,timestampHistorico(msg)||valor.queuedAt||fs.statSync(path.join(diretorio,nome)).mtimeMs);caches[grupo]=null;
   }
   function indexar() {
     if (indexada) return;
     for (const nome of fs.readdirSync(diretorio).filter(n => /^[a-f0-9]{64}\.json$/.test(n))) {
       try {
         const valor = JSON.parse(fs.readFileSync(path.join(diretorio,nome),'utf8'));
+        if (ignorarConversa(valor)) {
+          const destino=diretorio+'-nao-individuais';fs.mkdirSync(destino,{recursive:true,mode:0o700});fs.renameSync(path.join(diretorio,nome),path.join(destino,nome+'.'+crypto.randomUUID()));continue;
+        }
         if (diasHistorico && valor.historical !== false && valor.msg && foraDaJanelaHistorica(JSON.parse(valor.msg), Date.now(), diasHistorico)) {
           const arquivo = path.join(diretorio, nome);
           const destino = path.join(diretorio + '-fora-da-janela', nome);
@@ -36,10 +46,10 @@ export function abrirFila(diretorio, { diasHistorico = null } = {}) {
     indexada = true;
   }
   function selecionar(grupo, limite) {
-    const nomes = [...grupos[grupo]].sort();
-    const cursor = cursores[grupo];
-    const lote = [...nomes.filter(n=>n>cursor),...nomes.filter(n=>n<=cursor)].slice(0,limite);
-    if (lote.length) cursores[grupo] = lote[lote.length-1];
+    const nomes=caches[grupo] ||= [...grupos[grupo]].sort((a,b)=>(datas.get(b)-datas.get(a))||a.localeCompare(b));
+    let disponiveis=nomes.filter(n=>!vistos[grupo].has(n));
+    if(!disponiveis.length){vistos[grupo].clear();disponiveis=nomes;}
+    const lote=disponiveis.slice(0,limite);for(const n of lote)vistos[grupo].add(n);
     const itens=[];
     for (const nome of lote) {
       try { itens.push({nome,valor:JSON.parse(fs.readFileSync(path.join(diretorio,nome),'utf8'))}); }
@@ -49,6 +59,7 @@ export function abrirFila(diretorio, { diasHistorico = null } = {}) {
   }
   return {
     guardar(chave, valor, { recuperarConteudo = false } = {}) {
+      if(ignorarConversa(valor))return false;
       const nome = crypto.createHash('sha256').update(chave).digest('hex') + '.json';
       const arquivo = path.join(diretorio, nome);
       if (fs.existsSync(arquivo)) {
@@ -70,12 +81,13 @@ export function abrirFila(diretorio, { diasHistorico = null } = {}) {
       const live = selecionar('live',limite);
       return [...live,...selecionar('history',Math.max(0,limite-live.length))];
     },
+    haPendentes(tipo,aceitar=()=>true){indexar();return [...grupos[tipo]].some(n=>aceitar(n));},
     contagem() { indexar();return {live:grupos.live.size,history:grupos.history.size}; },
     confirmar(nome) {
       if (!/^[a-f0-9]{64}\.json$/.test(nome)) throw new Error('Nome de entrada inválido.');
       try { fs.unlinkSync(path.join(diretorio,nome)); } catch(e) { if(e.code!=='ENOENT')throw e; }
       const grupo = grupoDe.get(nome);
-      if (grupo) grupos[grupo].delete(nome);
+      if (grupo) {grupos[grupo].delete(nome);vistos[grupo].delete(nome);caches[grupo]=null;}datas.delete(nome);
       grupoDe.delete(nome);
     }
   };

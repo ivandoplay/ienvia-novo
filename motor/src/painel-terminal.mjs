@@ -27,17 +27,17 @@ export function iniciarPainelTerminal({ obterVisao, output = process.stdout, con
     const linhas = linhasDoPainel(visao, Math.max(20, (output.columns || 71) - 1), output.rows || 100);
     // Um terminal muito baixo usa resumo, evitando rolagem/cursor quebrado no teclado do Termux.
     const fixo = output.isTTY && (!output.rows || output.rows > linhas.length + 1) && process.env.TERM !== 'dumb';
-    const atual = linhas.join('\n');
+    const atual = linhas.join('\r\n');
     if (fixo) {
       if (atual === anterior) return;
-      if (altura) output.write(`\x1b[${altura}A`);
+      if (altura) output.write(`\x1b[${altura}F`);
       const n = Math.max(altura, linhas.length);
       const colorir=(linha,i)=> {
         if(process.env.NO_COLOR !== undefined)return linha;
         const cor=i===0?'1;36':/ATENCAO|Reconectando|Sem comunicacao|Desconectado/.test(linha)?'33':/Conectado/.test(linha)?'32':/^-+$/.test(linha)?'2':'0';
         return `\x1b[${cor}m${linha}\x1b[0m`;
       };
-      for (let i=0; i<n; i++) output.write(`\r\x1b[2K${colorir(linhas[i] || '',i)}\n`);
+      for (let i=0; i<n; i++) output.write(`\r\x1b[2K${colorir(linhas[i] || '',i)}\r\n`);
       altura = n;
     } else {
       // Não imprimir contadores a cada ciclo em logs, serviços ou terminais estreitos.
