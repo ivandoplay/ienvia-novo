@@ -414,3 +414,19 @@ export async function resolverEnvioIncertoCampanha(
   atualizarCaminhos();
   return { ok: true, detalhe: data as DetalheDaCampanha, lista };
 }
+
+/** Resolve somente arquivos da biblioteca do workspace autenticado; URL temporária. */
+export async function obterPreviaAudioCampanha(fileId: string): Promise<
+  { ok: true; url: string } | { ok: false; erro: string }
+> {
+  const sessao = await obterSessao();
+  if (!sessao?.workspaceAtivo) return { ok: false, erro: SESSAO_EXPIRADA };
+  if (!ehIdentificador(fileId)) return { ok: false, erro: 'Áudio inválido.' };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from('campaign_media_files')
+    .select('object_key, kind').eq('workspace_id', sessao.workspaceAtivo.id).eq('id', fileId).maybeSingle();
+  if (error || !data || data.kind !== 'audio') return { ok: false, erro: 'Áudio não encontrado ou sem acesso.' };
+  const signed = await supabase.storage.from(DEPOSITO).createSignedUrl(data.object_key, 900);
+  if (signed.error || !signed.data?.signedUrl) return { ok: false, erro: 'Não foi possível abrir o áudio. Tente novamente.' };
+  return { ok: true, url: signed.data.signedUrl };
+}

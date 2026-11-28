@@ -1,5 +1,6 @@
 'use client';
 
+import { PlayerAudioCampanha } from './player-audio';
 import { CampoDeHora } from '@/components/ui/campo-de-hora';
 import { useState, useTransition } from 'react';
 import {
@@ -147,6 +148,7 @@ export function PainelDeCampanhas({ dados }: Props) {
 
   // Biblioteca de mídia
   const [novaPastaNome, setNovaPastaNome] = useState('');
+  const [paginaDestinatarios, setPaginaDestinatarios] = useState(0);
   const [novaPastaTipo, setNovaPastaTipo] = useState<'image' | 'audio'>('image');
   const [pastaAtivaId, setPastaAtivaId] = useState<string>(dados.pastas[0]?.id ?? '');
   const [enviandoMidia, setEnviandoMidia] = useState(false);
@@ -350,6 +352,7 @@ export function PainelDeCampanhas({ dados }: Props) {
       }
       setCampanhas(res.lista);
       setDetalhe(res.detalhe);
+      setPaginaDestinatarios(0);
       limparFormularioCampanha();
       setAba('detalhe');
       setAviso({
@@ -369,6 +372,7 @@ export function PainelDeCampanhas({ dados }: Props) {
       if (!res.ok) setAviso({ tipo: 'erro', texto: res.erro });
       else {
         setDetalhe(res.detalhe);
+      setPaginaDestinatarios(0);
         setAba('detalhe');
       }
     });
@@ -385,6 +389,7 @@ export function PainelDeCampanhas({ dados }: Props) {
       else {
         setCampanhas(res.lista);
         if (detalhe?.campaign.id === res.detalhe.campaign.id) setDetalhe(res.detalhe);
+      setPaginaDestinatarios(0);
         setAviso({ tipo: 'ok', texto: msgOk });
       }
     });
@@ -1002,6 +1007,11 @@ export function PainelDeCampanhas({ dados }: Props) {
                       </div>
                     </div>
 
+                    <div aria-label="Ouvir áudios desta pasta">
+                      {arquivos.filter((a) => a.folder_id === bloco.folder_id && a.kind === 'audio').map((a) => (
+                        <div key={a.id}><strong>{a.file_name}</strong><PlayerAudioCampanha id={a.id} nome={a.file_name} /></div>
+                      ))}
+                    </div>
                     <div className="interruptor">
                       <input
                         id={`bloco-aud-voz-${index}`}
@@ -1334,6 +1344,7 @@ export function PainelDeCampanhas({ dados }: Props) {
                         <div>
                           <strong>{a.file_name}</strong>
                           <div className="f5-card-sub">{formatarTamanho(a.byte_size)}</div>
+                          {a.kind === 'audio' && <PlayerAudioCampanha id={a.id} nome={a.file_name} />}
                         </div>
                         <button
                           type="button"
@@ -1362,6 +1373,13 @@ export function PainelDeCampanhas({ dados }: Props) {
 
       {aba === 'detalhe' && detalhe && (
         <div className="f5-pagina">
+          <div className="f5-card">
+            <h2 className="f5-card-titulo">Ouvir áudios da campanha</h2>
+            <p className="f5-card-sub">Esta reprodução é apenas uma prévia. Não envia mensagens aos contatos.</p>
+            {arquivos.filter((a) => a.kind === 'audio' && detalhe.campaign.blocks.some((b) => b.type === 'audio' && b.folder_id === a.folder_id)).map((a) => (
+              <div key={a.id}><strong>{a.file_name}</strong><PlayerAudioCampanha id={a.id} nome={a.file_name} /></div>
+            ))}
+          </div>
           {detalhe.campaign.pause_detail && (
             <div className="f5-aviso-topo f5-aviso-topo--alerta" role="alert">
               <span>{detalhe.campaign.pause_detail}</span>
@@ -1492,7 +1510,14 @@ export function PainelDeCampanhas({ dados }: Props) {
           )}
 
           <div className="f5-card">
-            <h2 className="f5-card-titulo">Destinatários ({detalhe.recipients.length})</h2>
+            <h2 className="f5-card-titulo">Destinatários ({detalhe.stats.total})</h2>
+            <div className="f5-bloco-acoes">
+              <button type="button" className="btn btn-secondary" disabled={paginaDestinatarios === 0}
+                onClick={() => setPaginaDestinatarios((p) => Math.max(0, p - 1))}>Anterior</button>
+              <span>Página {paginaDestinatarios + 1} de {Math.max(1, Math.ceil(detalhe.recipients.length / 50))}</span>
+              <button type="button" className="btn btn-secondary" disabled={(paginaDestinatarios + 1) * 50 >= detalhe.recipients.length}
+                onClick={() => setPaginaDestinatarios((p) => p + 1)}>Próxima</button>
+            </div>
             <div className="f5-tabela-wrap">
               <table className="f5-tabela">
                 <thead>
@@ -1505,7 +1530,7 @@ export function PainelDeCampanhas({ dados }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {detalhe.recipients.map((r) => {
+                  {detalhe.recipients.slice(paginaDestinatarios * 50, (paginaDestinatarios + 1) * 50).map((r) => {
                     const st = ROTULO_DESTINATARIO[r.status] ?? { texto: r.status, classe: 'estado' };
                     return (
                       <tr key={r.id}>
