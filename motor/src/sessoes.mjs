@@ -1,3 +1,4 @@
+import { abrirDiagnosticoConexao } from './diagnostico-conexao.mjs';
 import { prepararMensagemDeVoz } from './audio-voz.mjs';
 import { foraDaJanelaHistorica } from './janela-historico.mjs';
 import crypto from 'node:crypto';
@@ -134,6 +135,7 @@ export function extrairConteudoMensagemBaileys(msg) {
 
 export class SupervisorDeSessoes {
   constructor({ rootDir, panelUrl, deviceToken, fetchFn = fetch, onLog = console.log, socketFactory = makeWASocket, authFactory = useMultiFileAuthState, versionFactory = fetchLatestBaileysVersion, voiceFactory = prepararMensagemDeVoz }) {
+    this.historicoConexao = abrirDiagnosticoConexao(rootDir);
     this.voiceFactory = voiceFactory;
     this.socketFactory = socketFactory; this.authFactory = authFactory; this.versionFactory = versionFactory;
     this.reconexoes = new Map();
@@ -180,7 +182,9 @@ export class SupervisorDeSessoes {
   }
 
   diagnosticoOperacional() {
-    return { filas: this.filaHistorico.contagem(), identidadesPendentes: [...this.retornosFila.values()].filter(v=>v.motivo==='identidade_pendente').length, chips: Object.fromEntries(this.diagnosticos) };
+    const motivos={};for(const v of this.retornosFila.values()){const m=v.motivo||'falha_temporaria';motivos[m]=(motivos[m]||0)+1;}
+    for(const [id,d] of this.diagnosticos){const sessao=this.sessoes.get(id);d.socketRegistrado=Boolean(sessao?.sock);d.estadoSocket=sessao?.status||'ausente';}
+    return { conexoes:this.historicoConexao.resumo(),pendenciasPorMotivo:motivos,filasPorInstancia:this.filaHistorico.porInstancia(),filas: this.filaHistorico.contagem(), identidadesPendentes: [...this.retornosFila.values()].filter(v=>v.motivo==='identidade_pendente').length, chips: Object.fromEntries(this.diagnosticos) };
   }
 
   headers(extra = {}) {
@@ -220,6 +224,7 @@ export class SupervisorDeSessoes {
     fs.mkdirSync(pasta, { recursive: true, mode: 0o700 });
 
     const { state, saveCreds } = await this.authFactory(pasta);
+    const sessaoExistente = state.creds?.registered === true;
     let version;
     try {
       ({ version } = await this.versionFactory());
@@ -289,6 +294,8 @@ export class SupervisorDeSessoes {
       }
 
       if (connection === 'open') {
+        this.diagnostico(instanceId).ultimaConexao = { em:Date.now(), sessaoExistente };
+        this.historicoConexao.registrar(instanceId,{evento:'open',...this.diagnostico(instanceId).ultimaConexao});
         registro.status = 'connected';
         registro.estabelecida = true;
         try { this.intencoes.definir(instanceId, true); } catch { this.onLog('[motor] Nao foi possivel salvar a retomada automatica.'); }
@@ -317,6 +324,8 @@ export class SupervisorDeSessoes {
         const retomar = podeRetomarSessao(statusCode, registro.estabelecida || state.creds?.registered === true);
         const vaiRecuperar = !this.encerrando && (retomar || (!estavaConectado &&
           ((!loggedOut && tentativa < 2 && ![403,411,440,500].includes(statusCode)) || (loggedOut && recuperarSessao && !sessaoRecuperada))));
+        this.diagnostico(instanceId).ultimaDesconexao = { em:Date.now(), codigo:Number.isInteger(statusCode)?statusCode:null, reconexaoAutomatica:vaiRecuperar };
+        this.historicoConexao.registrar(instanceId,{evento:'close',...this.diagnostico(instanceId).ultimaDesconexao});
         this.estados.set(instanceId, { estado: vaiRecuperar ? 'reconnecting' : 'disconnected', desde: this.estados.get(instanceId)?.desde || Date.now(), proxima: vaiRecuperar ? Date.now() + atrasoReconexao(tentativa) : null });
         await this.chamarApi('/api/motor/estado', {
           instance_id: instanceId,
@@ -434,13 +443,13 @@ export class SupervisorDeSessoes {
     try {
       for (const item of this.filaHistorico.listar(tipo === 'history' ? 2 : 10, tipo)) {
         if (this.encerrando) break;
-        if(tipo==='history'&&this.filaHistorico.haPendentes('live',n=>(this.retornosFila.get(n)?.proxima||0)<=Date.now()))break;
+        if(tipo==='history'&&this.filaHistorico.haPendentes('live',(n,id)=>Boolean(this.sessoes.get(id)?.sock)&&(this.retornosFila.get(n)?.proxima||0)<=Date.now()))break;
         if ((this.retornosFila.get(item.nome)?.proxima || 0) > Date.now()) continue;
         const { instanceId } = item.valor;
-        const msg = JSON.parse(item.valor.msg, BufferJSON.reviver);
-        const sock = this.sessoes.get(instanceId)?.sock;
-        if (!sock) continue;
         try {
+          const msg = JSON.parse(item.valor.msg, BufferJSON.reviver);
+          const sock = this.sessoes.get(instanceId)?.sock;
+          if (!sock) {this.retornosFila.set(item.nome,{tentativas:0,proxima:Date.now()+15000,motivo:'aguardando_sessao'});continue;}
           let jid = normalizarJidParaContato(msg.key?.remoteJid) || normalizarJidParaContato(msg.key?.remoteJidAlt);
           if (!jid && msg.key?.remoteJid?.endsWith('@lid')) jid = normalizarJidParaContato(await sock.signalRepository?.lidMapping?.getPNForLID(msg.key.remoteJid));
           if (!jid) {
@@ -459,7 +468,7 @@ export class SupervisorDeSessoes {
         } catch (err) {
           this.diagnostico(instanceId).apiFalhas++;
           const tentativas = (this.retornosFila.get(item.nome)?.tentativas || 0) + 1;
-          this.retornosFila.set(item.nome, { tentativas, proxima: Date.now() + atrasoReconexao(tentativas) });
+          this.retornosFila.set(item.nome, { tentativas, proxima: Date.now() + atrasoReconexao(tentativas), motivo: err instanceof SyntaxError?'arquivo_invalido_preservado':'falha_api_ou_midia' });
           this.onLog('[motor] Mensagem preservada. Nova tentativa automatica.');
         }
       }

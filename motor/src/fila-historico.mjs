@@ -16,11 +16,12 @@ export function abrirFila(diretorio, { diasHistorico = null } = {}) {
   const datas=new Map();
   const caches={live:null,history:null};
   const grupoDe = new Map();
+  const origens = new Map();
   let indexada = false;
   function classificar(nome, valor) {
     let msg;try{msg=JSON.parse(valor.msg);}catch{}
     const grupo = valor.historical === false ? 'live' : 'history';
-    grupos[grupo].add(nome);grupoDe.set(nome, grupo);datas.set(nome,timestampHistorico(msg)||valor.queuedAt||fs.statSync(path.join(diretorio,nome)).mtimeMs);caches[grupo]=null;
+    grupos[grupo].add(nome);grupoDe.set(nome, grupo);origens.set(nome, valor.instanceId);datas.set(nome,timestampHistorico(msg)||valor.queuedAt||fs.statSync(path.join(diretorio,nome)).mtimeMs);caches[grupo]=null;
   }
   function indexar() {
     if (indexada) return;
@@ -81,14 +82,15 @@ export function abrirFila(diretorio, { diasHistorico = null } = {}) {
       const live = selecionar('live',limite);
       return [...live,...selecionar('history',Math.max(0,limite-live.length))];
     },
-    haPendentes(tipo,aceitar=()=>true){indexar();return [...grupos[tipo]].some(n=>aceitar(n));},
+    haPendentes(tipo,aceitar=()=>true){indexar();return [...grupos[tipo]].some(n=>aceitar(n,origens.get(n)));},
+    porInstancia() { indexar();const r={};for(const [nome,id] of origens){if(!id)continue;r[id] ||= {live:0,history:0};const g=grupoDe.get(nome);if(g)r[id][g]++;}return r; },
     contagem() { indexar();return {live:grupos.live.size,history:grupos.history.size}; },
     confirmar(nome) {
       if (!/^[a-f0-9]{64}\.json$/.test(nome)) throw new Error('Nome de entrada inválido.');
       try { fs.unlinkSync(path.join(diretorio,nome)); } catch(e) { if(e.code!=='ENOENT')throw e; }
       const grupo = grupoDe.get(nome);
       if (grupo) {grupos[grupo].delete(nome);vistos[grupo].delete(nome);caches[grupo]=null;}datas.delete(nome);
-      grupoDe.delete(nome);
+      grupoDe.delete(nome);origens.delete(nome);
     }
   };
 }

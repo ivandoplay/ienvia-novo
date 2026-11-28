@@ -98,3 +98,12 @@ test('matriz visual adapta todos os estados sem ultrapassar telas pequenas ou ex
   assert.ok(lines.every(l=>l.length<=Math.min(w,78)));assert.ok(lines.length<=h-1);assert.ok(!lines.join('\n').includes('NAO-PODE'));assert.ok(!lines.join('\n').includes('CONTEUDO-PRIVADO'));
  }
 });
+test('painel móvel usa tela alternativa ancorada e restaura cursor ao sair',()=>{
+ const env=process.env.TERM;process.env.TERM='xterm';const writes=[];const output={isTTY:true,rows:20,columns:33,write:s=>writes.push(s)};const fake={log(){},info(){},warn(){},error(){},debug(){},trace(){}};
+ const ui=iniciarPainelTerminal({obterVisao:()=>({versao:'6.4.2',painel:'Conectado',chips:[],aviso:'Entrada nova pendente: recebimento no painel ainda nao confirmado.'}),output,consoleAlvo:fake});
+ try{const n=writes.length;ui.atualizar();assert.equal(writes.length,n);output.columns=25;output.rows=14;ui.atualizar();assert.ok(writes.join('').includes('\x1b[H'));assert.ok(writes.join('').includes('\x1b[?1049h'));assert.ok(!/\x1b\[\d+F/.test(writes.join('')));}finally{ui.parar();if(env===undefined)delete process.env.TERM;else process.env.TERM=env;}
+ assert.ok(writes.join('').includes('\x1b[?1049l'));assert.ok(writes.join('').includes('\x1b[?25h'));
+});
+test('telemetria guarda código da queda e estado real do socket sem texto bruto de erro',()=>temp(async root=>{
+ const {s,sockets}=supervisor(root);try{await s.iniciarConexao('chip');sockets[0].ev.emit('connection.update',{connection:'open'});await tick();close(sockets[0],440);await tick();const d=s.diagnosticoOperacional();assert.equal(d.chips.chip.ultimaDesconexao.codigo,440);assert.equal(d.chips.chip.socketRegistrado,false);assert.equal(d.conexoes.chip.at(-1).codigo,440);assert.equal(d.conexoes.chip[0].sessaoExistente,true);}finally{await s.encerrarTudo();}
+}));

@@ -100,3 +100,21 @@ test('historico cede ao live e retoma durante backoff de identidade sem perder a
  assert.equal(calls.length,1);assert.equal(calls[0].historical,true);assert.equal(s.filaHistorico.contagem().live,1);assert.equal(s.diagnosticoOperacional().identidadesPendentes,1);
  }finally{fs.rmSync(r,{recursive:true,force:true});}
 });
+test('entrada de chip sem socket é preservada sem bloquear histórico de chip conectado',async()=>{
+ const root=tmp();try{
+  let chamadas=0;const s=new SupervisorDeSessoes({rootDir:root,panelUrl:'https://example.invalid',deviceToken:'teste',onLog:()=>{},fetchFn:async()=>{chamadas++;return new Response(JSON.stringify({result:'accepted'}));}});
+  s.sessoes.set('inst',{sock:{}});
+  s.filaHistorico.guardar('sem-sessao',{...valor('orfa',false),instanceId:'outro-chip'});
+  s.filaHistorico.guardar('historico',valor('historico',true));
+  await s.escoarHistorico({tipo:'history'});assert.equal(chamadas,1);
+  await s.escoarHistorico({tipo:'live'});assert.deepEqual(s.filaHistorico.contagem(),{history:0,live:1});
+  const d=s.diagnosticoOperacional();assert.equal(d.pendenciasPorMotivo.aguardando_sessao,1);assert.deepEqual(d.filasPorInstancia['outro-chip'],{live:1,history:0});
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+test('mensagem JSON inválida fica preservada e não interrompe o lote seguinte',async()=>{
+ const root=tmp();try{
+  let chamadas=0;const s=new SupervisorDeSessoes({rootDir:root,panelUrl:'https://example.invalid',deviceToken:'teste',onLog:()=>{},fetchFn:async()=>{chamadas++;return new Response(JSON.stringify({result:'accepted'}));}});
+  s.sessoes.set('inst',{sock:{}});s.filaHistorico.guardar('corrompida',{instanceId:'inst',historical:false,msg:'{'});s.filaHistorico.guardar('valida',valor('valida',false));
+  await s.escoarHistorico({tipo:'live'});assert.equal(chamadas,1);assert.equal(s.filaHistorico.contagem().live,1);assert.equal(s.diagnosticoOperacional().pendenciasPorMotivo.arquivo_invalido_preservado,1);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});

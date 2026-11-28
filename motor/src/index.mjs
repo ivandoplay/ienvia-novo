@@ -184,11 +184,14 @@ export async function rodarLoopPrincipal(args = lerArgumentos(process.argv.slice
   let avisoOperacao = '';
   const painel = args.once ? null : iniciarPainelTerminal({ obterVisao: () => {
     const fila = supervisor.filaHistorico.contagem();
+    const filasPorInstancia = supervisor.filaHistorico.porInstancia();
+    const historicoComSessao = Object.entries(filasPorInstancia).some(([id, f]) => f.history && supervisor.sessoes.get(id)?.sock);
+    const aguardandoSessao = [...supervisor.retornosFila.values()].some(v => v.motivo === 'aguardando_sessao');
     const chips = [...supervisor.estados].map(([id, e]) => ({ desde: e.desde, nome: supervisor.nomes.get(id) || 'WhatsApp', estado: e.estado, emSegundos: e.proxima ? Math.max(1, Math.ceil((e.proxima-Date.now())/1000)) : null }));
     const comProblema = chips.find(c => c.estado === 'reconnecting' || c.estado === 'disconnected' || c.estado === 'pairing');
     return { versao: versaoAtual, painel: estadoPainel, chips, live: fila.live, history: fila.history, recebidas: supervisor.historicoRecebido, envios: supervisor.enviosAtivos,
-      sincronizacao: fila.history ? (chips.some(c=>c.estado==='connected') ? 'Processando ultimos 30 dias' : 'Pausado: aguardando WhatsApp') : supervisor.ultimoHistorico ? 'Lotes recebidos processados' : 'Aguardando WhatsApp',
-      aviso: avisoOperacao || (fila.live ? 'Entrada nova pendente: recebimento no painel ainda nao confirmado.' : fila.history ? 'Historico em segundo plano. Conexao nao confirma importacao completa.' : '') || (comProblema?.estado === 'pairing' ? 'Abra o painel para concluir o QR ou codigo do WhatsApp.' : comProblema?.estado === 'reconnecting' ? (Date.now()-(comProblema.desde || Date.now()) > 300000 ? 'Sem WhatsApp ha mais de 5 min. Verifique a rede; novas tentativas continuam.' : 'Conexao caiu. Reconectando automaticamente.') : comProblema ? 'Abra o painel e verifique o numero desconectado.' : '') };
+      sincronizacao: fila.history ? (chips.some(c=>c.estado==='connected') ? (historicoComSessao ? 'Historico em segundo plano' : 'Historico aguarda sua sessao') : 'Pausado: aguardando WhatsApp') : supervisor.ultimoHistorico ? 'Lotes recebidos processados' : 'Aguardando WhatsApp',
+      aviso: avisoOperacao || (aguardandoSessao ? 'Fila preservada aguardando a sessao do chip de origem.' : '') || (fila.live ? 'Entrada nova pendente: recebimento no painel ainda nao confirmado.' : fila.history ? 'Historico em segundo plano. Conexao nao confirma importacao completa.' : '') || (comProblema?.estado === 'pairing' ? 'Abra o painel para concluir o QR ou codigo do WhatsApp.' : comProblema?.estado === 'reconnecting' ? (Date.now()-(comProblema.desde || Date.now()) > 300000 ? 'Sem WhatsApp ha mais de 5 min. Verifique a rede; novas tentativas continuam.' : 'Conexao caiu. Reconectando automaticamente.') : comProblema ? 'Abra o painel e verifique o numero desconectado.' : '') };
   }});
   const pendencias = supervisor.filaHistorico.contagem();
   console.log(`[motor] Fila prioritária: ${pendencias.live} novas; ${pendencias.history} históricas. Processamento independente ativado.`);

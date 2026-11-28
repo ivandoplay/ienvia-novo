@@ -8,14 +8,14 @@ Este é o resumo operacional atual. Documentos de auditoria antigos são histór
 - Pasta de trabalho canônica neste workspace: `/home/user/ienvia`.
 - `motor-640-consolidacao` é apenas um alias de compatibilidade para essa pasta; não é outra versão.
 - Painel: `web/`, projeto Vercel `ienvia-novo`, diretório raiz de deploy `web`.
-- Motor publicado: **6.4.1**. Não incrementar versão nem republicar pacote para uma alteração de organização/documentação.
+- Motor da próxima atualização: **6.4.2** (confirmar instalação de cada aparelho pelo heartbeat). Não incrementar versão nem republicar pacote para uma alteração de organização/documentação.
 - Nunca publicar outra árvore histórica inteira sobre esta.
 
 ## Trabalho recente concluído
 
 ### Motor
 
-A versão 6.4.1 prioriza eventos novos (mais novos primeiro), mantém histórico em baixa prioridade, resolve identidades e exibe diagnóstico de entrada. Release validado com 109 testes do motor. Teste de saída de voz no Termux foi recebido pelo usuário. Isso **não prova** que todos os problemas anteriores de entrada de mensagens foram resolvidos.
+A versão 6.4.1 prioriza eventos novos (mais novos primeiro), mantém histórico em baixa prioridade, resolve identidades e exibe diagnóstico de entrada. Release 6.4.1 validado com 109 testes do motor. A correção 6.4.2 acrescenta terminal ancorado em tela alternativa, registro sanitizado de abertura/queda que sobrevive ao restart, diagnóstico de filas por chip/socket e isolamento de arquivo inválido/entrada sem sessão. 114 testes do motor passaram. Isso não prova que a fila do Termux real já foi drenada. Teste de saída de voz no Termux foi recebido pelo usuário. Isso **não prova** que todos os problemas anteriores de entrada de mensagens foram resolvidos.
 
 ### Campanhas
 
