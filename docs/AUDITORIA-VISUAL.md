@@ -2,7 +2,7 @@
 
 Tudo o que está aqui foi **medido**, não deduzido: prints + números (largura/altura em px) e,
 sempre que possível, conferido no build de produção (`next start`), que é o que o cliente usa.
-A versão com as imagens lado a lado está em `docs/auditoria-antes-depois.html`.
+A versão histórica com imagens foi retirada da árvore ativa para reduzir o workspace; consulte o arquivo privado ou o histórico Git. Veja `docs/ORGANIZACAO.md`.
 
 ## Como a auditoria foi feita
 

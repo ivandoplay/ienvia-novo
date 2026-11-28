@@ -1,6 +1,6 @@
 /**
  * Só tira prints: percorre cada tela do painel, no computador e no celular, e guarda as imagens em
- * "auditoria-visual/todas-as-telas/<tamanho>/". Não altera nada de verdade (ambiente de mentira).
+ * ".cache/evidencias/todas-as-telas/<tamanho>/". Não altera nada de verdade (ambiente de mentira).
  *
  * Rodar: npx playwright test e2e/telas-para-ver.spec.ts
  */
@@ -8,7 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { abrirMenuDaConta, entrar } from './apoio/sessao';
 
-const PASTA = 'auditoria-visual/todas-as-telas';
+const PASTA = '.cache/evidencias/todas-as-telas';
 
 type Tela = { nome: string; ir: (page: Page) => Promise<void>; conferir?: (page: Page) => Promise<void> };
 

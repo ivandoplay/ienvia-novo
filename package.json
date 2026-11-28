@@ -21,7 +21,10 @@
     "test:unit": "vitest run --project shared --project web",
     "test:db": "vitest run --project banco",
     "test:e2e": "npm run test:e2e -w web",
-    "verificar": "npm run check && npm run lint && npm test && npm run build && npm run test:e2e"
+    "verificar": "npm run check && npm run lint && npm test && npm run build && npm run test:e2e",
+    "workspace:check": "node scripts/workspace-budget.mjs",
+    "repo:check": "node scripts/repo-check.mjs",
+    "test:tooling": "node --test tests/tooling/*.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",

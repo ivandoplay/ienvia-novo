@@ -16,21 +16,15 @@ as decisões, está em [docs/PLANO.md](docs/PLANO.md). A lista do que fica e do 
 trabalho é feito, o que já foi feito e testado, o que falta e o que é cada arquivo), leia
 [docs/DOCUMENTACAO-DO-PROJETO.md](docs/DOCUMENTACAO-DO-PROJETO.md).
 
-**Situação:** Fase 0 (fundação) pronta. Fase 1 pronta no código e no banco: a aba **Instâncias**
-(conectar chips), o recebimento das mensagens e a **Inbox** com texto e com arquivos (fotos, áudios,
-vídeos, documentos e figurinhas). Fase 2 em andamento: as abas **Motor de IA** e **Treinamento**, o
-**atendente de IA** (a IA responde no WhatsApp nos chips em que for ligada, passa a conversa para uma
-pessoa quando precisa e para quando alguém responde) e o **corrigir resposta em 1 clique** (na Inbox,
-guardar no Treinamento o jeito certo de responder) estão prontos no código e no banco. Faltam: as
-Mensagens prontas e as Skills.
-O banco voltou a funcionar em 12/11/2026, num projeto Supabase novo e só dele (`ienvia-001`), já com
-a Edge Function `evolution-webhook` no ar e o canal de Realtime da Inbox aplicado. Os webhooks e o
-atendente de IA rodam 24h na Supabase Edge Function protegidos pelo porteiro Cloudflare Worker
-(`cloudflare/porteiro/`) com failover automático para as rotas reserva da Vercel e da Netlify; a Inbox
-atualiza em tempo real via Supabase Realtime Broadcast, deixando a Vercel (`web/vercel.json`, região
-`gru1`) leve só para servir as telas sem marca d'água (com `netlify.toml` e `render.yaml` prontos
-como alternativas/reservas).
-As outras abas aparecem no menu e avisam em que fase ficam prontas.
+## Estado atual e continuidade
+
+O resumo mantido está em **[docs/CONTINUIDADE.md](docs/CONTINUIDADE.md)**. Ele substitui resumos antigos de fases e explicita o que ainda não foi comprovado.
+
+- Organização e recuperação: [docs/ORGANIZACAO.md](docs/ORGANIZACAO.md).
+- Índice único dos testes: [tests/README.md](tests/README.md).
+- Motor publicado: 6.4.1; alterações de documentação não mudam a versão do motor.
+- Código, testes e documentos ficam no Git. Credenciais, sessões, listas e evidências pesadas ficam fora dele.
+- Histórico de imagens não foi reescrito: artefatos antigos continuam no histórico Git; a cópia local foi arquivada privadamente.
 
 ## O que tem em cada pasta
 

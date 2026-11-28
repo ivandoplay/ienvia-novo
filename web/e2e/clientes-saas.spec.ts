@@ -17,7 +17,7 @@ const REINICIAR_INBOX = 'http://127.0.0.1:54399/controle/reiniciar-inbox';
 const REINICIAR_IA = 'http://127.0.0.1:54399/controle/reiniciar-ia';
 // Cada teste do arquivo mexe num cliente que os OUTROS specs usam. No banco falso o estado da IA e dos
 // chips é único para todos: por isso os testes daqui rodam um de cada vez (serial).
-const PASTA = 'auditoria-visual/clientes-saas';
+const PASTA = '.cache/evidencias/clientes-saas';
 // Cliente que já existe no banco de teste, com dono e movimento.
 const CLIENTE = 'Loja da Maria';
 const cartaoDoCliente = (page: import('@playwright/test').Page) => page.locator('.conta-card', { hasText: CLIENTE }).first();

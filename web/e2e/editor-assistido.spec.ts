@@ -15,7 +15,7 @@ test('página Next autenticada: proposta, confirmação, persistência e desfaze
  await expect(page.getByRole('button',{name:'Aplicar alterações'})).toBeVisible();
  await page.locator('.treino-chat-proposta summary').click();
  await expect(page.getByText('Seja direto e confirme as informações antes de responder.',{exact:true})).toBeVisible();
- await page.screenshot({path:`../auditoria/editor-ia/next-${info.project.name}-revisao.png`,fullPage:true});
+ await page.screenshot({path:`.cache/evidencias/editor-ia/next-${info.project.name}-revisao.png`,fullPage:true});
  await page.getByRole('button',{name:'Aplicar alterações'}).click();
  await expect(page.getByRole('button',{name:'Desfazer alterações'})).toBeVisible();
  await page.getByRole('tab',{name:'Regras',exact:true}).click();

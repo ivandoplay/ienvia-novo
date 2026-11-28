@@ -13,7 +13,7 @@ test('biblioteca e editor de áudio responsivos com identificação correta da G
   await expect(dialog.getByRole('button',{name:'Transcrever áudio',exact:true})).toBeDisabled();
   await dialog.getByRole('button',{name:'Salvar áudio',exact:true}).scrollIntoViewIfNeeded();
   await expect(dialog.getByRole('button',{name:'Salvar áudio',exact:true})).toBeInViewport();
-  await page.screenshot({path:`../auditoria/editor-ia/audios-layout-${width}.png`});
+  await page.screenshot({path:`.cache/evidencias/editor-ia/audios-layout-${width}.png`});
   await dialog.getByRole('button',{name:'Cancelar',exact:true}).click();await expect(dialog).toHaveCount(0);
  }
 });

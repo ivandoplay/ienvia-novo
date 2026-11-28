@@ -13,15 +13,15 @@
     },
     "funcoes": {
       "itens": 238,
-      "md5": "a4734c4ea646f8a7ac4008bf14828d66"
+      "md5": "ed45740524fa00c7bbd46d17fa11c105"
     },
     "gatilhos": {
       "itens": 28,
       "md5": "246a5f0a24d04f8803f67fbf28d519e4"
     },
     "indices": {
-      "itens": 193,
-      "md5": "0e2035a6ff8ebdc653804748599761ee"
+      "itens": 195,
+      "md5": "1a2407183d2aa73f4889976772501d5a"
     },
     "permissoes_coluna": {
       "itens": 32,
@@ -29,7 +29,7 @@
     },
     "permissoes_funcao": {
       "itens": 714,
-      "md5": "20eef64c7016e190b2af57bc777f07c7"
+      "md5": "a76a3dbe4e5ba9d19d0333d2a82cd862"
     },
     "permissoes_tabela": {
       "itens": 480,

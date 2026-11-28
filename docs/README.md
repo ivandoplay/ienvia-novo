@@ -1,5 +1,8 @@
 # Ienvia — mapa para quem vai mexer (pessoa ou IA)
 
+**Primeiro leia [CONTINUIDADE.md](CONTINUIDADE.md), [ORGANIZACAO.md](ORGANIZACAO.md) e o [índice de testes](../tests/README.md).** Eles descrevem o estado mais recente; o texto abaixo contém referências e decisões históricas.
+
+
 > **Leia este arquivo antes de qualquer coisa.** Ele existe para você (ou outra IA) não perder tempo nem repetir
 > erros já resolvidos. Ordem sugerida: este arquivo → `docs/ESTRUTURA-HOSPEDAGEM.md` → `docs/INFRA-E-DEPLOY.md` →
 > `docs/REGRAS-DA-CASA.md` → o documento da área que você vai tocar.

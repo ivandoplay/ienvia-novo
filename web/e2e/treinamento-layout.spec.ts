@@ -18,7 +18,7 @@ test('treinamento: oito seções visíveis, salvar sem sobreposição e chat res
    }else await expect(page.locator('.barra-de-salvar')).toHaveCount(0);
   }
   await page.locator('.treino-chat').scrollIntoViewIfNeeded();
-  await page.screenshot({path:`../auditoria/editor-ia/layout-treinamento-${width}.png`,fullPage:true});
+  await page.screenshot({path:`.cache/evidencias/editor-ia/layout-treinamento-${width}.png`,fullPage:true});
  }
  await page.getByRole('tab',{name:'Regras',exact:true}).click();
  const rules=page.getByLabel('Regras de ouro');const original=await rules.inputValue();
