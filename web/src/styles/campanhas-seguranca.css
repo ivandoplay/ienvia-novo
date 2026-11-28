@@ -369,3 +369,25 @@
     justify-content: center;
   }
 }
+
+/* Conteúdo intrínseco (select, nome de arquivo e player) não alarga o celular. */
+.f5-pagina, .f5-card, .f5-grade-2, .f5-grade-3,
+.f5-pagina .campo, .f5-pagina .campo > *, .f5-midia-grade,
+.f5-midia-item, .f5-midia-item > div, .f5-tabela-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+.f5-card strong, .f5-card-titulo, .f5-card-sub { overflow-wrap: anywhere; }
+.f5-pagina audio { display: block; width: 100%; max-width: 360px; min-width: 0; }
+.f5-midia-item { flex-wrap: wrap; }
+.f5-midia-item > div { flex: 1 1 180px; }
+@media (max-width: 600px) {
+  .f5-card { padding: 12px; }
+  .f5-midia-grade { grid-template-columns: minmax(0, 1fr); }
+  .f5-card-topo > *, .f5-bloco-acoes { min-width: 0; max-width: 100%; }
+  .f5-bloco-acoes { flex-wrap: wrap; }
+  .f5-bloco-acoes .btn, .f5-acoes-rodape .btn { white-space: normal; overflow-wrap: anywhere; }
+  .f5-card-topo > .f5-bloco-acoes { width: 100%; }
+  .f5-card-topo > .f5-bloco-acoes .btn { flex: 1 1 130px; }
+  .f5-pagina input, .f5-pagina select, .f5-pagina textarea { box-sizing: border-box; max-width: 100%; }
+}

@@ -33,6 +33,8 @@ function sanitizarNomeArquivo(nome: string): string {
 
 function traduzirErro(msg: string | undefined): string {
   if (!msg) return 'Não foi possível concluir agora. Tente de novo.';
+  if (/statement timeout|canceling statement|57014|timeout/i.test(msg)) return 'A operação excedeu o tempo de processamento. Seus dados não foram confirmados; tente novamente. Se persistir, contate o suporte.';
+  if (/permission denied|42501/i.test(msg)) return 'Sua sessão não tem permissão para esta operação. Entre novamente na conta correta.';
   if (msg.includes('campaign_chip_required')) return 'Escolha pelo menos um chip habilitado para campanhas.';
   if (msg.includes('chip_not_connected')) return 'O chip escolhido precisa estar conectado para confirmar ou retomar a campanha.';
   if (msg.includes('no_eligible_recipients')) return 'Nenhum destinatário elegível restou após remover ignorados, bloqueados e chips próprios.';
