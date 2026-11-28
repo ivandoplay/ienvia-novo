@@ -4,8 +4,8 @@
   "sql_sha256": "913a73ef93c3feefff113b737dc28851a91077d12fe39895bcf021d3a114acb3",
   "categorias": {
     "colunas": {
-      "itens": 701,
-      "md5": "f430972288acf1877f4a2d5cf1895448"
+      "itens": 703,
+      "md5": "210b99622218adae2a0f406fcde56ff8"
     },
     "deposito": {
       "itens": 4,
@@ -13,7 +13,7 @@
     },
     "funcoes": {
       "itens": 238,
-      "md5": "ed45740524fa00c7bbd46d17fa11c105"
+      "md5": "e29a265cb575bbe22467122f0da3c55f"
     },
     "gatilhos": {
       "itens": 28,

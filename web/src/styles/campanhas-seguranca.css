@@ -391,3 +391,10 @@
   .f5-card-topo > .f5-bloco-acoes .btn { flex: 1 1 130px; }
   .f5-pagina input, .f5-pagina select, .f5-pagina textarea { box-sizing: border-box; max-width: 100%; }
 }
+
+/* Resumo de operação: empilha sem rolagem horizontal em telas estreitas. */
+.f5-ritmo-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-block: 1.25rem; }
+.f5-ritmo-numero { font-size: 1.2rem; font-weight: 650; overflow-wrap: anywhere; margin-block: .5rem; }
+.f5-ritmo progress { width: 100%; accent-color: #12bb8c; }
+.f5-ritmo summary { cursor: pointer; padding-block: .75rem; }
+@media (max-width: 760px) { .f5-ritmo-grade { grid-template-columns: 1fr; } }

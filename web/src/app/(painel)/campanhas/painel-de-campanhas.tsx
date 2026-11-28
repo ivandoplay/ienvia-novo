@@ -1,5 +1,6 @@
 'use client';
 
+import { RitmoDaCampanha } from './ritmo-da-campanha';
 import { PlayerAudioCampanha } from './player-audio';
 import { CampoDeHora } from '@/components/ui/campo-de-hora';
 import { useState, useTransition } from 'react';
@@ -1411,13 +1412,14 @@ export function PainelDeCampanhas({ dados }: Props) {
 
       {aba === 'detalhe' && detalhe && (
         <div className="f5-pagina">
-          <div className="f5-card">
+          <RitmoDaCampanha detalhe={detalhe} />
+          {detalhe.campaign.blocks.some((b) => b.type === 'audio') && <div className="f5-card">
             <h2 className="f5-card-titulo">Ouvir áudios da campanha</h2>
             <p className="f5-card-sub">Esta reprodução é apenas uma prévia. Não envia mensagens aos contatos.</p>
             {arquivos.filter((a) => a.kind === 'audio' && detalhe.campaign.blocks.some((b) => b.type === 'audio' && b.folder_id === a.folder_id)).map((a) => (
               <div key={a.id}><strong>{a.file_name}</strong><PlayerAudioCampanha id={a.id} nome={a.file_name} /></div>
             ))}
-          </div>
+          </div>}
           {detalhe.campaign.pause_detail && (
             <div className="f5-aviso-topo f5-aviso-topo--alerta" role="alert">
               <span>{detalhe.campaign.pause_detail}</span>

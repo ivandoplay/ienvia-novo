@@ -418,6 +418,8 @@ describe('Pastas de Mídia, Campanhas Multi-Bloco, Baileys + Evolution e Rastrei
       );
       expect(step0).toHaveLength(1);
       expect(step0[0]!.step_index).toBe(0);
+      const ritmo0 = await comoUsuario(ATENDENTE_A, () => chamar<{campaign: {rhythm_wait_reason: string; rhythm_delay_sec: number; batch_sent_count: number}}>('select public.read_my_campaign($1,$2) as r', [LOJA_A, draft.campaign.id]));
+      expect(ritmo0.campaign).toMatchObject({rhythm_wait_reason: 'block_interval', rhythm_delay_sec: 3, batch_sent_count: 0});
 
       const disp0 = await comoServico(() =>
         chamar<{ result: string; command_id: string }>(
@@ -444,6 +446,11 @@ describe('Pastas de Mídia, Campanhas Multi-Bloco, Baileys + Evolution e Rastrei
       );
       expect(step1).toHaveLength(1);
       expect(step1[0]!.step_index).toBe(1);
+      const ritmo1 = await comoUsuario(ATENDENTE_A, () => chamar<{campaign: {rhythm_wait_reason: string; rhythm_delay_sec: number; batch_sent_count: number}}>('select public.read_my_campaign($1,$2) as r', [LOJA_A, draft.campaign.id]));
+      expect(ritmo1.campaign.rhythm_wait_reason).toBe('contact_interval');
+      expect(ritmo1.campaign.batch_sent_count).toBe(1);
+      expect(ritmo1.campaign.rhythm_delay_sec).toBeGreaterThanOrEqual(20);
+      expect(ritmo1.campaign.rhythm_delay_sec).toBeLessThanOrEqual(30);
 
       const disp1 = await comoServico(() =>
         chamar<{ result: string; command_id: string }>(

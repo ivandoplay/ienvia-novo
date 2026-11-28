@@ -51,6 +51,11 @@ export interface ResumoDeCampanha {
   finished_at: string | null;
   created_at: string;
   updated_at: string;
+  next_action_at?: string | null;
+  batch_sent_count?: number;
+  batch_target?: number;
+  rhythm_wait_reason?: string | null;
+  rhythm_delay_sec?: number | null;
   stats: EstatisticasDaCampanha;
 }
 
