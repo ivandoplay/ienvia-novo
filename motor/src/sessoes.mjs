@@ -318,10 +318,10 @@ export class SupervisorDeSessoes {
         const estavaConectado = registro.status === 'connected';
         registro.status = 'disconnected';
         this.sessoes.delete(instanceId);
-        if ([401,403,411,440,500].includes(statusCode)) {
+        const retomar = podeRetomarSessao(statusCode, registro.estabelecida || state.creds?.registered === true, tentativa);
+        if ([401,403,411,440].includes(statusCode) || (statusCode === 500 && !retomar)) {
           try { this.intencoes.definir(instanceId, false); } catch {}
         }
-        const retomar = podeRetomarSessao(statusCode, registro.estabelecida || state.creds?.registered === true);
         const vaiRecuperar = !this.encerrando && (retomar || (!estavaConectado &&
           ((!loggedOut && tentativa < 2 && ![403,411,440,500].includes(statusCode)) || (loggedOut && recuperarSessao && !sessaoRecuperada))));
         this.diagnostico(instanceId).ultimaDesconexao = { em:Date.now(), codigo:Number.isInteger(statusCode)?statusCode:null, reconexaoAutomatica:vaiRecuperar };
@@ -545,6 +545,13 @@ export class SupervisorDeSessoes {
 
     try {
       if (['connect_qr','connect_code'].includes(cmd.command_type)) {
+        // Botão repetido/estado atrasado do painel não deve derrubar um socket saudável.
+        const atual = this.sessoes.get(cmd.instance_id);
+        if (atual?.status === 'connected' && atual.sock) {
+          await this.chamarApi('/api/motor/estado', { instance_id: cmd.instance_id, status: 'connected' });
+          await concluir('succeeded');
+          return;
+        }
         let timeout;
         try {
           await new Promise((resolve, reject) => {

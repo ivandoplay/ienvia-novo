@@ -23,9 +23,13 @@ test('backoff cresce e fica limitado a cinco minutos',()=>{
  assert.deepEqual([0,1,2,3,4,5,6,100].map(atrasoReconexao),[4000,8000,16000,32000,64000,128000,256000,300000]);
 });
 test('logout, substituição e erro de credencial não causam loop infinito',()=>{
- for(const status of [401,403,411,440,500])assert.equal(podeRetomarSessao(status,true),false);
+ for(const status of [401,403,411,440])assert.equal(podeRetomarSessao(status,true),false);
  for(const status of [408,428,515,undefined])assert.equal(podeRetomarSessao(status,true),true);
  assert.equal(podeRetomarSessao(428,false),false);
+ assert.equal(podeRetomarSessao(500,true,0),true);
+ assert.equal(podeRetomarSessao(500,true,1),true);
+ assert.equal(podeRetomarSessao(500,true,2),false);
+ assert.equal(podeRetomarSessao(500,false,0),false);
 });
 test('histórico append e notify antigo não viram conversa nova; mensagem atual continua live',()=>{
  const now=Date.now();assert.equal(ehMensagemHistorica('append',{},now),true);
@@ -106,4 +110,36 @@ test('painel móvel usa tela alternativa ancorada e restaura cursor ao sair',()=
 });
 test('telemetria guarda código da queda e estado real do socket sem texto bruto de erro',()=>temp(async root=>{
  const {s,sockets}=supervisor(root);try{await s.iniciarConexao('chip');sockets[0].ev.emit('connection.update',{connection:'open'});await tick();close(sockets[0],440);await tick();const d=s.diagnosticoOperacional();assert.equal(d.chips.chip.ultimaDesconexao.codigo,440);assert.equal(d.chips.chip.socketRegistrado,false);assert.equal(d.conexoes.chip.at(-1).codigo,440);assert.equal(d.conexoes.chip[0].sessaoExistente,true);}finally{await s.encerrarTudo();}
+}));
+
+// Regressão: erro real 500 deixava chip conectado anteriormente parado para sempre.
+test('500 registrado reabre credenciais existentes duas vezes e para sem apagar nem entrar em loop', t=>temp(async root=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const {s,sockets}=supervisor(root);
+ try {
+  await s.iniciarConexao('chip');
+  sockets[0].ev.emit('connection.update',{connection:'open'});await tick();
+  const p=path.join(root,'data/wa_auth/chip/creds.json');fs.writeFileSync(p,'CREDENCIAL-PRESERVADA');
+  for(let n=0;n<2;n++){close(sockets.at(-1),500);await tick();assert.equal(s.reconexoes.size,1);assert.equal(s.intencoes.tem('chip'),true);t.mock.timers.tick(atrasoReconexao(n));await tick();}
+  assert.equal(sockets.length,3);close(sockets.at(-1),500);await tick();
+  assert.equal(s.reconexoes.size,0);assert.equal(s.estados.get('chip').estado,'disconnected');
+  assert.equal(s.intencoes.tem('chip'),false);assert.equal(fs.readFileSync(p,'utf8'),'CREDENCIAL-PRESERVADA');
+  t.mock.timers.tick(1000000);await tick();assert.equal(sockets.length,3);
+ } finally {await s.encerrarTudo();t.mock.timers.reset();}
+}));
+test('500 durante primeiro pareamento não inventa recuperação de sessão inexistente',()=>temp(async root=>{
+ const {s,sockets}=supervisor(root,false);try{await s.iniciarConexao('chip');close(sockets[0],500);await tick();assert.equal(s.reconexoes.size,0);assert.equal(s.estados.get('chip').estado,'disconnected');}finally{await s.encerrarTudo();}
+}));
+
+test('conectar novamente em socket saudável só sincroniza estado; não reinicia ou pede código',()=>temp(async root=>{
+ const {s,sockets,reports}=supervisor(root);try{
+  await s.iniciarConexao('chip');sockets[0].ev.emit('connection.update',{connection:'open'});await tick();
+  for(const command_type of ['connect_code','connect_qr'])await s.executarComando({id:'idempotente',instance_id:'chip',command_type,payload:{phone:'5586999999999'}});
+  assert.equal(sockets.length,1);assert.equal(s.sessoes.get('chip').status,'connected');
+  assert.equal(reports.filter(r=>r.u.endsWith('/comandos')&&r.body.outcome==='succeeded').length,2);
+ }finally{await s.encerrarTudo();}
+}));
+test('recuperação 500 bem-sucedida mantém a intenção e zera o backoff',t=>temp(async root=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const {s,sockets}=supervisor(root);
+ try{await s.iniciarConexao('chip');sockets[0].ev.emit('connection.update',{connection:'open'});await tick();close(sockets[0],500);await tick();t.mock.timers.tick(4000);await tick();sockets[1].ev.emit('connection.update',{connection:'open'});await tick();assert.equal(s.intencoes.tem('chip'),true);assert.equal(s.sessoes.get('chip').status,'connected');close(sockets[1],428);await tick();assert.equal(s.estados.get('chip').proxima-Date.now(),4000);}
+ finally{await s.encerrarTudo();t.mock.timers.reset();}
 }));
